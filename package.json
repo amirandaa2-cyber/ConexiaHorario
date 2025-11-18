@@ -1,0 +1,13 @@
+{
+  "name": "fullcalendar-examples-local",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Minimal package.json to serve FullCalendar examples locally",
+  "scripts": {
+    "serve": "http-server ./examples -p 8000",
+    "serve:py": "python -m http.server 8000"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
