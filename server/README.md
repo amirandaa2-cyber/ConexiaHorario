@@ -1,42 +1,29 @@
-Server scaffold for FullCalendar prototype
+# Conexia API Server
 
-How to run:
+Express + PostgreSQL backend that powers the Conexia scheduling experience.
 
-1. cd server
-2. npm install
-3. npm start
+## Run locally
 
-API endpoints (basic):
-- GET /api/carreras
-- POST /api/carreras
-- PUT /api/carreras/:id
-- DELETE /api/carreras/:id
+1. `cd server`
+2. `npm install`
+3. Configure environment variables:
+	- `DATABASE_URL` (PostgreSQL connection string)
+	- `DEFAULT_ADMIN_EMAIL`, `DEFAULT_ADMIN_PASSWORD`, `DEFAULT_ADMIN_USERNAME` (seed admin user)
+4. `npm start`
 
-- GET /api/modulos
-- POST /api/modulos
-- PUT /api/modulos/:id
-- DELETE /api/modulos/:id
+## REST endpoints
 
-- GET /api/docentes
-- POST /api/docentes
-- PUT /api/docentes/:id
-- DELETE /api/docentes/:id
+- `/api/carreras`
+- `/api/modulos`
+- `/api/docentes`
+- `/api/salas`
+- `/api/templates`
+- `/api/events`
+- `/api/auth/*` (admin login/session helpers)
 
-- GET /api/salas
-- POST /api/salas
-- PUT /api/salas/:id
-- DELETE /api/salas/:id
+Each resource supports the usual CRUD verbs (`GET`, `POST`, `PUT`, `DELETE`).
 
-- GET /api/templates
-- POST /api/templates
-- PUT /api/templates/:id
-- DELETE /api/templates/:id
+## Notes
 
-- GET /api/events
-- POST /api/events
-- PUT /api/events/:id
-- DELETE /api/events/:id
-
-Notes:
-- This is a development scaffold. No authentication included.
-- Uses SQLite (better-sqlite3) and creates a local `data.db` file in the server folder.
+- Authentication endpoints secure the admin dashboard; regular collections expect a valid session token.
+- SSL is enabled automatically when the `DATABASE_URL` host requires it.

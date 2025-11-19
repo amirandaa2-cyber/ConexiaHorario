@@ -2,7 +2,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
 const db = require('./db');
@@ -16,20 +15,18 @@ app.use(bodyParser.json());
 
 const dbReady = db && db.ready;
 const AUTH_TOKEN_TTL_HOURS = parseInt(process.env.SESSION_TTL_HOURS || '12', 10);
-const MAX_FAILED_ATTEMPTS = parseInt(process.env.MAX_FAILED_ATTEMPTS || '5', 10);
-const LOCKOUT_MINUTES = parseInt(process.env.LOCKOUT_MINUTES || '15', 10);
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) : null;
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET || undefined) : null;
 const USE_DB_ONLY = /^(1|true)$/i.test(process.env.USE_DB_ONLY || '');
+const ALLOWED_ROLE_CODES = (process.env.ALLOWED_ROLE_CODES || 'admin,docente')
+	.split(',')
+	.map((code) => code.trim().toLowerCase())
+	.filter(Boolean);
 
 function handleDbError(res, err){
   console.error('Database error', err);
   res.status(500).json({ error: 'Database error', details: err.message });
-}
-
-function hashToken(raw){
-	return crypto.createHash('sha256').update(String(raw || '')).digest('hex');
 }
 
 function extractToken(req){
@@ -49,65 +46,119 @@ function extractToken(req){
 	return null;
 }
 
-async function recordFailedAttempt(user){
-	const attempts = (user.intentos_fallidos || 0) + 1;
-	if (attempts >= MAX_FAILED_ATTEMPTS){
-		const lockUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+function normalizeEmail(value) {
+	return (value || '').trim().toLowerCase();
+}
+
+function mapRoleCodes(roleArray = []) {
+	return roleArray
+		.filter(Boolean)
+		.map((code) => String(code).toLowerCase())
+		.filter((code, idx, list) => list.indexOf(code) === idx);
+}
+
+function formatUserPayload(row) {
+	if (!row) return null;
+	const roles = mapRoleCodes(row.roles || row.role_codes || []);
+	return {
+		id: row.id,
+		email: row.email,
+		fullName: row.full_name || row.fullname || row.username || row.email,
+		roles
+	};
+}
+
+function userHasAllowedRole(user) {
+	if (!ALLOWED_ROLE_CODES.length) return true;
+	const userRoles = mapRoleCodes(user.roles || []);
+	return userRoles.some((code) => ALLOWED_ROLE_CODES.includes(code));
+}
+
+async function fetchUserByEmail(email) {
+	const normalized = normalizeEmail(email);
+	if (!normalized) return null;
+	const { rows } = await db.query(
+		`SELECT u.id, u.email, u.full_name, u.password_hash, u.is_active, u.must_reset_pwd,
+		        ARRAY_REMOVE(ARRAY_AGG(r.code), NULL) AS roles
+		   FROM auth_user u
+		   LEFT JOIN auth_user_role ur ON ur.user_id = u.id
+		   LEFT JOIN auth_role r ON r.id = ur.role_id
+		  WHERE LOWER(u.email) = LOWER($1)
+		  GROUP BY u.id`,
+		[normalized]
+	);
+	if (!rows.length) return null;
+	const user = rows[0];
+	user.roles = mapRoleCodes(user.roles);
+	return user;
+}
+
+async function logLoginAttempt({ userId = null, emailInput = '', success = false, reason = null, req }) {
+	try {
 		await db.query(
-			'UPDATE usuarios SET intentos_fallidos=$1, bloqueo_hasta=$2, actualizado_en=now() WHERE id=$3',
-			[attempts, lockUntil, user.id]
+			`INSERT INTO auth_login_audit (user_id, email_input, ip_address, user_agent, was_success, reason)
+			 VALUES ($1, $2, $3, $4, $5, $6)`,
+			[userId, emailInput || '', req?.ip || null, req?.headers?.['user-agent'] || null, success, reason]
 		);
-	} else {
-		await db.query('UPDATE usuarios SET intentos_fallidos=$1, actualizado_en=now() WHERE id=$2', [attempts, user.id]);
+	} catch (auditErr) {
+		console.warn('No se pudo registrar el intento de login', auditErr);
 	}
 }
 
-async function resetFailedAttempts(userId){
-	await db.query('UPDATE usuarios SET intentos_fallidos=0, bloqueo_hasta=NULL, actualizado_en=now() WHERE id=$1', [userId]);
+async function touchUserLogin(userId) {
+	await db.query('UPDATE auth_user SET updated_at = now() WHERE id = $1', [userId]);
 }
 
-async function createLoginSession(userId, rawToken, req){
+async function createLoginSession(userId, req){
 	const expiresAt = new Date(Date.now() + AUTH_TOKEN_TTL_HOURS * 60 * 60 * 1000);
+	const token = uuidv4();
 	await db.query(
-		'INSERT INTO login_sessions (id, usuario_id, token, user_agent, ip_address, expira_en) VALUES ($1,$2,$3,$4,$5,$6)',
-		[uuidv4(), userId, hashToken(rawToken), req.headers['user-agent'] || null, req.ip || null, expiresAt]
+		`INSERT INTO auth_session_token (token, user_id, expires_at, metadata)
+		 VALUES ($1, $2, $3, $4)`,
+		[token, userId, expiresAt.toISOString(), JSON.stringify({
+			source: 'admin-ui',
+			ip: req?.ip || null,
+			userAgent: req?.headers?.['user-agent'] || null
+		})]
 	);
-	return expiresAt.toISOString();
+	return { token, expiresAt: expiresAt.toISOString() };
 }
 
 async function loadSessionFromToken(rawToken, { requireAdmin = false } = {}){
 	if (!rawToken) return null;
-	const tokenHash = hashToken(rawToken);
 	const { rows } = await db.query(
-		`SELECT ls.id AS session_id, ls.usuario_id, ls.expira_en, ls.revocado,
-						u.username, u.email, u.rol, u.esta_activo
-			 FROM login_sessions ls
-			 JOIN usuarios u ON u.id = ls.usuario_id
-			WHERE ls.token=$1
-			LIMIT 1`,
-		[tokenHash]
+		`SELECT s.token, s.user_id, s.expires_at,
+		        u.full_name, u.email, u.is_active,
+		        ARRAY_REMOVE(ARRAY_AGG(r.code), NULL) AS roles
+		   FROM auth_session_token s
+		   JOIN auth_user u ON u.id = s.user_id
+		   LEFT JOIN auth_user_role ur ON ur.user_id = u.id
+		   LEFT JOIN auth_role r ON r.id = ur.role_id
+		  WHERE s.token = $1
+		  GROUP BY s.token, s.user_id, s.expires_at, u.full_name, u.email, u.is_active
+		  LIMIT 1`,
+		[rawToken]
 	);
 	if (!rows.length) return null;
 	const row = rows[0];
-	const now = new Date();
-	if (row.revocado || (row.expira_en && new Date(row.expira_en) < now) || !row.esta_activo) {
-		if (!row.revocado) {
-			await db.query('UPDATE login_sessions SET revocado=true WHERE id=$1', [row.session_id]);
-		}
+	const expired = row.expires_at && new Date(row.expires_at) < new Date();
+	if (!row.is_active || expired) {
+		await db.query('DELETE FROM auth_session_token WHERE token = $1', [rawToken]);
 		return null;
 	}
-	if (requireAdmin && row.rol !== 'admin') {
+	const roles = mapRoleCodes(row.roles);
+	if (requireAdmin && !roles.includes('admin')) {
 		return null;
 	}
 	return {
-		sessionId: row.session_id,
-		userId: row.usuario_id,
-		expiraEn: row.expira_en,
+		sessionId: row.token,
+		userId: row.user_id,
+		expiraEn: row.expires_at,
 		user: {
-			id: row.usuario_id,
-			username: row.username,
+			id: row.user_id,
 			email: row.email,
-			rol: row.rol
+			fullName: row.full_name,
+			roles
 		}
 	};
 }
@@ -115,7 +166,8 @@ async function loadSessionFromToken(rawToken, { requireAdmin = false } = {}){
 app.get('/api/public-config', (req,res)=>{
 	res.json({
 		googleClientId: GOOGLE_CLIENT_ID || null,
-		useDbOnly: USE_DB_ONLY
+		useDbOnly: USE_DB_ONLY,
+		allowedRoles: ALLOWED_ROLE_CODES
 	});
 });
 
@@ -123,49 +175,81 @@ app.get('/api/public-config', (req,res)=>{
 if(dbReady){
 	app.post('/api/auth/login', async (req,res)=>{
 		const { identifier, password } = req.body || {};
-		if (!identifier || !password) {
-			return res.status(400).json({ error: 'Debes proporcionar usuario/correo y contraseña.' });
+		const email = normalizeEmail(identifier);
+		if (!email || !password) {
+			return res.status(400).json({ error: 'Debes proporcionar correo y contraseña.' });
 		}
 		try {
-			const { rows } = await db.query(
-				`SELECT id, email, username, password_hash, rol, esta_activo, ultimo_login, intentos_fallidos, bloqueo_hasta
-				   FROM usuarios
-				  WHERE (LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1))
-				    AND rol = 'admin'
-				  LIMIT 1`,
-				[identifier]
-			);
-			if (!rows.length) {
+			const user = await fetchUserByEmail(email);
+			if (!user) {
+				await logLoginAttempt({ emailInput: email, success: false, reason: 'user_not_found', req });
 				return res.status(401).json({ error: 'Credenciales inválidas.' });
 			}
-			const user = rows[0];
-			if (!user.esta_activo) {
+			if (!user.is_active) {
+				await logLoginAttempt({ userId: user.id, emailInput: email, success: false, reason: 'inactive', req });
 				return res.status(403).json({ error: 'La cuenta está deshabilitada.' });
-			}
-			if (user.bloqueo_hasta && new Date(user.bloqueo_hasta) > new Date()) {
-				return res.status(423).json({ error: 'Cuenta bloqueada temporalmente. Inténtalo más tarde.' });
 			}
 			const passOk = await bcrypt.compare(password, user.password_hash || '');
 			if (!passOk) {
-				await recordFailedAttempt(user);
+				await logLoginAttempt({ userId: user.id, emailInput: email, success: false, reason: 'wrong_password', req });
 				return res.status(401).json({ error: 'Credenciales inválidas.' });
 			}
-			await resetFailedAttempts(user.id);
-			await db.query('UPDATE usuarios SET ultimo_login=now(), actualizado_en=now() WHERE id=$1', [user.id]);
-			const token = crypto.randomBytes(48).toString('hex');
-			const expiresAt = await createLoginSession(user.id, token, req);
+			if (!userHasAllowedRole(user)) {
+				await logLoginAttempt({ userId: user.id, emailInput: email, success: false, reason: 'forbidden_role', req });
+				return res.status(403).json({ error: 'Esta cuenta no tiene permisos para acceder.' });
+			}
+			const session = await createLoginSession(user.id, req);
+			await touchUserLogin(user.id);
+			await logLoginAttempt({ userId: user.id, emailInput: email, success: true, req });
 			res.json({
-				token,
-				expiresAt,
-				user: {
-					id: user.id,
-					email: user.email,
-					username: user.username,
-					rol: user.rol
-				}
+				token: session.token,
+				expiresAt: session.expiresAt,
+				user: formatUserPayload(user)
 			});
 		} catch (err) {
 			handleDbError(res, err);
+		}
+	});
+
+	app.post('/api/auth/google', async (req,res)=>{
+		if (!googleClient) {
+			return res.status(503).json({ error: 'Inicio con Google no está configurado.' });
+		}
+		const { credential } = req.body || {};
+		if (!credential) {
+			return res.status(400).json({ error: 'Token de Google faltante.' });
+		}
+		try {
+			const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID });
+			const payload = ticket.getPayload();
+			const email = normalizeEmail(payload?.email);
+			if (!email) {
+				return res.status(400).json({ error: 'Cuenta de Google sin correo verificado.' });
+			}
+			const user = await fetchUserByEmail(email);
+			if (!user) {
+				await logLoginAttempt({ emailInput: email, success: false, reason: 'user_not_found', req });
+				return res.status(403).json({ error: 'Esta cuenta no tiene permisos para acceder.' });
+			}
+			if (!user.is_active) {
+				await logLoginAttempt({ userId: user.id, emailInput: email, success: false, reason: 'inactive', req });
+				return res.status(403).json({ error: 'La cuenta está deshabilitada.' });
+			}
+			if (!userHasAllowedRole(user)) {
+				await logLoginAttempt({ userId: user.id, emailInput: email, success: false, reason: 'forbidden_role', req });
+				return res.status(403).json({ error: 'Esta cuenta no tiene permisos para acceder.' });
+			}
+			const session = await createLoginSession(user.id, req);
+			await touchUserLogin(user.id);
+			await logLoginAttempt({ userId: user.id, emailInput: email, success: true, req });
+			res.json({
+				token: session.token,
+				expiresAt: session.expiresAt,
+				user: formatUserPayload(user)
+			});
+		} catch (err) {
+			console.error('Google auth error', err);
+			res.status(401).json({ error: 'No se pudo validar la sesión de Google.' });
 		}
 	});
 
@@ -175,7 +259,7 @@ if(dbReady){
 			return res.status(400).json({ error: 'Token requerido para cerrar sesión.' });
 		}
 		try {
-			await db.query('UPDATE login_sessions SET revocado=true WHERE token=$1', [hashToken(token)]);
+			await db.query('DELETE FROM auth_session_token WHERE token=$1', [token]);
 			res.json({ ok: true });
 		} catch (err) {
 			handleDbError(res, err);
@@ -183,54 +267,6 @@ if(dbReady){
 	});
 
 	app.get('/api/auth/session', async (req,res)=>{
-			app.post('/api/auth/google', async (req,res)=>{
-				if (!googleClient) {
-					return res.status(503).json({ error: 'Inicio con Google no está configurado.' });
-				}
-				const { credential } = req.body || {};
-				if (!credential) {
-					return res.status(400).json({ error: 'Token de Google faltante.' });
-				}
-				try {
-					const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID });
-					const payload = ticket.getPayload();
-					const email = (payload && payload.email) ? payload.email.toLowerCase() : null;
-					if (!email) {
-						return res.status(400).json({ error: 'Cuenta de Google sin correo verificado.' });
-					}
-					const { rows } = await db.query(
-						`SELECT id, email, username, rol, esta_activo
-						   FROM usuarios
-						  WHERE LOWER(email) = LOWER($1)
-						    AND rol = 'admin'
-						  LIMIT 1`,
-						[email]
-					);
-					if (!rows.length) {
-						return res.status(403).json({ error: 'Esta cuenta no tiene permisos para acceder.' });
-					}
-					const user = rows[0];
-					if (!user.esta_activo) {
-						return res.status(403).json({ error: 'La cuenta está deshabilitada.' });
-					}
-					await db.query('UPDATE usuarios SET ultimo_login=now(), actualizado_en=now() WHERE id=$1', [user.id]);
-					const token = crypto.randomBytes(48).toString('hex');
-					const expiresAt = await createLoginSession(user.id, token, req);
-					res.json({
-						token,
-						expiresAt,
-						user: {
-							id: user.id,
-							email: user.email,
-							username: user.username,
-							rol: user.rol
-						}
-					});
-				} catch (err) {
-					console.error('Google auth error', err);
-					res.status(401).json({ error: 'No se pudo validar la sesión de Google.' });
-				}
-			});
 		const token = extractToken(req);
 		if (!token) {
 			return res.status(401).json({ error: 'Token no enviado.' });
