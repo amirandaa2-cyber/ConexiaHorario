@@ -595,18 +595,8 @@
       }
     }
   </style>
-  <script>
-    // Try to load local copy of FullCalendar first, otherwise fall back to CDN.
-    (function () {
-      try {
-        var s = document.createElement('script');
-        s.src = '../dist/index.global.js';
-        s.onload = function () { console.info('FullCalendar loaded from local ../dist/index.global.js'); };
-        s.onerror = function () { console.warn('Local FullCalendar not found, loading from CDN fallback'); var s2 = document.createElement('script'); s2.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js'; s2.onload = function () { console.info('FullCalendar loaded from CDN fallback'); }; s2.onerror = function () { console.error('Failed to load FullCalendar from local and CDN'); }; document.head.appendChild(s2); };
-        document.head.appendChild(s);
-      } catch (e) { console.error('Error injecting FullCalendar loader', e); }
-    })();
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
   <script>
 
     const ADMIN_AUTH_KEY = 'proto_admin_session_v1';
@@ -858,27 +848,24 @@
 
       // helper: ensure FullCalendar library is available (load from CDN as fallback)
       function ensureFullCalendarReady(cb) {
-        function loadLocalesThen(cb2) {
-          try {
-            const hasEs = window.FullCalendar && Array.isArray(window.FullCalendar.globalLocales) && window.FullCalendar.globalLocales.some(l => l && (l.code === 'es' || l.localeCode === 'es'));
-            if (hasEs) { cb2(); return; }
-          } catch (e) { }
-          // try loading local locales-all first, then CDN fallback
-          const sLoc = document.createElement('script');
-          sLoc.src = '../packages/core/locales-all.global.js';
-          sLoc.onload = function () { try { cb2(); } catch (e) { console.error('locale init callback error', e); } };
-          sLoc.onerror = function () { console.warn('No se pudo cargar locales localmente, intentando CDN locales-all'); const s2 = document.createElement('script'); s2.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js'; s2.onload = function () { try { cb2(); } catch (e) { console.error('locale init callback error', e); } }; s2.onerror = function () { console.error('No se pudo cargar locales de FullCalendar'); }; document.head.appendChild(s2); };
-          document.head.appendChild(sLoc);
+        const MAX_ATTEMPTS = 40;
+        let attempts = 0;
+
+        function loadWhenReady() {
+          attempts += 1;
+          if (window.FullCalendar && window.FullCalendar.Calendar) {
+            try { cb(); } catch (e) { console.error('init callback error', e); }
+            return;
+          }
+          if (attempts > MAX_ATTEMPTS) {
+            runtimeErrorEl.textContent = 'FullCalendar no cargó desde CDN. Verifica tu conexión o permite el dominio cdn.jsdelivr.net.';
+            runtimeErrorEl.style.display = 'block';
+            return;
+          }
+          setTimeout(loadWhenReady, 150);
         }
 
-        if (window.FullCalendar) { try { loadLocalesThen(cb); } catch (e) { console.error('init callback error', e); } return; }
-
-        // If FullCalendar not present, try CDN (local copy is attempted earlier in the page)
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js';
-        s.onload = function () { console.info('FullCalendar loaded from CDN fallback'); try { loadLocalesThen(cb); } catch (e) { console.error('init callback error', e); } };
-        s.onerror = function () { runtimeErrorEl.textContent = 'No se pudo cargar FullCalendar. Asegúrate de servir el repositorio raíz para que ../dist/index.global.js esté disponible, o revisa tu conexión.'; runtimeErrorEl.style.display = 'block'; };
-        document.head.appendChild(s);
+        loadWhenReady();
       }
 
       // initialize calendar only after FullCalendar available
