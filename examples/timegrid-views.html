@@ -585,6 +585,13 @@
 
     .conflict-week-list { max-height:200px; overflow:auto; border:1px solid #e6e6e9; padding:8px; border-radius:6px; font-size:13px }
 
+    /* Result modal (success / error) */
+    .result-header { display:flex; align-items:center; gap:10px; margin-bottom:8px }
+    .result-icon { width:36px; height:36px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:#fff; font-weight:700 }
+    .result-icon.success { background:#10b981 }
+    .result-icon.warn { background:#f59e0b }
+    .result-icon.error { background:#ef4444 }
+    .result-message { font-size:15px; color:#111 }
     /* Small-screen friendly tweaks */
     @media (max-width: 520px) {
       .modal-box, .legacy-conflict-modal {
@@ -600,10 +607,56 @@
   <script>
 
     const ADMIN_AUTH_KEY = 'proto_admin_session_v1';
+    const SESSION_TOKEN_KEY = 'proto_admin_token';
+    const SESSION_EXP_KEY = 'proto_admin_session_exp';
     const ADMIN_USER = 'admin';
     const ADMIN_PASS = 'ceduc123';
     const SESSION_USER_KEY = 'proto_admin_username';
     const SESSION_PRIV_DESC = 'Privilegios: crear/editar carreras, módulos, docentes y publicar horarios oficiales.';
+    const STATE_VERSION = '1.0';
+    const KEY_DOCENTES = 'proto_docentes_v1';
+    const KEY_CARRERAS = 'proto_carreras_v1';
+    const KEY_MODULOS = 'proto_modulos_v1';
+    const KEY_EVENTS = 'proto_mod_events_v1';
+    const KEY_TEMPLATES = 'proto_templates_v1';
+    const USE_API = (typeof window !== 'undefined' && 'APP_USE_API' in window) ? Boolean(window.APP_USE_API) : false;
+    const API_BASE = (typeof window !== 'undefined' && window.APP_API_URL) ? window.APP_API_URL : 'http://localhost:3001/api';
+
+    function storageGet(key) {
+      try { return window.localStorage.getItem(key); } catch (_) { return null; }
+    }
+
+    function storageSet(key, val) {
+      try { window.localStorage.setItem(key, val); } catch (_) { }
+    }
+
+    function storageRemove(key) {
+      try { window.localStorage.removeItem(key); } catch (_) { }
+    }
+
+    function getStoredToken() {
+      return storageGet(SESSION_TOKEN_KEY);
+    }
+
+    async function authorizedFetch(url, options = {}) {
+      const opts = { ...(options || {}) };
+      opts.headers = { ...(opts.headers || {}) };
+      if (USE_API) {
+        const token = getStoredToken();
+        if (token && !opts.headers.Authorization) {
+          opts.headers.Authorization = 'Bearer ' + token;
+        }
+      }
+      const response = await fetch(url, opts);
+      if (USE_API && response.status === 401) {
+        console.warn('Sesión expirada o inválida. Forzando logout.');
+        if (window.__ADMIN_AUTH__?.forceLogout) {
+          await window.__ADMIN_AUTH__.forceLogout({ skipServer: true, silent: true });
+        }
+        throw new Error('Sesión expirada');
+      }
+      return response;
+    }
 
     function setupAdminAuth() {
       const overlay = document.getElementById('auth-screen');
@@ -614,6 +667,11 @@
       const sessionPanel = document.getElementById('session-panel');
       const sessionUserLabel = document.getElementById('session-user-label');
       const sessionPrivilegesLabel = document.getElementById('session-privileges');
+
+      const authState = {
+        authenticated: storageGet(ADMIN_AUTH_KEY) === '1',
+        userLabel: storageGet(SESSION_USER_KEY) || ADMIN_USER
+      };
 
       function renderSessionIndicator(activeUser) {
         if (!sessionPanel) return;
@@ -626,64 +684,166 @@
         }
       }
 
-      function isAuthenticated() {
-        try { return localStorage.getItem(ADMIN_AUTH_KEY) === '1'; } catch (_) { return false; }
-      }
-
       function applyState() {
-        const authed = isAuthenticated();
+        const authed = authState.authenticated;
         if (layout) layout.style.display = authed ? '' : 'none';
         if (overlay) overlay.style.display = authed ? 'none' : 'flex';
         if (logoutBtn) logoutBtn.style.display = authed ? 'inline-flex' : 'none';
         if (sessionPanel) sessionPanel.classList.toggle('visible', authed);
-        if (authed) {
-          const storedUser = (() => { try { return localStorage.getItem(SESSION_USER_KEY); } catch (_) { return null; } })();
-          renderSessionIndicator(storedUser || ADMIN_USER);
-        } else {
-          renderSessionIndicator(null);
-        }
+        renderSessionIndicator(authed ? (authState.userLabel || storageGet(SESSION_USER_KEY) || ADMIN_USER) : null);
         return authed;
       }
 
+      function persistSessionMeta({ token, expiresAt, userLabel } = {}) {
+        if (token) storageSet(SESSION_TOKEN_KEY, token);
+        if (expiresAt) storageSet(SESSION_EXP_KEY, expiresAt);
+        if (userLabel) storageSet(SESSION_USER_KEY, userLabel);
+        storageSet(ADMIN_AUTH_KEY, '1');
+      }
+
+      function clearSessionStorage() {
+        storageRemove(SESSION_TOKEN_KEY);
+        storageRemove(SESSION_EXP_KEY);
+        storageRemove(ADMIN_AUTH_KEY);
+        storageRemove(SESSION_USER_KEY);
+      }
+
+      async function forceLogout({ skipServer = false, silent = false } = {}) {
+        const token = getStoredToken();
+        clearSessionStorage();
+        authState.authenticated = false;
+        authState.userLabel = null;
+        renderSessionIndicator(null);
+        applyState();
+        if (!skipServer && USE_API && token) {
+          try {
+            await fetch(API_BASE + '/auth/logout', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+              },
+              body: JSON.stringify({ token })
+            });
+          } catch (err) {
+            if (!silent) console.warn('No se pudo cerrar sesión en el servidor', err);
+          }
+        }
+        if (!silent) {
+          window.location.reload();
+        }
+      }
+
+      async function loginWithApi(identifier, password) {
+        const response = await fetch(API_BASE + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, password })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || 'Credenciales inválidas.');
+        }
+        const displayName = payload?.user?.username || payload?.user?.email || identifier;
+        persistSessionMeta({
+          token: payload.token,
+          expiresAt: payload.expiresAt,
+          userLabel: displayName
+        });
+        authState.authenticated = true;
+        authState.userLabel = displayName;
+        applyState();
+        window.location.reload();
+      }
+
+      async function ensureSession({ silent = false } = {}) {
+        if (!USE_API) {
+          authState.authenticated = storageGet(ADMIN_AUTH_KEY) === '1';
+          authState.userLabel = storageGet(SESSION_USER_KEY) || ADMIN_USER;
+          applyState();
+          return authState.authenticated;
+        }
+        const token = getStoredToken();
+        if (!token) {
+          await forceLogout({ skipServer: true, silent: true });
+          return false;
+        }
+        try {
+          const response = await fetch(API_BASE + '/auth/session', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          if (!response.ok) {
+            throw new Error('Sesión inválida');
+          }
+          const payload = await response.json().catch(() => ({}));
+          if (payload?.tokenExpiresAt) storageSet(SESSION_EXP_KEY, payload.tokenExpiresAt);
+          const displayName = payload?.user?.username || payload?.user?.email || storageGet(SESSION_USER_KEY) || ADMIN_USER;
+          storageSet(SESSION_USER_KEY, displayName);
+          storageSet(ADMIN_AUTH_KEY, '1');
+          authState.authenticated = true;
+          authState.userLabel = displayName;
+          applyState();
+          return true;
+        } catch (err) {
+          if (!silent) console.warn('Validación de sesión falló', err);
+          await forceLogout({ skipServer: true, silent: true });
+          return false;
+        }
+      }
+
       if (form) {
-        form.addEventListener('submit', function (e) {
+        form.addEventListener('submit', async function (e) {
           e.preventDefault();
+          if (errorEl) errorEl.textContent = '';
           const userInput = (document.getElementById('auth-user')?.value || '').trim();
-          const user = userInput.toLowerCase();
           const pass = (document.getElementById('auth-pass')?.value || '').trim();
-          if (user === ADMIN_USER && pass === ADMIN_PASS) {
-            try {
-              localStorage.setItem(ADMIN_AUTH_KEY, '1');
-              localStorage.setItem(SESSION_USER_KEY, userInput || ADMIN_USER);
-            } catch (_) { }
-            renderSessionIndicator(userInput || ADMIN_USER);
-            applyState();
-            window.location.reload();
+          if (!userInput || !pass) {
+            if (errorEl) errorEl.textContent = 'Debes ingresar usuario y contraseña.';
             return;
           }
-          if (errorEl) errorEl.textContent = 'Credenciales inválidas. Verifica el usuario y la clave temporal.';
+          try {
+            if (USE_API) {
+              await loginWithApi(userInput, pass);
+              return;
+            }
+            const normalized = userInput.toLowerCase();
+            if (normalized === ADMIN_USER && pass === ADMIN_PASS) {
+              persistSessionMeta({ userLabel: userInput || ADMIN_USER });
+              authState.authenticated = true;
+              authState.userLabel = userInput || ADMIN_USER;
+              applyState();
+              window.location.reload();
+              return;
+            }
+            throw new Error('Credenciales inválidas.');
+          } catch (err) {
+            console.error('Login falló', err);
+            if (errorEl) errorEl.textContent = err.message || 'No se pudo iniciar sesión.';
+          }
         });
       }
 
       if (logoutBtn) {
         logoutBtn.addEventListener('click', function () {
-          try {
-            localStorage.removeItem(ADMIN_AUTH_KEY);
-            localStorage.removeItem(SESSION_USER_KEY);
-          } catch (_) { }
-          renderSessionIndicator(null);
-          window.location.reload();
+          forceLogout();
         });
       }
 
       applyState();
-      return { isAuthenticated, applyState };
+      const api = {
+        isAuthenticated: () => authState.authenticated,
+        ensureSession,
+        forceLogout
+      };
+      window.__ADMIN_AUTH__ = api;
+      return api;
     }
 
     // Prototipo: gestión de docentes, carreras y módulos + asignación en calendario
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', async function () {
       const authCtrl = setupAdminAuth();
-      if (!authCtrl.isAuthenticated()) {
+      const authed = await authCtrl.ensureSession({ silent: true });
+      if (!authed) {
         return;
       }
       // (removed .fc-event.hidden CSS approach - rely on strict filtering instead)
@@ -764,17 +924,6 @@
         } catch (e) { console.log('setupDiagnostics failed', e); }
       })();
       // ---------------------------------------------------------------------------
-      // Storage keys and version control
-      const STATE_VERSION = '1.0';
-      const KEY_DOCENTES = 'proto_docentes_v1';
-      const KEY_CARRERAS = 'proto_carreras_v1';
-      const KEY_MODULOS = 'proto_modulos_v1';
-      const KEY_EVENTS = 'proto_mod_events_v1';
-      const KEY_TEMPLATES = 'proto_templates_v1';
-      // Toggle to use API server instead of localStorage
-      const USE_API = false; // set true to enable API calls to server at http://localhost:3001
-      const API_BASE = 'http://localhost:3001/api';
-
       // Cache management
       let conflictDecisionCache = null;
       function clearConflictDecisionCache() {
@@ -824,11 +973,60 @@
       }
 
       // Minimal API helpers (used when USE_API=true)
-      async function fetchCarreras() { if (!USE_API) return load(KEY_CARRERAS, []); const r = await fetch(API_BASE + '/carreras'); return r.ok ? await r.json() : []; }
-      async function fetchModulos() { if (!USE_API) return load(KEY_MODULOS, []); const r = await fetch(API_BASE + '/modulos'); return r.ok ? await r.json() : []; }
-      async function fetchDocentes() { if (!USE_API) return load(KEY_DOCENTES, []); const r = await fetch(API_BASE + '/docentes'); return r.ok ? await r.json() : []; }
-      async function fetchEvents() { if (!USE_API) return load(KEY_EVENTS, []); const r = await fetch(API_BASE + '/events'); return r.ok ? await r.json() : []; }
-      async function fetchTemplates() { if (!USE_API) return load(KEY_TEMPLATES, []); const r = await fetch(API_BASE + '/templates'); return r.ok ? await r.json() : []; }
+      async function fetchCarreras() {
+        if (!USE_API) return load(KEY_CARRERAS, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/carreras');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchCarreras falló', err);
+          return [];
+        }
+      }
+
+      async function fetchModulos() {
+        if (!USE_API) return load(KEY_MODULOS, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/modulos');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchModulos falló', err);
+          return [];
+        }
+      }
+
+      async function fetchDocentes() {
+        if (!USE_API) return load(KEY_DOCENTES, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/docentes');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchDocentes falló', err);
+          return [];
+        }
+      }
+
+      async function fetchEvents() {
+        if (!USE_API) return load(KEY_EVENTS, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/events');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchEvents falló', err);
+          return [];
+        }
+      }
+
+      async function fetchTemplates() {
+        if (!USE_API) return load(KEY_TEMPLATES, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/templates');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchTemplates falló', err);
+          return [];
+        }
+      }
 
       // Data
       // docente fields: {id, rut, nombre, edad, estadoCivil, contratoHoras, horasAsignadas, horasTrabajadas, turno, activo}
@@ -1019,7 +1217,7 @@
                 if (nonConflictMsgs.length) {
                   console.warn('eventAdd blocked por validación:', nonConflictMsgs);
                   showValidationMessage(nonConflictMsgs.join(' '), 'error');
-                  if (typeof info.revert === 'function') info.revert(); else ev.remove();
+                  handleKeepExistingAction({ info, ev });
                   return;
                 }
 
@@ -1027,7 +1225,7 @@
                   console.warn('eventAdd conflict detected', conflicts);
                   let decision = conflictDecisionCache || await resolveConflictModal(candidate, conflicts);
                   if (!decision || decision.action === 'omit') {
-                    if (typeof info.revert === 'function') info.revert(); else ev.remove();
+                    handleKeepExistingAction({ info, ev });
                     return;
                   }
                   if (decision.action === 'force') {
@@ -1176,7 +1374,7 @@
                   console.warn('eventDrop conflict detected', conflicts);
                   let decision = conflictDecisionCache || await resolveConflictModal(candidate, conflicts);
                   if (!decision || decision.action === 'omit') {
-                    if (typeof info.revert === 'function') info.revert();
+                    handleKeepExistingAction({ info, ev });
                     return;
                   }
                   if (decision.action === 'force') {
@@ -1304,7 +1502,7 @@
                   console.warn('eventResize conflict detected', conflicts);
                   let decision = conflictDecisionCache || await resolveConflictModal(candidate, conflicts);
                   if (!decision || decision.action === 'omit') {
-                    if (typeof info.revert === 'function') info.revert();
+                    handleKeepExistingAction({ info, ev });
                     return;
                   }
                   if (decision.action === 'force') {
@@ -2720,6 +2918,34 @@
       const decisionForceBtn = document.getElementById('conflict-decision-force');
       const decisionReschedBtn = document.getElementById('conflict-decision-resched-btn');
 
+      // Small result modal used for feedback (replaces native alert for operations)
+      const resultModalHtml = `
+      <div id="result-overlay" class="modal-overlay" style="display:none">
+        <div class="modal-box" role="dialog" aria-modal="true">
+          <div class="result-header">
+            <div id="result-icon" class="result-icon success">✓</div>
+            <div class="result-message" id="result-message">Operación completada.</div>
+          </div>
+          <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+            <button id="result-ok-btn" class="btn-conflict btn-close">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    `;
+      document.body.insertAdjacentHTML('beforeend', resultModalHtml);
+      const resultOverlay = document.getElementById('result-overlay');
+      const resultIcon = document.getElementById('result-icon');
+      const resultMessage = document.getElementById('result-message');
+      const resultOkBtn = document.getElementById('result-ok-btn');
+      function hideResultModal() { if (resultOverlay) resultOverlay.style.display = 'none'; }
+      function showResultModal(msg, type = 'success') {
+        if (!resultOverlay) { alert(msg); return; }
+        resultMessage.textContent = msg || '';
+        resultIcon.className = 'result-icon ' + (type === 'error' ? 'error' : (type === 'warn' ? 'warn' : 'success'));
+        resultOverlay.style.display = 'flex';
+      }
+      resultOkBtn.addEventListener('click', hideResultModal);
+
       // Open/close and helper functions for simple modal
       function openConflictModal(docenteId) {
         try {
@@ -3656,8 +3882,8 @@
           // persist and refresh
           save(KEY_DOCENTES, docentes);
           persistEventsAndValidate();
-          alert(`Programación completada: ${added.length} eventos añadidos. ${skipped.length ? skipped.length + ' omitidos.' : ''}`);
-        } catch (err) { console.error('replicateCareerWeek error', err); alert('Error programando módulos: ' + (err && err.message ? err.message : String(err))); }
+          showResultModal(`Programación completada: ${added.length} eventos añadidos. ${skipped.length ? skipped.length + ' omitidos.' : ''}`, 'success');
+        } catch (err) { console.error('replicateCareerWeek error', err); showResultModal('Error programando módulos: ' + (err && err.message ? err.message : String(err)), 'error'); }
       }
 
       // Simplified resolver backed by the new lightweight overlay
@@ -3757,101 +3983,8 @@
           }
 
           function onKeep() {
-            try {
-              // Al elegir "Mantener existente" queremos asegurarnos de no dejar
-              // duplicados en el calendario ni en el almacenamiento.
-              // Si el candidato (evento movido/creado) quedó presente en la UI
-              // o en `storedEvents`, lo eliminamos, manteniendo únicamente los
-              // eventos ya existentes que causaron el conflicto.
-              (function cleanupDuplicates() {
-                try {
-                  if (!Array.isArray(conflicts)) return;
-                  const candStart = candidate && candidate.start ? new Date(candidate.start).getTime() : null;
-                  const candEnd = candidate && candidate.end ? new Date(candidate.end).getTime() : null;
-
-                  // Primero: intentar eliminar explícitamente cualquier evento del calendario
-                  // que coincida exactamente con el candidato (por id y por firma).
-                  // Esto cubre casos donde FullCalendar ya creó/modificó el evento
-                  // pero aún no se limpió correctamente.
-                  try {
-                    if (candidate && candidate.id && calendar && typeof calendar.getEventById === 'function') {
-                      const existingById = calendar.getEventById(String(candidate.id));
-                      if (existingById) {
-                        const existingStartIso = existingById.start ? existingById.start.toISOString() : null;
-                        const existingEndIso = existingById.end ? existingById.end.toISOString() : null;
-                        if (existingStartIso === candidate.start && (existingEndIso === candidate.end || (existingEndIso === null && candidate.end === null))) {
-                          try { existingById.remove(); } catch (e) { console.warn('No se pudo eliminar duplicado exacto por id', e); }
-                        }
-                        // también limpiar storedEvents por id + firma exacta (defensivo)
-                        try {
-                          if (typeof storedEvents !== 'undefined' && Array.isArray(storedEvents)) {
-                            storedEvents = storedEvents.filter(se => {
-                              try {
-                                if (!se) return true;
-                                if (se.id && candidate.id && String(se.id) === String(candidate.id)) {
-                                  const ss = se.start || null;
-                                  const seEnd = se.end || null;
-                                  if (ss === candidate.start && seEnd === candidate.end) return false;
-                                }
-                                return true;
-                              } catch (_) { return true; }
-                            });
-                          }
-                        } catch (e) { console.warn('No se pudo limpiar storedEvents por id del candidato', e); }
-                      }
-                    }
-                  } catch (e) { console.warn('explicit candidate removal failed', e); }
-
-                  // remove any calendar event that overlaps the candidate and is not one of the conflict.event items
-                  if (calendar && typeof calendar.getEvents === 'function') {
-                    const events = calendar.getEvents().slice();
-                    events.forEach(calEv => {
-                      try {
-                        const calId = calEv.id || null;
-                        const calStart = calEv.start ? calEv.start.getTime() : null;
-                        const calEnd = calEv.end ? calEv.end.getTime() : null;
-                        if (candStart === null || candEnd === null || calStart === null || calEnd === null) return;
-
-                        const overlap = !(candEnd <= calStart || candStart >= calEnd);
-                        if (!overlap) return;
-
-                        // check if this calendar event corresponds to any of the known conflicts
-                        const isConflictEvent = conflicts.some(c => c && c.event && (String((c.event && c.event.id) || '') === String(calId) || (c.event && c.event.start === (calEv.start ? calEv.start.toISOString() : null) && c.event && c.event.title === calEv.title)));
-                        if (isConflictEvent) return;
-
-                        // if it overlaps and is not one of the conflict events, remove it (it's likely the moved duplicate)
-                        try { calEv.remove(); } catch (e) { console.warn('No se pudo eliminar evento duplicado del calendario', e); }
-                        // also remove matching entries from storedEvents by id or by signature
-                        try {
-                          storedEvents = storedEvents.filter(se => {
-                            if (se && se.id && calId && String(se.id) === String(calId)) return false;
-                            const sig = `${se.title||''}__${se.start||''}__${se.end||''}`;
-                            const calSig = `${calEv.title||''}__${(calEv.start?calEv.start.toISOString():'')}__${(calEv.end?calEv.end.toISOString():'')}`;
-                            if (sig === calSig) return false;
-                            return true;
-                          });
-                        } catch (e) { console.warn('Error limpiando storedEvents de duplicados', e); }
-                      } catch (err) { console.warn('cleanup check event failed', err); }
-                    });
-                  }
-
-                  // also defensively remove any storedEvents that exactly match the candidate signature
-                  try {
-                    if (candidate && candidate.start && candidate.end) {
-                      const candSig = `${candidate.title||''}__${candidate.start||''}__${candidate.end||''}`;
-                      storedEvents = storedEvents.filter(se => {
-                        const sig = `${se.title||''}__${se.start||''}__${se.end||''}`;
-                        return sig !== candSig;
-                      });
-                    }
-                  } catch (e) { console.warn('cleanup storedEvents signature remove failed', e); }
-
-                  // persist changes and refresh calendar view
-                  try { persistEventsAndValidate(); } catch (e) { console.warn('persist after cleanup failed', e); }
-                } catch (e) { console.warn('cleanupDuplicates failed', e); }
-              })();
-            } catch (e) { console.warn('onKeep cleanup error', e); }
-
+            // Mantener exactamente el estado existente: no tocar calendario ni storage aquí.
+            // Los handlers (add/drop/resize) harán revert/remove según corresponda.
             finish(keepAction);
           }
 
@@ -3884,6 +4017,31 @@
           decisionForceBtn.addEventListener('click', onForce);
           decisionReschedBtn.addEventListener('click', onResched);
         });
+      }
+
+      // Manejo centralizado para "Mantener existentes"/"Descartar cambios"
+      // Descarta el candidato, no persiste ni llama APIs, cierra modal y revierte UI
+      function handleKeepExistingAction(opts) {
+        try {
+          const info = opts && opts.info;
+          const ev = opts && opts.ev;
+          try { if (typeof decisionOverlay !== 'undefined' && decisionOverlay) decisionOverlay.style.display = 'none'; } catch (_) {}
+          if (info && typeof info.revert === 'function') {
+            try { info.revert(); } catch (e) { console.warn('Revert falló', e); }
+          } else if (ev && typeof ev.remove === 'function') {
+            try { ev.remove(); } catch (e) { console.warn('Remove falló', e); }
+          }
+          // Hook opcional para gestores de estado (Redux/Vuex, etc.)
+          try {
+            if (typeof window !== 'undefined' && typeof window.dispatchConflictAction === 'function') {
+              window.dispatchConflictAction({ type: 'DISMISS_CONFLICT', payload: { eventId: ev && ev.id ? ev.id : null } });
+            }
+          } catch (_) {}
+          return { ok: true };
+        } catch (err) {
+          console.warn('handleKeepExistingAction error', err);
+          return { ok: false, error: err };
+        }
       }
 
       function formatFriendlyRange(startIso, endIso) {
@@ -4469,18 +4627,25 @@
         if (!USE_API) { alert('Para migrar, activa el Modo API en el código (USE_API=true) y asegúrate de que el servidor esté corriendo en ' + API_BASE); return; }
         try {
           const base = API_BASE;
-          // send carreras
-          for (const c of carreras) { try { await fetch(base + '/carreras', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) }); } catch (e) { console.warn('carrera post failed', e); } }
-          // send modulos
-          for (const m of modulos) { try { await fetch(base + '/modulos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) }); } catch (e) { console.warn('modulo post failed', e); } }
-          // send docentes
-          for (const d of docentes) { try { await fetch(base + '/docentes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }); } catch (e) { console.warn('docente post failed', e); } }
-          // send salas
-          for (const s of salas) { try { await fetch(base + '/salas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }); } catch (e) { console.warn('sala post failed', e); } }
-          // send templates
-          for (const t of templates) { try { await fetch(base + '/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(t) }); } catch (e) { console.warn('template post failed', e); } }
-          // send events
-          for (const e of storedEvents) { try { await fetch(base + '/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(e) }); } catch (e) { console.warn('event post failed', e); } }
+          const jsonHeaders = { 'Content-Type': 'application/json' };
+          for (const c of carreras) {
+            try { await authorizedFetch(base + '/carreras', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(c) }); } catch (err) { console.warn('carrera post failed', err); }
+          }
+          for (const m of modulos) {
+            try { await authorizedFetch(base + '/modulos', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(m) }); } catch (err) { console.warn('modulo post failed', err); }
+          }
+          for (const d of docentes) {
+            try { await authorizedFetch(base + '/docentes', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(d) }); } catch (err) { console.warn('docente post failed', err); }
+          }
+          for (const s of salas) {
+            try { await authorizedFetch(base + '/salas', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(s) }); } catch (err) { console.warn('sala post failed', err); }
+          }
+          for (const t of templates) {
+            try { await authorizedFetch(base + '/templates', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(t) }); } catch (err) { console.warn('template post failed', err); }
+          }
+          for (const evt of storedEvents) {
+            try { await authorizedFetch(base + '/events', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(evt) }); } catch (err) { console.warn('event post failed', err); }
+          }
           alert('Migración completada (revisa el servidor para confirmar).');
         } catch (err) { console.error('migrateToServer', err); alert('Error migrando datos: ' + (err && err.message ? err.message : String(err))); }
       }

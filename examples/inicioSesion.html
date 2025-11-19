@@ -130,6 +130,18 @@
         .contact-form button:hover {
             background: #147a3e;
         }
+
+        .login-error {
+            color: #ef4444;
+            font-weight: 600;
+            min-height: 20px;
+            margin: 6px 0;
+        }
+
+        .cont-formulario.is-loading .boton-principal {
+            opacity: 0.6;
+            pointer-events: none;
+        }
         
         .scroll-indicator {
             position: absolute;
@@ -208,8 +220,10 @@
                     <h1 class="titulo2 logo-estilo animate-logo">BigFood</h1>
                 </div>
 
-                <form class="cont-formulario" action="pagina2.html" method="GET">
-                    <input type="text" class="input" id="nombre" name="nombre" placeholder="Ingresa tu Nombre / Apellido" required>
+                <form class="cont-formulario" novalidate>
+                    <input type="text" class="input" id="nombre" name="nombre" placeholder="Usuario o correo institucional" autocomplete="username" required>
+                    <input type="password" class="input" id="password" name="password" placeholder="Contraseña" autocomplete="current-password" required>
+                    <p class="login-error" id="login-error" aria-live="polite"></p>
                     <input type="submit" value="Ingresar" class="boton-enviar boton-principal" id="ingresar">
                 </form>
             </div>
@@ -385,6 +399,60 @@
         });
     })();
 
+        </script>
+
+        <script>
+            (function initAdminLogin(){
+                const API_BASE = window.APP_API_URL || 'http://localhost:3001/api';
+                const form = document.querySelector('.cont-formulario');
+                const identifierInput = document.getElementById('nombre');
+                const passwordInput = document.getElementById('password');
+                const errorEl = document.getElementById('login-error');
+
+                if (!form || !identifierInput || !passwordInput) {
+                    return;
+                }
+
+                async function handleLogin(evt){
+                    evt.preventDefault();
+                    if (errorEl) errorEl.textContent = '';
+                    form.classList.add('is-loading');
+                    const identifier = identifierInput.value.trim();
+                    const password = passwordInput.value;
+                    try {
+                        const response = await fetch(API_BASE + '/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ identifier, password })
+                        });
+                        const payload = await response.json().catch(()=>({}));
+                        if (!response.ok) {
+                            throw new Error(payload.error || 'No se pudo iniciar sesión.');
+                        }
+                        if (payload?.token) {
+                            localStorage.setItem('proto_admin_token', payload.token);
+                        }
+                        if (payload?.expiresAt) {
+                            localStorage.setItem('proto_admin_session_exp', payload.expiresAt);
+                        }
+                        if (payload?.user) {
+                            const displayName = payload.user.username || payload.user.email;
+                            localStorage.setItem('proto_admin_username', displayName);
+                        }
+                        localStorage.setItem('proto_admin_session_v1', '1');
+                        window.location.href = 'timegrid-views.html';
+                    } catch (err) {
+                        console.error('Login error', err);
+                        if (errorEl) {
+                            errorEl.textContent = err.message || 'Error al iniciar sesión.';
+                        }
+                    } finally {
+                        form.classList.remove('is-loading');
+                    }
+                }
+
+                form.addEventListener('submit', handleLogin);
+            })();
         </script>
 
         <!-- Modal para palabra baneada -->

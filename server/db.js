@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -68,12 +69,59 @@ async function initializeSchema() {
 			start TEXT,
 			"end" TEXT,
 			extendedProps JSONB
-		)`
+		)`,
+		`CREATE TABLE IF NOT EXISTS usuarios (
+			id BIGSERIAL PRIMARY KEY,
+			docente_id BIGINT,
+			email VARCHAR(255) NOT NULL UNIQUE,
+			username VARCHAR(50) UNIQUE,
+			password_hash VARCHAR(255) NOT NULL,
+			rol VARCHAR(30) NOT NULL DEFAULT 'docente',
+			esta_activo BOOLEAN NOT NULL DEFAULT TRUE,
+			ultimo_login TIMESTAMPTZ,
+			intentos_fallidos INT NOT NULL DEFAULT 0,
+			bloqueo_hasta TIMESTAMPTZ,
+			creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+			actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+		)`,
+		`CREATE TABLE IF NOT EXISTS login_sessions (
+			id UUID PRIMARY KEY,
+			usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+			token VARCHAR(255) NOT NULL UNIQUE,
+			user_agent TEXT,
+			ip_address VARCHAR(45),
+			creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+			expira_en TIMESTAMPTZ,
+			revocado BOOLEAN NOT NULL DEFAULT FALSE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_login_sessions_usuario ON login_sessions(usuario_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_login_sessions_token ON login_sessions(token)`
 	];
 
 	for (const statement of statements) {
 		await pool.query(statement);
 	}
+
+	await ensureSeedAdmin();
+}
+
+async function ensureSeedAdmin() {
+	const seedEmail = process.env.DEFAULT_ADMIN_EMAIL;
+	const seedPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+	const seedUsername = process.env.DEFAULT_ADMIN_USERNAME || 'admin';
+
+	if (!seedEmail || !seedPassword) {
+		console.warn('DEFAULT_ADMIN_EMAIL o DEFAULT_ADMIN_PASSWORD no están definidos. No se creará un administrador por defecto.');
+		return;
+	}
+
+	const passwordHash = await bcrypt.hash(seedPassword, 10);
+	await pool.query(
+		`INSERT INTO usuarios (email, username, password_hash, rol, esta_activo)
+		 VALUES ($1, $2, $3, 'admin', TRUE)
+		 ON CONFLICT (email) DO NOTHING`,
+		[seedEmail, seedUsername, passwordHash]
+	);
 }
 
 initializeSchema().catch((err) => {
