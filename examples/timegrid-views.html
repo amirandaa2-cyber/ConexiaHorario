@@ -305,6 +305,31 @@
       color: #b91c1c;
       margin-top: 4px;
     }
+      .auth-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        margin: 18px 0 12px;
+        color: rgba(17, 24, 39, 0.5);
+      }
+
+      .auth-divider::before,
+      .auth-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(17, 24, 39, 0.2);
+      }
+
+      .google-login {
+        display: flex;
+        justify-content: center;
+        min-height: 48px;
+        margin-bottom: 12px;
+      }
 
     .auth-hint {
       font-size: 0.8rem;
@@ -604,6 +629,7 @@
   </style>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
 
     const ADMIN_AUTH_KEY = 'conexia_admin_session_v1';
@@ -621,6 +647,7 @@
     const KEY_TEMPLATES = 'conexia_templates_v1';
     const KEY_SALAS = 'conexia_salas_v1';
     const KEY_CALENDAR_STATE = 'conexia_calendar_state_v1';
+    const SESSION_ROLES_KEY = 'conexia_admin_roles';
 
     function storageGet(key) {
       try { return window.localStorage.getItem(key); } catch (_) { return null; }
@@ -632,6 +659,15 @@
 
     function storageRemove(key) {
       try { window.localStorage.removeItem(key); } catch (_) { }
+    }
+
+    function storageGetJSON(key, fallback = null) {
+      try {
+        const raw = storageGet(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch (_) {
+        return fallback;
+      }
     }
 
     function detectDefaultApiBase() {
@@ -659,6 +695,29 @@
       window.APP_USE_API = USE_API;
     }
 
+    let PUBLIC_CONFIG_PROMISE = null;
+    async function loadPublicConfig() {
+      if (!USE_API) return {};
+      if (PUBLIC_CONFIG_PROMISE) {
+        return PUBLIC_CONFIG_PROMISE;
+      }
+      PUBLIC_CONFIG_PROMISE = (async () => {
+        try {
+          const response = await fetch(API_BASE + '/public-config');
+          if (!response.ok) throw new Error('No se pudo obtener la configuración pública');
+          const data = await response.json().catch(() => ({}));
+          if (typeof window !== 'undefined') {
+            window.APP_PUBLIC_CONFIG = data;
+          }
+          return data || {};
+        } catch (err) {
+          console.warn('Error cargando la configuración pública', err);
+          return {};
+        }
+      })();
+      return PUBLIC_CONFIG_PROMISE;
+    }
+
     function getStoredToken() {
       return storageGet(SESSION_TOKEN_KEY);
     }
@@ -683,7 +742,7 @@
       return response;
     }
 
-    function setupAdminAuth() {
+    function setupAdminAuth(publicConfig = {}) {
       const overlay = document.getElementById('auth-screen');
       const layout = document.getElementById('layout-shell');
       const form = document.getElementById('auth-form');
@@ -692,10 +751,15 @@
       const sessionPanel = document.getElementById('session-panel');
       const sessionUserLabel = document.getElementById('session-user-label');
       const sessionPrivilegesLabel = document.getElementById('session-privileges');
+      const googleButtonContainer = document.getElementById('google-login-container');
+      const googleStatusEl = document.getElementById('google-login-status');
+      const googleHintEl = document.getElementById('google-login-hint');
+      let googleInitStarted = false;
 
       const authState = {
         authenticated: storageGet(ADMIN_AUTH_KEY) === '1',
-        userLabel: storageGet(SESSION_USER_KEY) || ADMIN_USER
+        userLabel: storageGet(SESSION_USER_KEY) || ADMIN_USER,
+        roles: storageGetJSON(SESSION_ROLES_KEY, []) || []
       };
 
       function renderSessionIndicator(activeUser) {
@@ -703,7 +767,12 @@
         if (activeUser) {
           sessionPanel.classList.add('visible');
           if (sessionUserLabel) sessionUserLabel.textContent = activeUser;
-          if (sessionPrivilegesLabel) sessionPrivilegesLabel.textContent = SESSION_PRIV_DESC;
+          if (sessionPrivilegesLabel) {
+            const rolesText = authState.roles && authState.roles.length
+              ? `Roles: ${authState.roles.join(', ')}`
+              : SESSION_PRIV_DESC;
+            sessionPrivilegesLabel.textContent = rolesText;
+          }
         } else {
           sessionPanel.classList.remove('visible');
         }
@@ -719,10 +788,11 @@
         return authed;
       }
 
-      function persistSessionMeta({ token, expiresAt, userLabel } = {}) {
+      function persistSessionMeta({ token, expiresAt, userLabel, roles } = {}) {
         if (token) storageSet(SESSION_TOKEN_KEY, token);
         if (expiresAt) storageSet(SESSION_EXP_KEY, expiresAt);
         if (userLabel) storageSet(SESSION_USER_KEY, userLabel);
+        if (Array.isArray(roles)) storageSet(SESSION_ROLES_KEY, JSON.stringify(roles));
         storageSet(ADMIN_AUTH_KEY, '1');
       }
 
@@ -731,6 +801,7 @@
         storageRemove(SESSION_EXP_KEY);
         storageRemove(ADMIN_AUTH_KEY);
         storageRemove(SESSION_USER_KEY);
+        storageRemove(SESSION_ROLES_KEY);
       }
 
       async function forceLogout({ skipServer = false, silent = false } = {}) {
@@ -738,6 +809,7 @@
         clearSessionStorage();
         authState.authenticated = false;
         authState.userLabel = null;
+        authState.roles = [];
         renderSessionIndicator(null);
         applyState();
         if (!skipServer && USE_API && token) {
@@ -759,6 +831,22 @@
         }
       }
 
+      function handleAuthSuccess(payload, fallbackLabel) {
+        const roles = Array.isArray(payload?.user?.roles) ? payload.user.roles : [];
+        const displayName = payload?.user?.fullName || payload?.user?.username || payload?.user?.email || fallbackLabel || ADMIN_USER;
+        persistSessionMeta({
+          token: payload.token,
+          expiresAt: payload.expiresAt,
+          userLabel: displayName,
+          roles
+        });
+        authState.authenticated = true;
+        authState.userLabel = displayName;
+        authState.roles = roles;
+        applyState();
+        window.location.reload();
+      }
+
       async function loginWithApi(identifier, password) {
         const response = await fetch(API_BASE + '/auth/login', {
           method: 'POST',
@@ -769,22 +857,27 @@
         if (!response.ok) {
           throw new Error(payload.error || 'Credenciales inválidas.');
         }
-        const displayName = payload?.user?.username || payload?.user?.email || identifier;
-        persistSessionMeta({
-          token: payload.token,
-          expiresAt: payload.expiresAt,
-          userLabel: displayName
+        handleAuthSuccess(payload, identifier);
+      }
+
+      async function loginWithGoogleCredential(credential) {
+        const response = await fetch(API_BASE + '/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential })
         });
-        authState.authenticated = true;
-        authState.userLabel = displayName;
-        applyState();
-        window.location.reload();
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || 'No se pudo validar la sesión de Google.');
+        }
+        handleAuthSuccess(payload, payload?.user?.fullName);
       }
 
       async function ensureSession({ silent = false } = {}) {
         if (!USE_API) {
           authState.authenticated = storageGet(ADMIN_AUTH_KEY) === '1';
           authState.userLabel = storageGet(SESSION_USER_KEY) || ADMIN_USER;
+          authState.roles = storageGetJSON(SESSION_ROLES_KEY, []) || [];
           applyState();
           return authState.authenticated;
         }
@@ -833,9 +926,10 @@
             }
             const normalized = userInput.toLowerCase();
             if (normalized === ADMIN_USER && pass === ADMIN_PASS) {
-              persistSessionMeta({ userLabel: userInput || ADMIN_USER });
+              persistSessionMeta({ userLabel: userInput || ADMIN_USER, roles: ['admin'] });
               authState.authenticated = true;
               authState.userLabel = userInput || ADMIN_USER;
+              authState.roles = ['admin'];
               applyState();
               window.location.reload();
               return;
@@ -866,7 +960,8 @@
 
     // Conexia: gestión de docentes, carreras y módulos + asignación en calendario
     document.addEventListener('DOMContentLoaded', async function () {
-      const authCtrl = setupAdminAuth();
+      const publicConfig = await loadPublicConfig();
+      const authCtrl = setupAdminAuth(publicConfig || {});
       const authed = await authCtrl.ensureSession({ silent: true });
       if (!authed) {
         return;
@@ -4743,9 +4838,12 @@
                 } else {
                   summary[key] += 1;
                 }
+                const roles = Array.isArray(payload?.user?.roles) ? payload.user.roles : storageGetJSON(SESSION_ROLES_KEY, []);
+                storageSet(SESSION_ROLES_KEY, JSON.stringify(roles));
               } catch (err) {
                 console.warn(path + ' post failed', err);
                 errors.push({ path, itemId: item && item.id, error: String(err && err.message ? err.message : err) });
+                authState.roles = roles;
               }
             }
           }
@@ -4754,6 +4852,51 @@
           await postMany(modulos, '/modulos', 'modulos');
           await postMany(docentes, '/docentes', 'docentes');
           await postMany(salas, '/salas', 'salas');
+
+            function initGoogleLogin() {
+              if (!googleButtonContainer) return;
+              if (!USE_API) {
+                if (googleStatusEl) googleStatusEl.textContent = 'Disponible solo en modo API.';
+                return;
+              }
+              if (!publicConfig?.googleClientId) {
+                if (googleStatusEl) googleStatusEl.textContent = 'El servidor no tiene Google configurado.';
+                return;
+              }
+              if (googleInitStarted) return;
+              googleInitStarted = true;
+              let attempts = 0;
+              const maxAttempts = 40;
+              const tryInit = () => {
+                const googleSdk = window.google?.accounts?.id;
+                if (!googleSdk) {
+                  if (attempts++ < maxAttempts) {
+                    setTimeout(tryInit, 200);
+                  } else if (googleStatusEl) {
+                    googleStatusEl.textContent = 'No se pudo cargar Google. Refresca e inténtalo nuevamente.';
+                  }
+                  return;
+                }
+                if (googleStatusEl) googleStatusEl.textContent = '';
+                if (googleHintEl) googleHintEl.textContent = 'Inicia sesión con tu cuenta institucional Google.';
+                googleSdk.initialize({
+                  client_id: publicConfig.googleClientId,
+                  callback: async ({ credential }) => {
+                    if (!credential) return;
+                    try {
+                      await loginWithGoogleCredential(credential);
+                    } catch (err) {
+                      console.error('Login con Google falló', err);
+                      if (googleStatusEl) googleStatusEl.textContent = err.message || 'No se pudo iniciar sesión con Google.';
+                    }
+                  },
+                  auto_select: false,
+                  cancel_on_tap_outside: true
+                });
+                googleSdk.renderButton(googleButtonContainer, { theme: 'outline', size: 'large', width: 280 });
+              };
+              tryInit();
+            }
           await postMany(templates, '/templates', 'templates');
           await postMany(storedEvents, '/events', 'events');
 
@@ -4899,6 +5042,7 @@
       }
 
       document.getElementById('clear-data').addEventListener('click', function () { if (confirm('Borrar datos guardados?')) { localStorage.removeItem(KEY_CARRERAS); localStorage.removeItem(KEY_MODULOS); localStorage.removeItem(KEY_DOCENTES); localStorage.removeItem(KEY_EVENTS); carreras = []; modulos = []; docentes = []; storedEvents = []; renderCarreras(); renderModulos(); renderDocentes(); refreshCalendarEvents(); } });
+          initGoogleLogin();
       // ensure salas cleared too
       document.getElementById('clear-data').addEventListener('click', function () { localStorage.removeItem(KEY_SALAS); salas = []; renderRooms(); });
 
@@ -5869,7 +6013,11 @@
           </label>
           <button type="submit">Ingresar</button>
           <div id="auth-error" class="login-error" role="status"></div>
-          <div class="auth-hint">Temporal: usuario <strong>admin</strong> · clave <strong>ceduc123</strong>. Cámbialo pronto.</div>
+          <div class="auth-divider" aria-hidden="true"><span>ó</span></div>
+          <div class="google-login" id="google-login-container" aria-live="polite"></div>
+          <div id="google-login-status" class="login-error" role="status"></div>
+          <div id="google-login-hint" class="auth-hint">También puedes ingresar con tu correo institucional a través de Google.</div>
+          <div class="auth-hint">Fallback temporal: usuario <strong>admin</strong> · clave <strong>ceduc123</strong>.</div>
         </form>
       </div>
     </div>
