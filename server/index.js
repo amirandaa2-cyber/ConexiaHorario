@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { OAuth2Client } = require('google-auth-library');
 const db = require('./db');
 const { v4: uuidv4 } = require('uuid');
 
@@ -17,6 +18,10 @@ const dbReady = db && db.ready;
 const AUTH_TOKEN_TTL_HOURS = parseInt(process.env.SESSION_TTL_HOURS || '12', 10);
 const MAX_FAILED_ATTEMPTS = parseInt(process.env.MAX_FAILED_ATTEMPTS || '5', 10);
 const LOCKOUT_MINUTES = parseInt(process.env.LOCKOUT_MINUTES || '15', 10);
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) : null;
+const USE_DB_ONLY = /^(1|true)$/i.test(process.env.USE_DB_ONLY || '');
 
 function handleDbError(res, err){
   console.error('Database error', err);
@@ -107,6 +112,13 @@ async function loadSessionFromToken(rawToken, { requireAdmin = false } = {}){
 	};
 }
 
+app.get('/api/public-config', (req,res)=>{
+	res.json({
+		googleClientId: GOOGLE_CLIENT_ID || null,
+		useDbOnly: USE_DB_ONLY
+	});
+});
+
 // Basic CRUD endpoints (only enabled if DB loaded)
 if(dbReady){
 	app.post('/api/auth/login', async (req,res)=>{
@@ -171,6 +183,54 @@ if(dbReady){
 	});
 
 	app.get('/api/auth/session', async (req,res)=>{
+			app.post('/api/auth/google', async (req,res)=>{
+				if (!googleClient) {
+					return res.status(503).json({ error: 'Inicio con Google no está configurado.' });
+				}
+				const { credential } = req.body || {};
+				if (!credential) {
+					return res.status(400).json({ error: 'Token de Google faltante.' });
+				}
+				try {
+					const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID });
+					const payload = ticket.getPayload();
+					const email = (payload && payload.email) ? payload.email.toLowerCase() : null;
+					if (!email) {
+						return res.status(400).json({ error: 'Cuenta de Google sin correo verificado.' });
+					}
+					const { rows } = await db.query(
+						`SELECT id, email, username, rol, esta_activo
+						   FROM usuarios
+						  WHERE LOWER(email) = LOWER($1)
+						    AND rol = 'admin'
+						  LIMIT 1`,
+						[email]
+					);
+					if (!rows.length) {
+						return res.status(403).json({ error: 'Esta cuenta no tiene permisos para acceder.' });
+					}
+					const user = rows[0];
+					if (!user.esta_activo) {
+						return res.status(403).json({ error: 'La cuenta está deshabilitada.' });
+					}
+					await db.query('UPDATE usuarios SET ultimo_login=now(), actualizado_en=now() WHERE id=$1', [user.id]);
+					const token = crypto.randomBytes(48).toString('hex');
+					const expiresAt = await createLoginSession(user.id, token, req);
+					res.json({
+						token,
+						expiresAt,
+						user: {
+							id: user.id,
+							email: user.email,
+							username: user.username,
+							rol: user.rol
+						}
+					});
+				} catch (err) {
+					console.error('Google auth error', err);
+					res.status(401).json({ error: 'No se pudo validar la sesión de Google.' });
+				}
+			});
 		const token = extractToken(req);
 		if (!token) {
 			return res.status(401).json({ error: 'Token no enviado.' });

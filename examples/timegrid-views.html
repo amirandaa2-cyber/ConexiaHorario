@@ -4647,30 +4647,56 @@
 
       // Migrate localStorage data to server endpoints (best-effort). Requires USE_API true and server running at API_BASE
       async function migrateToServer() {
-        if (!USE_API) { alert('Para migrar, activa el Modo API en el código (USE_API=true) y asegúrate de que el servidor esté corriendo en ' + API_BASE); return; }
+        const btn = document.getElementById('migrate-server');
+        if (!USE_API) {
+          try { showResultModal('Para migrar, activa el Modo API y asegura que el servidor esté corriendo en ' + API_BASE, 'error'); } catch (e) { alert('Para migrar, activa el Modo API y asegúrate de que el servidor esté corriendo en ' + API_BASE); }
+          return;
+        }
+        if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Migrando...'; }
+        const base = API_BASE;
+        const jsonHeaders = { 'Content-Type': 'application/json' };
+        const summary = { carreras: 0, modulos: 0, docentes: 0, salas: 0, templates: 0, events: 0 };
+        const errors = [];
         try {
-          const base = API_BASE;
-          const jsonHeaders = { 'Content-Type': 'application/json' };
-          for (const c of carreras) {
-            try { await authorizedFetch(base + '/carreras', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(c) }); } catch (err) { console.warn('carrera post failed', err); }
+          // helper to post and collect errors
+          async function postMany(list, path, key) {
+            for (const item of (list || [])) {
+              try {
+                const r = await authorizedFetch(base + path, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(item) });
+                if (!r.ok) {
+                  let txt = await r.text().catch(() => '');
+                  try { const j = JSON.parse(txt); txt = j && j.error ? j.error : JSON.stringify(j); } catch (_) { }
+                  errors.push({ path, itemId: item && item.id, status: r.status, body: txt });
+                } else {
+                  summary[key] += 1;
+                }
+              } catch (err) {
+                console.warn(path + ' post failed', err);
+                errors.push({ path, itemId: item && item.id, error: String(err && err.message ? err.message : err) });
+              }
+            }
           }
-          for (const m of modulos) {
-            try { await authorizedFetch(base + '/modulos', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(m) }); } catch (err) { console.warn('modulo post failed', err); }
+
+          await postMany(carreras, '/carreras', 'carreras');
+          await postMany(modulos, '/modulos', 'modulos');
+          await postMany(docentes, '/docentes', 'docentes');
+          await postMany(salas, '/salas', 'salas');
+          await postMany(templates, '/templates', 'templates');
+          await postMany(storedEvents, '/events', 'events');
+
+          if (errors.length === 0) {
+            try { showResultModal('Los datos se migraron correctamente. Se migraron: ' + Object.entries(summary).map(([k,v])=>`${v} ${k}`).join(', ') + '.', 'success'); } catch (e) { alert('Los datos se migraron correctamente.'); }
+          } else {
+            console.error('Errores al migrar:', errors);
+            const errCount = errors.length;
+            try { showResultModal('Migración incompleta: ' + errCount + ' error(es). Revisa la consola para detalles.', 'error'); } catch (e) { alert('Migración incompleta: ' + errCount + ' error(es). Revisa la consola para detalles.'); }
           }
-          for (const d of docentes) {
-            try { await authorizedFetch(base + '/docentes', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(d) }); } catch (err) { console.warn('docente post failed', err); }
-          }
-          for (const s of salas) {
-            try { await authorizedFetch(base + '/salas', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(s) }); } catch (err) { console.warn('sala post failed', err); }
-          }
-          for (const t of templates) {
-            try { await authorizedFetch(base + '/templates', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(t) }); } catch (err) { console.warn('template post failed', err); }
-          }
-          for (const evt of storedEvents) {
-            try { await authorizedFetch(base + '/events', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(evt) }); } catch (err) { console.warn('event post failed', err); }
-          }
-          alert('Migración completada (revisa el servidor para confirmar).');
-        } catch (err) { console.error('migrateToServer', err); alert('Error migrando datos: ' + (err && err.message ? err.message : String(err))); }
+        } catch (err) {
+          console.error('migrateToServer', err);
+          try { showResultModal('Error migrando datos: ' + (err && err.message ? err.message : String(err)), 'error'); } catch (e) { alert('Error migrando datos: ' + (err && err.message ? err.message : String(err))); }
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || 'Migrar datos al servidor'; }
+        }
       }
 
       const migrateBtn = document.getElementById('migrate-server');
