@@ -873,6 +873,51 @@
         handleAuthSuccess(payload, payload?.user?.fullName);
       }
 
+      function initGoogleLogin() {
+        if (!googleButtonContainer) return;
+        if (!USE_API) {
+          if (googleStatusEl) googleStatusEl.textContent = 'Disponible solo en modo API.';
+          return;
+        }
+        if (!publicConfig?.googleClientId) {
+          if (googleStatusEl) googleStatusEl.textContent = 'El servidor no tiene Google configurado.';
+          return;
+        }
+        if (googleInitStarted) return;
+        googleInitStarted = true;
+        let attempts = 0;
+        const maxAttempts = 40;
+        const tryInit = () => {
+          const googleSdk = window.google?.accounts?.id;
+          if (!googleSdk) {
+            if (attempts++ < maxAttempts) {
+              setTimeout(tryInit, 200);
+            } else if (googleStatusEl) {
+              googleStatusEl.textContent = 'No se pudo cargar Google. Refresca e inténtalo nuevamente.';
+            }
+            return;
+          }
+          if (googleStatusEl) googleStatusEl.textContent = '';
+          if (googleHintEl) googleHintEl.textContent = 'Inicia sesión con tu cuenta institucional Google.';
+          googleSdk.initialize({
+            client_id: publicConfig.googleClientId,
+            callback: async ({ credential }) => {
+              if (!credential) return;
+              try {
+                await loginWithGoogleCredential(credential);
+              } catch (err) {
+                console.error('Login con Google falló', err);
+                if (googleStatusEl) googleStatusEl.textContent = err.message || 'No se pudo iniciar sesión con Google.';
+              }
+            },
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+          googleSdk.renderButton(googleButtonContainer, { theme: 'outline', size: 'large', width: 280 });
+        };
+        tryInit();
+      }
+
       async function ensureSession({ silent = false } = {}) {
         if (!USE_API) {
           authState.authenticated = storageGet(ADMIN_AUTH_KEY) === '1';
@@ -949,6 +994,7 @@
       }
 
       applyState();
+      try { initGoogleLogin(); } catch (err) { console.error('initGoogleLogin error', err); }
       const api = {
         isAuthenticated: () => authState.authenticated,
         ensureSession,
@@ -1111,21 +1157,30 @@
           [KEY_DOCENTES]: '/docentes',
           [KEY_TEMPLATES]: '/templates',
           [KEY_EVENTS]: '/events',
-          [KEY_SALAS]: '/salas'
+          [KEY_SALAS]: '/salas',
+          'proto_salas_v1': '/salas'
         };
         const path = mapping[key];
         if (!path) return;
         try {
           const base = API_BASE;
-          // fetch remote list to detect removals
           const remoteR = await authorizedFetch(base + path);
           const remoteList = remoteR.ok ? await remoteR.json() : [];
-          const remoteIds = new Set((remoteList || []).map(r => String(r.id)));
+          const remoteMap = new Map();
+          (remoteList || []).forEach(entry => {
+            if (entry && entry.id != null) {
+              remoteMap.set(String(entry.id), entry);
+            }
+          });
           const localList = Array.isArray(val) ? val : [];
-          const localIds = new Set(localList.map(l => String(l.id)));
+          const localIds = new Set();
+          for (const item of localList) {
+            if (item && item.id != null) {
+              localIds.add(String(item.id));
+            }
+          }
 
-          // delete remote items that no longer exist locally
-          for (const rid of remoteIds) {
+          for (const [rid] of remoteMap) {
             if (!localIds.has(rid)) {
               try {
                 await authorizedFetch(base + path + '/' + encodeURIComponent(rid), { method: 'DELETE' });
@@ -1133,21 +1188,25 @@
             }
           }
 
-          // upsert local items
           for (const item of localList) {
+            if (!item) continue;
+            const id = item.id != null ? String(item.id) : null;
             try {
-              const postR = await authorizedFetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-              if (!postR.ok) {
-                // try update
-                const id = item && item.id;
-                if (id) {
-                  try {
-                    await authorizedFetch(base + path + '/' + encodeURIComponent(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-                  } catch (err2) { console.warn('put failed for', path, id, err2); }
-                }
+              if (id && remoteMap.has(id)) {
+                await authorizedFetch(base + path + '/' + encodeURIComponent(id), {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(item)
+                });
+              } else {
+                await authorizedFetch(base + path, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(item)
+                });
               }
             } catch (err) {
-              console.warn('post/put failed for', path, item && item.id, err);
+              console.warn('sync failed for', path, id || '(sin id)', err);
             }
           }
         } catch (err) { console.error('apiSyncForKey error', key, err); }
@@ -3852,9 +3911,6 @@
 
             // En lugar de buscar ev.from (que no existe), agregamos el evento directamente
             try {
-              // Asegurarnos de que el evento tenga un ID único
-              if (!ev.id) ev.id = 'evt_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-
               storedEvents.push(ev);
               addedEvents.push(ev);
               applied.push(ev);
@@ -4690,7 +4746,11 @@
 
       function refreshCalendarEvents() {
         try {
-          storedEvents = load(KEY_EVENTS, []);
+          if (!USE_API) {
+            storedEvents = load(KEY_EVENTS, []);
+          } else if (!Array.isArray(storedEvents)) {
+            storedEvents = [];
+          }
           if (!calendar) { console.warn('Calendar not initialized yet'); return; }
 
           // Ejecutar limpieza de eventos antiguos
@@ -4838,12 +4898,9 @@
                 } else {
                   summary[key] += 1;
                 }
-                const roles = Array.isArray(payload?.user?.roles) ? payload.user.roles : storageGetJSON(SESSION_ROLES_KEY, []);
-                storageSet(SESSION_ROLES_KEY, JSON.stringify(roles));
               } catch (err) {
                 console.warn(path + ' post failed', err);
                 errors.push({ path, itemId: item && item.id, error: String(err && err.message ? err.message : err) });
-                authState.roles = roles;
               }
             }
           }
@@ -4852,51 +4909,6 @@
           await postMany(modulos, '/modulos', 'modulos');
           await postMany(docentes, '/docentes', 'docentes');
           await postMany(salas, '/salas', 'salas');
-
-            function initGoogleLogin() {
-              if (!googleButtonContainer) return;
-              if (!USE_API) {
-                if (googleStatusEl) googleStatusEl.textContent = 'Disponible solo en modo API.';
-                return;
-              }
-              if (!publicConfig?.googleClientId) {
-                if (googleStatusEl) googleStatusEl.textContent = 'El servidor no tiene Google configurado.';
-                return;
-              }
-              if (googleInitStarted) return;
-              googleInitStarted = true;
-              let attempts = 0;
-              const maxAttempts = 40;
-              const tryInit = () => {
-                const googleSdk = window.google?.accounts?.id;
-                if (!googleSdk) {
-                  if (attempts++ < maxAttempts) {
-                    setTimeout(tryInit, 200);
-                  } else if (googleStatusEl) {
-                    googleStatusEl.textContent = 'No se pudo cargar Google. Refresca e inténtalo nuevamente.';
-                  }
-                  return;
-                }
-                if (googleStatusEl) googleStatusEl.textContent = '';
-                if (googleHintEl) googleHintEl.textContent = 'Inicia sesión con tu cuenta institucional Google.';
-                googleSdk.initialize({
-                  client_id: publicConfig.googleClientId,
-                  callback: async ({ credential }) => {
-                    if (!credential) return;
-                    try {
-                      await loginWithGoogleCredential(credential);
-                    } catch (err) {
-                      console.error('Login con Google falló', err);
-                      if (googleStatusEl) googleStatusEl.textContent = err.message || 'No se pudo iniciar sesión con Google.';
-                    }
-                  },
-                  auto_select: false,
-                  cancel_on_tap_outside: true
-                });
-                googleSdk.renderButton(googleButtonContainer, { theme: 'outline', size: 'large', width: 280 });
-              };
-              tryInit();
-            }
           await postMany(templates, '/templates', 'templates');
           await postMany(storedEvents, '/events', 'events');
 
@@ -5041,10 +5053,58 @@
         });
       }
 
-      document.getElementById('clear-data').addEventListener('click', function () { if (confirm('Borrar datos guardados?')) { localStorage.removeItem(KEY_CARRERAS); localStorage.removeItem(KEY_MODULOS); localStorage.removeItem(KEY_DOCENTES); localStorage.removeItem(KEY_EVENTS); carreras = []; modulos = []; docentes = []; storedEvents = []; renderCarreras(); renderModulos(); renderDocentes(); refreshCalendarEvents(); } });
-          initGoogleLogin();
-      // ensure salas cleared too
-      document.getElementById('clear-data').addEventListener('click', function () { localStorage.removeItem(KEY_SALAS); salas = []; renderRooms(); });
+      const clearDataBtn = document.getElementById('clear-data');
+      if (clearDataBtn) {
+        clearDataBtn.addEventListener('click', async function () {
+          if (!confirm('Borrar datos guardados?')) return;
+          if (USE_API) {
+            const base = API_BASE;
+            const pathsInOrder = ['/events', '/templates', '/salas', '/docentes', '/modulos', '/carreras'];
+            for (const path of pathsInOrder) {
+              try {
+                const response = await authorizedFetch(base + path);
+                const items = response.ok ? await response.json() : [];
+                for (const item of items || []) {
+                  const id = item && item.id;
+                  if (!id) continue;
+                  try {
+                    await authorizedFetch(base + path + '/' + encodeURIComponent(id), { method: 'DELETE' });
+                  } catch (err) {
+                    console.warn('No se pudo eliminar', path, id, err);
+                  }
+                }
+              } catch (err) {
+                console.warn('No se pudieron limpiar recursos en', path, err);
+              }
+            }
+          } else {
+            localStorage.removeItem(KEY_CARRERAS);
+            localStorage.removeItem(KEY_MODULOS);
+            localStorage.removeItem(KEY_DOCENTES);
+            localStorage.removeItem(KEY_EVENTS);
+            localStorage.removeItem(KEY_TEMPLATES);
+            localStorage.removeItem(KEY_SALAS);
+          }
+          carreras = [];
+          modulos = [];
+          docentes = [];
+          storedEvents = [];
+          templates = [];
+          salas = [];
+          save(KEY_CARRERAS, carreras);
+          save(KEY_MODULOS, modulos);
+          save(KEY_DOCENTES, docentes);
+          save(KEY_TEMPLATES, templates);
+          save(KEY_SALAS, salas);
+          persistEventsAndValidate();
+          renderCarreras();
+          renderModulos();
+          renderDocentes();
+          renderRooms();
+          refreshCalendarEvents();
+          try { showResultModal('Datos limpiados correctamente.', 'success'); } catch (_) { alert('Datos limpiados correctamente.'); }
+        });
+      }
 
       document.getElementById('run-acople').addEventListener('click', function () { if (!confirm('Abrir vista previa de acople para la semana seleccionada?')) return; const wk = document.getElementById('filter-week')?.value || getWeekRange()[0]; openAcoplePreview(wk); });
 
