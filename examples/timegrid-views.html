@@ -606,19 +606,21 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
   <script>
 
-    const ADMIN_AUTH_KEY = 'proto_admin_session_v1';
-    const SESSION_TOKEN_KEY = 'proto_admin_token';
-    const SESSION_EXP_KEY = 'proto_admin_session_exp';
+    const ADMIN_AUTH_KEY = 'conexia_admin_session_v1';
+    const SESSION_TOKEN_KEY = 'conexia_admin_token';
+    const SESSION_EXP_KEY = 'conexia_admin_session_exp';
     const ADMIN_USER = 'admin';
     const ADMIN_PASS = 'ceduc123';
-    const SESSION_USER_KEY = 'proto_admin_username';
+    const SESSION_USER_KEY = 'conexia_admin_username';
     const SESSION_PRIV_DESC = 'Privilegios: crear/editar carreras, módulos, docentes y publicar horarios oficiales.';
     const STATE_VERSION = '1.0';
-    const KEY_DOCENTES = 'proto_docentes_v1';
-    const KEY_CARRERAS = 'proto_carreras_v1';
-    const KEY_MODULOS = 'proto_modulos_v1';
-    const KEY_EVENTS = 'proto_mod_events_v1';
-    const KEY_TEMPLATES = 'proto_templates_v1';
+    const KEY_DOCENTES = 'conexia_docentes_v1';
+    const KEY_CARRERAS = 'conexia_carreras_v1';
+    const KEY_MODULOS = 'conexia_modulos_v1';
+    const KEY_EVENTS = 'conexia_mod_events_v1';
+    const KEY_TEMPLATES = 'conexia_templates_v1';
+    const KEY_SALAS = 'conexia_salas_v1';
+    const KEY_CALENDAR_STATE = 'conexia_calendar_state_v1';
 
     function storageGet(key) {
       try { return window.localStorage.getItem(key); } catch (_) { return null; }
@@ -862,12 +864,26 @@
       return api;
     }
 
-    // Prototipo: gestión de docentes, carreras y módulos + asignación en calendario
+    // Conexia: gestión de docentes, carreras y módulos + asignación en calendario
     document.addEventListener('DOMContentLoaded', async function () {
       const authCtrl = setupAdminAuth();
       const authed = await authCtrl.ensureSession({ silent: true });
       if (!authed) {
         return;
+      }
+      // If running with API mode, fetch initial data from the server so the app uses PostgreSQL
+      if (USE_API) {
+        try {
+          try { carreras = await fetchCarreras(); } catch (e) { carreras = []; console.error('fetchCarreras error', e); }
+          try { modulos = await fetchModulos(); } catch (e) { modulos = []; console.error('fetchModulos error', e); }
+          try { docentes = await fetchDocentes(); } catch (e) { docentes = []; console.error('fetchDocentes error', e); }
+          try { templates = await fetchTemplates(); } catch (e) { templates = []; console.error('fetchTemplates error', e); }
+          try { storedEvents = await fetchEvents(); } catch (e) { storedEvents = []; console.error('fetchEvents error', e); }
+          try { const r = await authorizedFetch(API_BASE + '/salas'); salas = r.ok ? await r.json() : []; } catch (e) { salas = []; console.error('fetchSalas error', e); }
+        } catch (err) { console.error('Initial data load from API failed', err); }
+      } else {
+        // fall back to loading from localStorage when not using API
+        try { docentes = load(KEY_DOCENTES, []); carreras = load(KEY_CARRERAS, []); modulos = load(KEY_MODULOS, []); storedEvents = load(KEY_EVENTS, []); templates = load(KEY_TEMPLATES, []); salas = load(KEY_SALAS, []); } catch (e) { console.warn('local load failed', e); }
       }
       // (removed .fc-event.hidden CSS approach - rely on strict filtering instead)
       // --- DIAGNÓSTICO EN PÁGINA -------------------------------------------------
@@ -978,11 +994,68 @@
       }
 
       function save(key, val) {
-        localStorage.setItem(key, JSON.stringify({
-          version: STATE_VERSION,
-          data: val,
-          timestamp: Date.now()
-        }));
+        try {
+          localStorage.setItem(key, JSON.stringify({
+            version: STATE_VERSION,
+            data: val,
+            timestamp: Date.now()
+          }));
+        } catch (e) { console.warn('localStorage save failed', e); }
+        // If running against an API, sync in background (best-effort)
+        if (USE_API) {
+          try { apiSyncForKey(key, val); } catch (e) { console.error('apiSyncForKey spawn failed', e); }
+        }
+      }
+
+      // background sync helper: best-effort synchronization of an in-memory array to REST endpoints
+      async function apiSyncForKey(key, val) {
+        if (!USE_API) return;
+        const mapping = {
+          [KEY_CARRERAS]: '/carreras',
+          [KEY_MODULOS]: '/modulos',
+          [KEY_DOCENTES]: '/docentes',
+          [KEY_TEMPLATES]: '/templates',
+          [KEY_EVENTS]: '/events',
+          [KEY_SALAS]: '/salas'
+        };
+        const path = mapping[key];
+        if (!path) return;
+        try {
+          const base = API_BASE;
+          // fetch remote list to detect removals
+          const remoteR = await authorizedFetch(base + path);
+          const remoteList = remoteR.ok ? await remoteR.json() : [];
+          const remoteIds = new Set((remoteList || []).map(r => String(r.id)));
+          const localList = Array.isArray(val) ? val : [];
+          const localIds = new Set(localList.map(l => String(l.id)));
+
+          // delete remote items that no longer exist locally
+          for (const rid of remoteIds) {
+            if (!localIds.has(rid)) {
+              try {
+                await authorizedFetch(base + path + '/' + encodeURIComponent(rid), { method: 'DELETE' });
+              } catch (err) { console.warn('delete remote failed', path, rid, err); }
+            }
+          }
+
+          // upsert local items
+          for (const item of localList) {
+            try {
+              const postR = await authorizedFetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+              if (!postR.ok) {
+                // try update
+                const id = item && item.id;
+                if (id) {
+                  try {
+                    await authorizedFetch(base + path + '/' + encodeURIComponent(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+                  } catch (err2) { console.warn('put failed for', path, id, err2); }
+                }
+              }
+            } catch (err) {
+              console.warn('post/put failed for', path, item && item.id, err);
+            }
+          }
+        } catch (err) { console.error('apiSyncForKey error', key, err); }
       }
 
       // Persistencia con debounce
@@ -1051,14 +1124,14 @@
         }
       }
 
-      // Data
+      // Data (start empty; if USE_API=true we'll fetch from the server at startup)
       // docente fields: {id, rut, nombre, edad, estadoCivil, contratoHoras, horasAsignadas, horasTrabajadas, turno, activo}
-      let docentes = load(KEY_DOCENTES, []);
-      let carreras = load(KEY_CARRERAS, []); // {id, nombre, totalHoras, practicaHoras, teoricaHoras}
-      let modulos = load(KEY_MODULOS, []);   // {id, nombre, carreraId, horas, tipo}
-      let storedEvents = load(KEY_EVENTS, []); // FullCalendar event objects + metadata
-      let templates = load(KEY_TEMPLATES, []); // recurrence templates: {id, moduloId, docenteId, salaId, startDate, time, duration, until}
-      let salas = load('proto_salas_v1', []); // {id, nombre, capacidad}
+      let docentes = [];
+      let carreras = []; // {id, nombre, totalHoras, practicaHoras, teoricaHoras}
+      let modulos = [];   // {id, nombre, carreraId, horas, tipo}
+      let storedEvents = []; // FullCalendar event objects + metadata
+      let templates = []; // recurrence templates: {id, moduloId, docenteId, salaId, startDate, time, duration, until}
+      let salas = []; // {id, nombre, capacidad}
 
       // Calendar
       const calendarEl = document.getElementById('calendar');
@@ -1096,7 +1169,7 @@
           let _initialDate = new Date().toISOString().slice(0, 10);
           let _initialView = 'timeGridWeek';
           try {
-            const raw = localStorage.getItem('proto_calendar_state_v1');
+            const raw = localStorage.getItem(KEY_CALENDAR_STATE);
             if (raw) {
               const st = JSON.parse(raw);
               if (st && st.currentDate) _initialDate = st.currentDate;
@@ -1154,7 +1227,7 @@
             datesSet: function (info) {
               try {
                 const state = { currentDate: info.startStr || (info.start ? info.start.toISOString().slice(0, 10) : null), view: info.view ? info.view.type : null };
-                localStorage.setItem('proto_calendar_state_v1', JSON.stringify(state));
+                localStorage.setItem(KEY_CALENDAR_STATE, JSON.stringify(state));
                 // Aseguramos guardar eventos en disco por si hay cambios pendientes
                 try { persistEventsAndValidate(); } catch (_) { }
               } catch (err) { console.error('datesSet handler error', err); }
@@ -2197,7 +2270,7 @@
                   salas = salas.filter(sala => sala.id !== s.id);
 
                   // Guardar cambios
-                  save('proto_salas_v1', salas);
+                  save(KEY_SALAS, salas);
                   save(KEY_EVENTS, storedEvents);
 
                   // Actualizar UI
@@ -2356,7 +2429,7 @@
       // handle sala form submit
       const formSala = document.getElementById('form-sala');
       if (formSala) {
-        formSala.addEventListener('submit', function (ev) { ev.preventDefault(); const id = document.getElementById('sala-id').value.trim(); const nombre = document.getElementById('sala-nombre').value.trim(); if (!id || !nombre) { alert('ID y nombre sala requeridos'); return; } salas.push({ id, nombre, capacidad: 0 }); save('proto_salas_v1', salas); renderRooms(); document.getElementById('sala-id').value = ''; document.getElementById('sala-nombre').value = ''; const sm = document.getElementById('sala-modal'); if (sm) hideModal(sm); });
+        formSala.addEventListener('submit', function (ev) { ev.preventDefault(); const id = document.getElementById('sala-id').value.trim(); const nombre = document.getElementById('sala-nombre').value.trim(); if (!id || !nombre) { alert('ID y nombre sala requeridos'); return; } salas.push({ id, nombre, capacidad: 0 }); save(KEY_SALAS, salas); renderRooms(); document.getElementById('sala-id').value = ''; document.getElementById('sala-nombre').value = ''; const sm = document.getElementById('sala-modal'); if (sm) hideModal(sm); });
       }
 
       // Assignment modal (replaces prompt flow)
@@ -4747,7 +4820,7 @@
           const weekStart = document.getElementById('filter-week')?.value || getWeekRange()[0];
           let createdEvents = 0;
           // persist all
-          save(KEY_CARRERAS, carreras); save(KEY_MODULOS, modulos); save(KEY_DOCENTES, docentes); save('proto_salas_v1', salas);
+          save(KEY_CARRERAS, carreras); save(KEY_MODULOS, modulos); save(KEY_DOCENTES, docentes); save(KEY_SALAS, salas);
           persistEventsAndValidate();
           renderCarreras(); renderModulos(); renderDocentes(); renderRooms();
           // navigate calendar to the seeded week so user sees results
@@ -4827,7 +4900,7 @@
 
       document.getElementById('clear-data').addEventListener('click', function () { if (confirm('Borrar datos guardados?')) { localStorage.removeItem(KEY_CARRERAS); localStorage.removeItem(KEY_MODULOS); localStorage.removeItem(KEY_DOCENTES); localStorage.removeItem(KEY_EVENTS); carreras = []; modulos = []; docentes = []; storedEvents = []; renderCarreras(); renderModulos(); renderDocentes(); refreshCalendarEvents(); } });
       // ensure salas cleared too
-      document.getElementById('clear-data').addEventListener('click', function () { localStorage.removeItem('proto_salas_v1'); salas = []; renderRooms(); });
+      document.getElementById('clear-data').addEventListener('click', function () { localStorage.removeItem(KEY_SALAS); salas = []; renderRooms(); });
 
       document.getElementById('run-acople').addEventListener('click', function () { if (!confirm('Abrir vista previa de acople para la semana seleccionada?')) return; const wk = document.getElementById('filter-week')?.value || getWeekRange()[0]; openAcoplePreview(wk); });
 
@@ -5781,8 +5854,8 @@
       <div class="auth-hero">
         <span class="auth-badge"><span aria-hidden="true">★</span> Inspirado en la bienvenida de inicioSesion</span>
         <h1>Bienvenido a</h1>
-        <h2>Horarium Pro · Gestión Horaria</h2>
-        <p>Este prototipo requiere credenciales de administrador para proteger la planificación horaria. Usa estos accesos provisionales y actualízalos más adelante.</p>
+        <h2>Conexia · Gestión Horaria</h2>
+        <p>Conexia requiere credenciales de administrador para proteger la planificación horaria. Usa estos accesos provisionales y actualízalos más adelante.</p>
       </div>
       <div class="auth-card">
         <h3>Acceso administrador</h3>
@@ -5829,7 +5902,7 @@
             </picture>
           </div>
       </div>
-      <h2>Prototipo: Gestión Académica</h2>
+      <h2>Conexia · Gestión Académica</h2>
       <p>Crear y administrar carreras, módulos y docentes. Los eventos se guardan en <em>localStorage</em>.</p>
 
       <div class="sidebar-group" data-group="legend">
