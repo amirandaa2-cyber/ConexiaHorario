@@ -3770,6 +3770,101 @@
           }
 
           function onKeep() {
+            try {
+              // Al elegir "Mantener existente" queremos asegurarnos de no dejar
+              // duplicados en el calendario ni en el almacenamiento.
+              // Si el candidato (evento movido/creado) quedó presente en la UI
+              // o en `storedEvents`, lo eliminamos, manteniendo únicamente los
+              // eventos ya existentes que causaron el conflicto.
+              (function cleanupDuplicates() {
+                try {
+                  if (!Array.isArray(conflicts)) return;
+                  const candStart = candidate && candidate.start ? new Date(candidate.start).getTime() : null;
+                  const candEnd = candidate && candidate.end ? new Date(candidate.end).getTime() : null;
+
+                  // Primero: intentar eliminar explícitamente cualquier evento del calendario
+                  // que coincida exactamente con el candidato (por id y por firma).
+                  // Esto cubre casos donde FullCalendar ya creó/modificó el evento
+                  // pero aún no se limpió correctamente.
+                  try {
+                    if (candidate && candidate.id && calendar && typeof calendar.getEventById === 'function') {
+                      const existingById = calendar.getEventById(String(candidate.id));
+                      if (existingById) {
+                        const existingStartIso = existingById.start ? existingById.start.toISOString() : null;
+                        const existingEndIso = existingById.end ? existingById.end.toISOString() : null;
+                        if (existingStartIso === candidate.start && (existingEndIso === candidate.end || (existingEndIso === null && candidate.end === null))) {
+                          try { existingById.remove(); } catch (e) { console.warn('No se pudo eliminar duplicado exacto por id', e); }
+                        }
+                        // también limpiar storedEvents por id + firma exacta (defensivo)
+                        try {
+                          if (typeof storedEvents !== 'undefined' && Array.isArray(storedEvents)) {
+                            storedEvents = storedEvents.filter(se => {
+                              try {
+                                if (!se) return true;
+                                if (se.id && candidate.id && String(se.id) === String(candidate.id)) {
+                                  const ss = se.start || null;
+                                  const seEnd = se.end || null;
+                                  if (ss === candidate.start && seEnd === candidate.end) return false;
+                                }
+                                return true;
+                              } catch (_) { return true; }
+                            });
+                          }
+                        } catch (e) { console.warn('No se pudo limpiar storedEvents por id del candidato', e); }
+                      }
+                    }
+                  } catch (e) { console.warn('explicit candidate removal failed', e); }
+
+                  // remove any calendar event that overlaps the candidate and is not one of the conflict.event items
+                  if (calendar && typeof calendar.getEvents === 'function') {
+                    const events = calendar.getEvents().slice();
+                    events.forEach(calEv => {
+                      try {
+                        const calId = calEv.id || null;
+                        const calStart = calEv.start ? calEv.start.getTime() : null;
+                        const calEnd = calEv.end ? calEv.end.getTime() : null;
+                        if (candStart === null || candEnd === null || calStart === null || calEnd === null) return;
+
+                        const overlap = !(candEnd <= calStart || candStart >= calEnd);
+                        if (!overlap) return;
+
+                        // check if this calendar event corresponds to any of the known conflicts
+                        const isConflictEvent = conflicts.some(c => c && c.event && (String((c.event && c.event.id) || '') === String(calId) || (c.event && c.event.start === (calEv.start ? calEv.start.toISOString() : null) && c.event && c.event.title === calEv.title)));
+                        if (isConflictEvent) return;
+
+                        // if it overlaps and is not one of the conflict events, remove it (it's likely the moved duplicate)
+                        try { calEv.remove(); } catch (e) { console.warn('No se pudo eliminar evento duplicado del calendario', e); }
+                        // also remove matching entries from storedEvents by id or by signature
+                        try {
+                          storedEvents = storedEvents.filter(se => {
+                            if (se && se.id && calId && String(se.id) === String(calId)) return false;
+                            const sig = `${se.title||''}__${se.start||''}__${se.end||''}`;
+                            const calSig = `${calEv.title||''}__${(calEv.start?calEv.start.toISOString():'')}__${(calEv.end?calEv.end.toISOString():'')}`;
+                            if (sig === calSig) return false;
+                            return true;
+                          });
+                        } catch (e) { console.warn('Error limpiando storedEvents de duplicados', e); }
+                      } catch (err) { console.warn('cleanup check event failed', err); }
+                    });
+                  }
+
+                  // also defensively remove any storedEvents that exactly match the candidate signature
+                  try {
+                    if (candidate && candidate.start && candidate.end) {
+                      const candSig = `${candidate.title||''}__${candidate.start||''}__${candidate.end||''}`;
+                      storedEvents = storedEvents.filter(se => {
+                        const sig = `${se.title||''}__${se.start||''}__${se.end||''}`;
+                        return sig !== candSig;
+                      });
+                    }
+                  } catch (e) { console.warn('cleanup storedEvents signature remove failed', e); }
+
+                  // persist changes and refresh calendar view
+                  try { persistEventsAndValidate(); } catch (e) { console.warn('persist after cleanup failed', e); }
+                } catch (e) { console.warn('cleanupDuplicates failed', e); }
+              })();
+            } catch (e) { console.warn('onKeep cleanup error', e); }
+
             finish(keepAction);
           }
 
