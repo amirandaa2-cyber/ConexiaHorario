@@ -619,8 +619,6 @@
     const KEY_MODULOS = 'proto_modulos_v1';
     const KEY_EVENTS = 'proto_mod_events_v1';
     const KEY_TEMPLATES = 'proto_templates_v1';
-    const USE_API = (typeof window !== 'undefined' && 'APP_USE_API' in window) ? Boolean(window.APP_USE_API) : false;
-    const API_BASE = (typeof window !== 'undefined' && window.APP_API_URL) ? window.APP_API_URL : 'http://localhost:3001/api';
 
     function storageGet(key) {
       try { return window.localStorage.getItem(key); } catch (_) { return null; }
@@ -632,6 +630,31 @@
 
     function storageRemove(key) {
       try { window.localStorage.removeItem(key); } catch (_) { }
+    }
+
+    function detectDefaultApiBase() {
+      if (typeof window === 'undefined') return 'http://localhost:3001/api';
+      const fallbackOrigin = (window.location && window.location.origin && window.location.origin !== 'null')
+        ? window.location.origin.replace(/\/$/, '')
+        : 'http://localhost:3001';
+      const resolved = window.APP_API_URL || (fallbackOrigin + '/api');
+      window.APP_API_URL = resolved;
+      return resolved;
+    }
+
+    function resolveApiMode() {
+      if (typeof window === 'undefined') return false;
+      if ('APP_USE_API' in window) return Boolean(window.APP_USE_API);
+      const storedPref = storageGet('use_api_mode');
+      if (storedPref === 'true') return true;
+      if (storedPref === 'false') return false;
+      return window.location ? window.location.protocol !== 'file:' : false;
+    }
+
+    const API_BASE = detectDefaultApiBase();
+    const USE_API = resolveApiMode();
+    if (typeof window !== 'undefined' && !('APP_USE_API' in window)) {
+      window.APP_USE_API = USE_API;
     }
 
     function getStoredToken() {
