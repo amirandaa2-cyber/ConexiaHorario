@@ -78,12 +78,7 @@
       position: fixed;
       bottom: 20px;
       right: 20px;
-      z-index: 12000;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 12px;
-      width: min(360px, 94vw);
+      z-index: 10001;
     }
 
     .chatbot-button {
@@ -94,73 +89,26 @@
       color: white;
       border: none;
       cursor: pointer;
-      display: inline-flex;
+      display: flex;
       justify-content: center;
       align-items: center;
       font-size: 24px;
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .chatbot-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 16px 30px rgba(0, 0, 0, 0.25);
-    }
-
-    .chatbot-button[data-open="true"] {
-      background-color: #0ea5e9;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
 
     .chatbot-window {
-      width: 100%;
-      max-height: 0;
-      display: flex;
-      flex-direction: column;
+      display: none;
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 350px;
+      height: 500px;
       background-color: white;
-      border-radius: 12px;
-      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: none;
+      flex-direction: column;
       overflow: hidden;
-      opacity: 0;
-      visibility: hidden;
-      transform: translateY(18px) scale(0.96);
-      transform-origin: bottom right;
-      pointer-events: none;
-      transition: opacity 0.25s ease, transform 0.25s ease, max-height 0.25s ease;
-    }
-
-    .chatbot-window.is-open {
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0) scale(1);
-      pointer-events: auto;
-      animation: chatbotPop 0.35s ease;
-      max-height: min(520px, 72vh);
-    }
-
-    @keyframes chatbotPop {
-      0% {
-        opacity: 0;
-        transform: translateY(28px) scale(0.9);
-      }
-
-      60% {
-        opacity: 1;
-        transform: translateY(-4px) scale(1.02);
-      }
-
-      100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .chatbot-window,
-      .chatbot-window.is-open {
-        transition: none;
-        animation: none;
-        transform: none;
-      }
     }
 
     .chatbot-header {
@@ -357,6 +305,31 @@
       color: #b91c1c;
       margin-top: 4px;
     }
+      .auth-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        margin: 18px 0 12px;
+        color: rgba(17, 24, 39, 0.5);
+      }
+
+      .auth-divider::before,
+      .auth-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(17, 24, 39, 0.2);
+      }
+
+      .google-login {
+        display: flex;
+        justify-content: center;
+        min-height: 48px;
+        margin-bottom: 12px;
+      }
 
     .auth-hint {
       font-size: 0.8rem;
@@ -637,6 +610,13 @@
 
     .conflict-week-list { max-height:200px; overflow:auto; border:1px solid #e6e6e9; padding:8px; border-radius:6px; font-size:13px }
 
+    /* Result modal (success / error) */
+    .result-header { display:flex; align-items:center; gap:10px; margin-bottom:8px }
+    .result-icon { width:36px; height:36px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:#fff; font-weight:700 }
+    .result-icon.success { background:#10b981 }
+    .result-icon.warn { background:#f59e0b }
+    .result-icon.error { background:#ef4444 }
+    .result-message { font-size:15px; color:#111 }
     /* Small-screen friendly tweaks */
     @media (max-width: 520px) {
       .modal-box, .legacy-conflict-modal {
@@ -647,27 +627,122 @@
       }
     }
   </style>
-  <script>
-    // Try to load local copy of FullCalendar first, otherwise fall back to CDN.
-    (function () {
-      try {
-        var s = document.createElement('script');
-        s.src = '../dist/index.global.js';
-        s.onload = function () { console.info('FullCalendar loaded from local ../dist/index.global.js'); };
-        s.onerror = function () { console.warn('Local FullCalendar not found, loading from CDN fallback'); var s2 = document.createElement('script'); s2.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js'; s2.onload = function () { console.info('FullCalendar loaded from CDN fallback'); }; s2.onerror = function () { console.error('Failed to load FullCalendar from local and CDN'); }; document.head.appendChild(s2); };
-        document.head.appendChild(s);
-      } catch (e) { console.error('Error injecting FullCalendar loader', e); }
-    })();
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
 
-    const ADMIN_AUTH_KEY = 'proto_admin_session_v1';
+    const ADMIN_AUTH_KEY = 'conexia_admin_session_v1';
+    const SESSION_TOKEN_KEY = 'conexia_admin_token';
+    const SESSION_EXP_KEY = 'conexia_admin_session_exp';
     const ADMIN_USER = 'admin';
     const ADMIN_PASS = 'ceduc123';
-    const SESSION_USER_KEY = 'proto_admin_username';
+    const SESSION_USER_KEY = 'conexia_admin_username';
     const SESSION_PRIV_DESC = 'Privilegios: crear/editar carreras, módulos, docentes y publicar horarios oficiales.';
+    const STATE_VERSION = '1.0';
+    const KEY_DOCENTES = 'conexia_docentes_v1';
+    const KEY_CARRERAS = 'conexia_carreras_v1';
+    const KEY_MODULOS = 'conexia_modulos_v1';
+    const KEY_EVENTS = 'conexia_mod_events_v1';
+    const KEY_TEMPLATES = 'conexia_templates_v1';
+    const KEY_SALAS = 'conexia_salas_v1';
+    const KEY_CALENDAR_STATE = 'conexia_calendar_state_v1';
+    const SESSION_ROLES_KEY = 'conexia_admin_roles';
 
-    function setupAdminAuth() {
+    function storageGet(key) {
+      try { return window.localStorage.getItem(key); } catch (_) { return null; }
+    }
+
+    function storageSet(key, val) {
+      try { window.localStorage.setItem(key, val); } catch (_) { }
+    }
+
+    function storageRemove(key) {
+      try { window.localStorage.removeItem(key); } catch (_) { }
+    }
+
+    function storageGetJSON(key, fallback = null) {
+      try {
+        const raw = storageGet(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    function detectDefaultApiBase() {
+      if (typeof window === 'undefined') return 'http://localhost:3001/api';
+      const fallbackOrigin = (window.location && window.location.origin && window.location.origin !== 'null')
+        ? window.location.origin.replace(/\/$/, '')
+        : 'http://localhost:3001';
+      const resolved = window.APP_API_URL || (fallbackOrigin + '/api');
+      window.APP_API_URL = resolved;
+      return resolved;
+    }
+
+    function resolveApiMode() {
+      if (typeof window === 'undefined') return false;
+      if ('APP_USE_API' in window) return Boolean(window.APP_USE_API);
+      const storedPref = storageGet('use_api_mode');
+      if (storedPref === 'true') return true;
+      if (storedPref === 'false') return false;
+      return window.location ? window.location.protocol !== 'file:' : false;
+    }
+
+    const API_BASE = detectDefaultApiBase();
+    const USE_API = resolveApiMode();
+    if (typeof window !== 'undefined' && !('APP_USE_API' in window)) {
+      window.APP_USE_API = USE_API;
+    }
+
+    let PUBLIC_CONFIG_PROMISE = null;
+    async function loadPublicConfig() {
+      if (!USE_API) return {};
+      if (PUBLIC_CONFIG_PROMISE) {
+        return PUBLIC_CONFIG_PROMISE;
+      }
+      PUBLIC_CONFIG_PROMISE = (async () => {
+        try {
+          const response = await fetch(API_BASE + '/public-config');
+          if (!response.ok) throw new Error('No se pudo obtener la configuración pública');
+          const data = await response.json().catch(() => ({}));
+          if (typeof window !== 'undefined') {
+            window.APP_PUBLIC_CONFIG = data;
+          }
+          return data || {};
+        } catch (err) {
+          console.warn('Error cargando la configuración pública', err);
+          return {};
+        }
+      })();
+      return PUBLIC_CONFIG_PROMISE;
+    }
+
+    function getStoredToken() {
+      return storageGet(SESSION_TOKEN_KEY);
+    }
+
+    async function authorizedFetch(url, options = {}) {
+      const opts = { ...(options || {}) };
+      opts.headers = { ...(opts.headers || {}) };
+      if (USE_API) {
+        const token = getStoredToken();
+        if (token && !opts.headers.Authorization) {
+          opts.headers.Authorization = 'Bearer ' + token;
+        }
+      }
+      const response = await fetch(url, opts);
+      if (USE_API && response.status === 401) {
+        console.warn('Sesión expirada o inválida. Forzando logout.');
+        if (window.__ADMIN_AUTH__?.forceLogout) {
+          await window.__ADMIN_AUTH__.forceLogout({ skipServer: true, silent: true });
+        }
+        throw new Error('Sesión expirada');
+      }
+      return response;
+    }
+
+    function setupAdminAuth(publicConfig = {}) {
       const overlay = document.getElementById('auth-screen');
       const layout = document.getElementById('layout-shell');
       const form = document.getElementById('auth-form');
@@ -676,77 +751,280 @@
       const sessionPanel = document.getElementById('session-panel');
       const sessionUserLabel = document.getElementById('session-user-label');
       const sessionPrivilegesLabel = document.getElementById('session-privileges');
+      const googleButtonContainer = document.getElementById('google-login-container');
+      const googleStatusEl = document.getElementById('google-login-status');
+      const googleHintEl = document.getElementById('google-login-hint');
+      let googleInitStarted = false;
+
+      const authState = {
+        authenticated: storageGet(ADMIN_AUTH_KEY) === '1',
+        userLabel: storageGet(SESSION_USER_KEY) || ADMIN_USER,
+        roles: storageGetJSON(SESSION_ROLES_KEY, []) || []
+      };
 
       function renderSessionIndicator(activeUser) {
         if (!sessionPanel) return;
         if (activeUser) {
           sessionPanel.classList.add('visible');
           if (sessionUserLabel) sessionUserLabel.textContent = activeUser;
-          if (sessionPrivilegesLabel) sessionPrivilegesLabel.textContent = SESSION_PRIV_DESC;
+          if (sessionPrivilegesLabel) {
+            const rolesText = authState.roles && authState.roles.length
+              ? `Roles: ${authState.roles.join(', ')}`
+              : SESSION_PRIV_DESC;
+            sessionPrivilegesLabel.textContent = rolesText;
+          }
         } else {
           sessionPanel.classList.remove('visible');
         }
       }
 
-      function isAuthenticated() {
-        try { return localStorage.getItem(ADMIN_AUTH_KEY) === '1'; } catch (_) { return false; }
-      }
-
       function applyState() {
-        const authed = isAuthenticated();
+        const authed = authState.authenticated;
         if (layout) layout.style.display = authed ? '' : 'none';
         if (overlay) overlay.style.display = authed ? 'none' : 'flex';
         if (logoutBtn) logoutBtn.style.display = authed ? 'inline-flex' : 'none';
         if (sessionPanel) sessionPanel.classList.toggle('visible', authed);
-        if (authed) {
-          const storedUser = (() => { try { return localStorage.getItem(SESSION_USER_KEY); } catch (_) { return null; } })();
-          renderSessionIndicator(storedUser || ADMIN_USER);
-        } else {
-          renderSessionIndicator(null);
-        }
+        renderSessionIndicator(authed ? (authState.userLabel || storageGet(SESSION_USER_KEY) || ADMIN_USER) : null);
         return authed;
       }
 
-      if (form) {
-        form.addEventListener('submit', function (e) {
-          e.preventDefault();
-          const userInput = (document.getElementById('auth-user')?.value || '').trim();
-          const user = userInput.toLowerCase();
-          const pass = (document.getElementById('auth-pass')?.value || '').trim();
-          if (user === ADMIN_USER && pass === ADMIN_PASS) {
-            try {
-              localStorage.setItem(ADMIN_AUTH_KEY, '1');
-              localStorage.setItem(SESSION_USER_KEY, userInput || ADMIN_USER);
-            } catch (_) { }
-            renderSessionIndicator(userInput || ADMIN_USER);
-            applyState();
-            window.location.reload();
+      function persistSessionMeta({ token, expiresAt, userLabel, roles } = {}) {
+        if (token) storageSet(SESSION_TOKEN_KEY, token);
+        if (expiresAt) storageSet(SESSION_EXP_KEY, expiresAt);
+        if (userLabel) storageSet(SESSION_USER_KEY, userLabel);
+        if (Array.isArray(roles)) storageSet(SESSION_ROLES_KEY, JSON.stringify(roles));
+        storageSet(ADMIN_AUTH_KEY, '1');
+      }
+
+      function clearSessionStorage() {
+        storageRemove(SESSION_TOKEN_KEY);
+        storageRemove(SESSION_EXP_KEY);
+        storageRemove(ADMIN_AUTH_KEY);
+        storageRemove(SESSION_USER_KEY);
+        storageRemove(SESSION_ROLES_KEY);
+      }
+
+      async function forceLogout({ skipServer = false, silent = false } = {}) {
+        const token = getStoredToken();
+        clearSessionStorage();
+        authState.authenticated = false;
+        authState.userLabel = null;
+        authState.roles = [];
+        renderSessionIndicator(null);
+        applyState();
+        if (!skipServer && USE_API && token) {
+          try {
+            await fetch(API_BASE + '/auth/logout', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+              },
+              body: JSON.stringify({ token })
+            });
+          } catch (err) {
+            if (!silent) console.warn('No se pudo cerrar sesión en el servidor', err);
+          }
+        }
+        if (!silent) {
+          window.location.reload();
+        }
+      }
+
+      function handleAuthSuccess(payload, fallbackLabel) {
+        const roles = Array.isArray(payload?.user?.roles) ? payload.user.roles : [];
+        const displayName = payload?.user?.fullName || payload?.user?.username || payload?.user?.email || fallbackLabel || ADMIN_USER;
+        persistSessionMeta({
+          token: payload.token,
+          expiresAt: payload.expiresAt,
+          userLabel: displayName,
+          roles
+        });
+        authState.authenticated = true;
+        authState.userLabel = displayName;
+        authState.roles = roles;
+        applyState();
+        window.location.reload();
+      }
+
+      async function loginWithApi(identifier, password) {
+        const response = await fetch(API_BASE + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, password })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || 'Credenciales inválidas.');
+        }
+        handleAuthSuccess(payload, identifier);
+      }
+
+      async function loginWithGoogleCredential(credential) {
+        const response = await fetch(API_BASE + '/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || 'No se pudo validar la sesión de Google.');
+        }
+        handleAuthSuccess(payload, payload?.user?.fullName);
+      }
+
+      function initGoogleLogin() {
+        if (!googleButtonContainer) return;
+        if (!USE_API) {
+          if (googleStatusEl) googleStatusEl.textContent = 'Disponible solo en modo API.';
+          return;
+        }
+        if (!publicConfig?.googleClientId) {
+          if (googleStatusEl) googleStatusEl.textContent = 'El servidor no tiene Google configurado.';
+          return;
+        }
+        if (googleInitStarted) return;
+        googleInitStarted = true;
+        let attempts = 0;
+        const maxAttempts = 40;
+        const tryInit = () => {
+          const googleSdk = window.google?.accounts?.id;
+          if (!googleSdk) {
+            if (attempts++ < maxAttempts) {
+              setTimeout(tryInit, 200);
+            } else if (googleStatusEl) {
+              googleStatusEl.textContent = 'No se pudo cargar Google. Refresca e inténtalo nuevamente.';
+            }
             return;
           }
-          if (errorEl) errorEl.textContent = 'Credenciales inválidas. Verifica el usuario y la clave temporal.';
+          if (googleStatusEl) googleStatusEl.textContent = '';
+          if (googleHintEl) googleHintEl.textContent = 'Inicia sesión con tu cuenta institucional Google.';
+          googleSdk.initialize({
+            client_id: publicConfig.googleClientId,
+            callback: async ({ credential }) => {
+              if (!credential) return;
+              try {
+                await loginWithGoogleCredential(credential);
+              } catch (err) {
+                console.error('Login con Google falló', err);
+                if (googleStatusEl) googleStatusEl.textContent = err.message || 'No se pudo iniciar sesión con Google.';
+              }
+            },
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+          googleSdk.renderButton(googleButtonContainer, { theme: 'outline', size: 'large', width: 280 });
+        };
+        tryInit();
+      }
+
+      async function ensureSession({ silent = false } = {}) {
+        if (!USE_API) {
+          authState.authenticated = storageGet(ADMIN_AUTH_KEY) === '1';
+          authState.userLabel = storageGet(SESSION_USER_KEY) || ADMIN_USER;
+          authState.roles = storageGetJSON(SESSION_ROLES_KEY, []) || [];
+          applyState();
+          return authState.authenticated;
+        }
+        const token = getStoredToken();
+        if (!token) {
+          await forceLogout({ skipServer: true, silent: true });
+          return false;
+        }
+        try {
+          const response = await fetch(API_BASE + '/auth/session', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          if (!response.ok) {
+            throw new Error('Sesión inválida');
+          }
+          const payload = await response.json().catch(() => ({}));
+          if (payload?.tokenExpiresAt) storageSet(SESSION_EXP_KEY, payload.tokenExpiresAt);
+          const displayName = payload?.user?.username || payload?.user?.email || storageGet(SESSION_USER_KEY) || ADMIN_USER;
+          storageSet(SESSION_USER_KEY, displayName);
+          storageSet(ADMIN_AUTH_KEY, '1');
+          authState.authenticated = true;
+          authState.userLabel = displayName;
+          applyState();
+          return true;
+        } catch (err) {
+          if (!silent) console.warn('Validación de sesión falló', err);
+          await forceLogout({ skipServer: true, silent: true });
+          return false;
+        }
+      }
+
+      if (form) {
+        form.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          if (errorEl) errorEl.textContent = '';
+          const userInput = (document.getElementById('auth-user')?.value || '').trim();
+          const pass = (document.getElementById('auth-pass')?.value || '').trim();
+          if (!userInput || !pass) {
+            if (errorEl) errorEl.textContent = 'Debes ingresar usuario y contraseña.';
+            return;
+          }
+          try {
+            if (USE_API) {
+              await loginWithApi(userInput, pass);
+              return;
+            }
+            const normalized = userInput.toLowerCase();
+            if (normalized === ADMIN_USER && pass === ADMIN_PASS) {
+              persistSessionMeta({ userLabel: userInput || ADMIN_USER, roles: ['admin'] });
+              authState.authenticated = true;
+              authState.userLabel = userInput || ADMIN_USER;
+              authState.roles = ['admin'];
+              applyState();
+              window.location.reload();
+              return;
+            }
+            throw new Error('Credenciales inválidas.');
+          } catch (err) {
+            console.error('Login falló', err);
+            if (errorEl) errorEl.textContent = err.message || 'No se pudo iniciar sesión.';
+          }
         });
       }
 
       if (logoutBtn) {
         logoutBtn.addEventListener('click', function () {
-          try {
-            localStorage.removeItem(ADMIN_AUTH_KEY);
-            localStorage.removeItem(SESSION_USER_KEY);
-          } catch (_) { }
-          renderSessionIndicator(null);
-          window.location.reload();
+          forceLogout();
         });
       }
 
       applyState();
-      return { isAuthenticated, applyState };
+      try { initGoogleLogin(); } catch (err) { console.error('initGoogleLogin error', err); }
+      const api = {
+        isAuthenticated: () => authState.authenticated,
+        ensureSession,
+        forceLogout
+      };
+      window.__ADMIN_AUTH__ = api;
+      return api;
     }
 
-    // Prototipo: gestión de docentes, carreras y módulos + asignación en calendario
-    document.addEventListener('DOMContentLoaded', function () {
-      const authCtrl = setupAdminAuth();
-      if (!authCtrl.isAuthenticated()) {
+    // Conexia: gestión de docentes, carreras y módulos + asignación en calendario
+    document.addEventListener('DOMContentLoaded', async function () {
+      const publicConfig = await loadPublicConfig();
+      const authCtrl = setupAdminAuth(publicConfig || {});
+      const authed = await authCtrl.ensureSession({ silent: true });
+      if (!authed) {
         return;
+      }
+      // If running with API mode, fetch initial data from the server so the app uses PostgreSQL
+      if (USE_API) {
+        try {
+          try { carreras = await fetchCarreras(); } catch (e) { carreras = []; console.error('fetchCarreras error', e); }
+          try { modulos = await fetchModulos(); } catch (e) { modulos = []; console.error('fetchModulos error', e); }
+          try { docentes = await fetchDocentes(); } catch (e) { docentes = []; console.error('fetchDocentes error', e); }
+          try { templates = await fetchTemplates(); } catch (e) { templates = []; console.error('fetchTemplates error', e); }
+          try { storedEvents = await fetchEvents(); } catch (e) { storedEvents = []; console.error('fetchEvents error', e); }
+          try { const r = await authorizedFetch(API_BASE + '/salas'); salas = r.ok ? await r.json() : []; } catch (e) { salas = []; console.error('fetchSalas error', e); }
+        } catch (err) { console.error('Initial data load from API failed', err); }
+      } else {
+        // fall back to loading from localStorage when not using API
+        try { docentes = load(KEY_DOCENTES, []); carreras = load(KEY_CARRERAS, []); modulos = load(KEY_MODULOS, []); storedEvents = load(KEY_EVENTS, []); templates = load(KEY_TEMPLATES, []); salas = load(KEY_SALAS, []); } catch (e) { console.warn('local load failed', e); }
       }
       // (removed .fc-event.hidden CSS approach - rely on strict filtering instead)
       // --- DIAGNÓSTICO EN PÁGINA -------------------------------------------------
@@ -826,40 +1104,6 @@
         } catch (e) { console.log('setupDiagnostics failed', e); }
       })();
       // ---------------------------------------------------------------------------
-      // Storage keys and version control
-      const STATE_VERSION = '1.0';
-      const KEY_DOCENTES = 'proto_docentes_v1';
-      const KEY_CARRERAS = 'proto_carreras_v1';
-      const KEY_MODULOS = 'proto_modulos_v1';
-      const KEY_EVENTS = 'proto_mod_events_v1';
-      const KEY_TEMPLATES = 'proto_templates_v1';
-      const KEY_SALAS = 'proto_salas_v1';
-      const API_MODE_STORAGE_KEY = 'use_api_mode';
-      const DEFAULT_USE_API = true;
-      function readApiPreferenceFlag() {
-        try {
-          const raw = localStorage.getItem(API_MODE_STORAGE_KEY);
-          if (raw === null) return null;
-          return raw === 'true';
-        } catch (err) {
-          console.warn('No se pudo leer preferencia Modo API', err);
-          return null;
-        }
-      }
-      const storedApiPref = readApiPreferenceFlag();
-      const USE_API = (typeof storedApiPref === 'boolean') ? storedApiPref : DEFAULT_USE_API;
-      const API_BASE = (function resolveApiBase() {
-        try {
-          if (typeof window !== 'undefined') {
-            const candidate = window.CONEXIA_API_BASE || window.__API_BASE__;
-            if (candidate && typeof candidate === 'string') {
-              return candidate.trim().replace(/\/$/, '') || 'http://localhost:3001/api';
-            }
-          }
-        } catch (_) { }
-        return 'http://localhost:3001/api';
-      })();
-
       // Cache management
       let conflictDecisionCache = null;
       function clearConflictDecisionCache() {
@@ -891,11 +1135,81 @@
       }
 
       function save(key, val) {
-        localStorage.setItem(key, JSON.stringify({
-          version: STATE_VERSION,
-          data: val,
-          timestamp: Date.now()
-        }));
+        try {
+          localStorage.setItem(key, JSON.stringify({
+            version: STATE_VERSION,
+            data: val,
+            timestamp: Date.now()
+          }));
+        } catch (e) { console.warn('localStorage save failed', e); }
+        // If running against an API, sync in background (best-effort)
+        if (USE_API) {
+          try { apiSyncForKey(key, val); } catch (e) { console.error('apiSyncForKey spawn failed', e); }
+        }
+      }
+
+      // background sync helper: best-effort synchronization of an in-memory array to REST endpoints
+      async function apiSyncForKey(key, val) {
+        if (!USE_API) return;
+        const mapping = {
+          [KEY_CARRERAS]: '/carreras',
+          [KEY_MODULOS]: '/modulos',
+          [KEY_DOCENTES]: '/docentes',
+          [KEY_TEMPLATES]: '/templates',
+          [KEY_EVENTS]: '/events',
+          [KEY_SALAS]: '/salas',
+          'proto_salas_v1': '/salas'
+        };
+        const path = mapping[key];
+        if (!path) return;
+        try {
+          const base = API_BASE;
+          const remoteR = await authorizedFetch(base + path);
+          const remoteList = remoteR.ok ? await remoteR.json() : [];
+          const remoteMap = new Map();
+          (remoteList || []).forEach(entry => {
+            if (entry && entry.id != null) {
+              remoteMap.set(String(entry.id), entry);
+            }
+          });
+          const localList = Array.isArray(val) ? val : [];
+          const localIds = new Set();
+          for (const item of localList) {
+            if (item && item.id != null) {
+              localIds.add(String(item.id));
+            }
+          }
+
+          for (const [rid] of remoteMap) {
+            if (!localIds.has(rid)) {
+              try {
+                await authorizedFetch(base + path + '/' + encodeURIComponent(rid), { method: 'DELETE' });
+              } catch (err) { console.warn('delete remote failed', path, rid, err); }
+            }
+          }
+
+          for (const item of localList) {
+            if (!item) continue;
+            const id = item.id != null ? String(item.id) : null;
+            try {
+              if (id && remoteMap.has(id)) {
+                await authorizedFetch(base + path + '/' + encodeURIComponent(id), {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(item)
+                });
+              } else {
+                await authorizedFetch(base + path, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(item)
+                });
+              }
+            } catch (err) {
+              console.warn('sync failed for', path, id || '(sin id)', err);
+            }
+          }
+        } catch (err) { console.error('apiSyncForKey error', key, err); }
       }
 
       // Persistencia con debounce
@@ -908,66 +1222,70 @@
         }, 1000);
       }
 
-      function buildApiUrl(path) {
-        const safeBase = (API_BASE || '').replace(/\/$/, '');
-        const suffix = path.startsWith('/') ? path : '/' + path;
-        return safeBase + suffix;
-      }
-
-      async function requestApiJson(path) {
-        const url = buildApiUrl(path);
-        try {
-          const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-          if (!response.ok) {
-            const text = await response.text().catch(() => '');
-            throw new Error(`${path} respondió ${response.status}${text ? ' · ' + text : ''}`);
-          }
-          return await response.json();
-        } catch (err) {
-          throw new Error(`No se pudo contactar ${url}: ${err && err.message ? err.message : err}`);
-        }
-      }
-
-      function normalizeEventPayload(raw) {
-        if (!raw || typeof raw !== 'object') return null;
-        const normalized = { ...raw };
-        const meta = raw.extendedProps && typeof raw.extendedProps === 'object' ? raw.extendedProps : {};
-        normalized.extendedProps = meta;
-        if (!normalized.extendedProps.__meta) {
-          normalized.extendedProps.__meta = (raw.extendedProps && raw.extendedProps.__meta) ? raw.extendedProps.__meta : {};
-        }
-        return normalized;
-      }
-
-      function updateApiModeIndicator(statusText = '') {
-        try {
-          const indicator = document.getElementById('api-mode');
-          if (!indicator) return;
-          const color = USE_API ? '#15803d' : '#b91c1c';
-          const label = USE_API ? 'ON' : 'OFF';
-          const suffix = statusText ? ` · ${statusText}` : '';
-          indicator.innerHTML = `Modo API: <strong style="color:${color}">${label}</strong>${suffix}`;
-        } catch (err) {
-          console.warn('No se pudo actualizar el indicador del modo API', err);
-        }
-      }
-
       // Minimal API helpers (used when USE_API=true)
-      async function fetchCarreras() { if (!USE_API) return load(KEY_CARRERAS, []); const data = await requestApiJson('/carreras'); return Array.isArray(data) ? data : []; }
-      async function fetchModulos() { if (!USE_API) return load(KEY_MODULOS, []); const data = await requestApiJson('/modulos'); return Array.isArray(data) ? data : []; }
-      async function fetchDocentes() { if (!USE_API) return load(KEY_DOCENTES, []); const data = await requestApiJson('/docentes'); return Array.isArray(data) ? data : []; }
-      async function fetchSalas() { if (!USE_API) return load(KEY_SALAS, []); const data = await requestApiJson('/salas'); return Array.isArray(data) ? data : []; }
-      async function fetchEvents() { if (!USE_API) return load(KEY_EVENTS, []); const data = await requestApiJson('/events'); if (!Array.isArray(data)) return []; return data.map(normalizeEventPayload).filter(Boolean); }
-      async function fetchTemplates() { if (!USE_API) return load(KEY_TEMPLATES, []); const data = await requestApiJson('/templates'); return Array.isArray(data) ? data : []; }
+      async function fetchCarreras() {
+        if (!USE_API) return load(KEY_CARRERAS, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/carreras');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchCarreras falló', err);
+          return [];
+        }
+      }
 
-      // Data
+      async function fetchModulos() {
+        if (!USE_API) return load(KEY_MODULOS, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/modulos');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchModulos falló', err);
+          return [];
+        }
+      }
+
+      async function fetchDocentes() {
+        if (!USE_API) return load(KEY_DOCENTES, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/docentes');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchDocentes falló', err);
+          return [];
+        }
+      }
+
+      async function fetchEvents() {
+        if (!USE_API) return load(KEY_EVENTS, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/events');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchEvents falló', err);
+          return [];
+        }
+      }
+
+      async function fetchTemplates() {
+        if (!USE_API) return load(KEY_TEMPLATES, []);
+        try {
+          const r = await authorizedFetch(API_BASE + '/templates');
+          return r.ok ? await r.json() : [];
+        } catch (err) {
+          console.error('fetchTemplates falló', err);
+          return [];
+        }
+      }
+
+      // Data (start empty; if USE_API=true we'll fetch from the server at startup)
       // docente fields: {id, rut, nombre, edad, estadoCivil, contratoHoras, horasAsignadas, horasTrabajadas, turno, activo}
-      let docentes = load(KEY_DOCENTES, []);
-      let carreras = load(KEY_CARRERAS, []); // {id, nombre, totalHoras, practicaHoras, teoricaHoras}
-      let modulos = load(KEY_MODULOS, []);   // {id, nombre, carreraId, horas, tipo}
-      let storedEvents = load(KEY_EVENTS, []); // FullCalendar event objects + metadata
-      let templates = load(KEY_TEMPLATES, []); // recurrence templates: {id, moduloId, docenteId, salaId, startDate, time, duration, until}
-      let salas = load(KEY_SALAS, []); // {id, nombre, capacidad}
+      let docentes = [];
+      let carreras = []; // {id, nombre, totalHoras, practicaHoras, teoricaHoras}
+      let modulos = [];   // {id, nombre, carreraId, horas, tipo}
+      let storedEvents = []; // FullCalendar event objects + metadata
+      let templates = []; // recurrence templates: {id, moduloId, docenteId, salaId, startDate, time, duration, until}
+      let salas = []; // {id, nombre, capacidad}
 
       // Calendar
       const calendarEl = document.getElementById('calendar');
@@ -978,27 +1296,24 @@
 
       // helper: ensure FullCalendar library is available (load from CDN as fallback)
       function ensureFullCalendarReady(cb) {
-        function loadLocalesThen(cb2) {
-          try {
-            const hasEs = window.FullCalendar && Array.isArray(window.FullCalendar.globalLocales) && window.FullCalendar.globalLocales.some(l => l && (l.code === 'es' || l.localeCode === 'es'));
-            if (hasEs) { cb2(); return; }
-          } catch (e) { }
-          // try loading local locales-all first, then CDN fallback
-          const sLoc = document.createElement('script');
-          sLoc.src = '../packages/core/locales-all.global.js';
-          sLoc.onload = function () { try { cb2(); } catch (e) { console.error('locale init callback error', e); } };
-          sLoc.onerror = function () { console.warn('No se pudo cargar locales localmente, intentando CDN locales-all'); const s2 = document.createElement('script'); s2.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js'; s2.onload = function () { try { cb2(); } catch (e) { console.error('locale init callback error', e); } }; s2.onerror = function () { console.error('No se pudo cargar locales de FullCalendar'); }; document.head.appendChild(s2); };
-          document.head.appendChild(sLoc);
+        const MAX_ATTEMPTS = 40;
+        let attempts = 0;
+
+        function loadWhenReady() {
+          attempts += 1;
+          if (window.FullCalendar && window.FullCalendar.Calendar) {
+            try { cb(); } catch (e) { console.error('init callback error', e); }
+            return;
+          }
+          if (attempts > MAX_ATTEMPTS) {
+            runtimeErrorEl.textContent = 'FullCalendar no cargó desde CDN. Verifica tu conexión o permite el dominio cdn.jsdelivr.net.';
+            runtimeErrorEl.style.display = 'block';
+            return;
+          }
+          setTimeout(loadWhenReady, 150);
         }
 
-        if (window.FullCalendar) { try { loadLocalesThen(cb); } catch (e) { console.error('init callback error', e); } return; }
-
-        // If FullCalendar not present, try CDN (local copy is attempted earlier in the page)
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js';
-        s.onload = function () { console.info('FullCalendar loaded from CDN fallback'); try { loadLocalesThen(cb); } catch (e) { console.error('init callback error', e); } };
-        s.onerror = function () { runtimeErrorEl.textContent = 'No se pudo cargar FullCalendar. Asegúrate de servir el repositorio raíz para que ../dist/index.global.js esté disponible, o revisa tu conexión.'; runtimeErrorEl.style.display = 'block'; };
-        document.head.appendChild(s);
+        loadWhenReady();
       }
 
       // initialize calendar only after FullCalendar available
@@ -1008,7 +1323,7 @@
           let _initialDate = new Date().toISOString().slice(0, 10);
           let _initialView = 'timeGridWeek';
           try {
-            const raw = localStorage.getItem('proto_calendar_state_v1');
+            const raw = localStorage.getItem(KEY_CALENDAR_STATE);
             if (raw) {
               const st = JSON.parse(raw);
               if (st && st.currentDate) _initialDate = st.currentDate;
@@ -1066,7 +1381,7 @@
             datesSet: function (info) {
               try {
                 const state = { currentDate: info.startStr || (info.start ? info.start.toISOString().slice(0, 10) : null), view: info.view ? info.view.type : null };
-                localStorage.setItem('proto_calendar_state_v1', JSON.stringify(state));
+                localStorage.setItem(KEY_CALENDAR_STATE, JSON.stringify(state));
                 // Aseguramos guardar eventos en disco por si hay cambios pendientes
                 try { persistEventsAndValidate(); } catch (_) { }
               } catch (err) { console.error('datesSet handler error', err); }
@@ -1152,7 +1467,7 @@
                 if (nonConflictMsgs.length) {
                   console.warn('eventAdd blocked por validación:', nonConflictMsgs);
                   showValidationMessage(nonConflictMsgs.join(' '), 'error');
-                  if (typeof info.revert === 'function') info.revert(); else ev.remove();
+                  handleKeepExistingAction({ info, ev });
                   return;
                 }
 
@@ -1160,7 +1475,7 @@
                   console.warn('eventAdd conflict detected', conflicts);
                   let decision = conflictDecisionCache || await resolveConflictModal(candidate, conflicts);
                   if (!decision || decision.action === 'omit') {
-                    if (typeof info.revert === 'function') info.revert(); else ev.remove();
+                    handleKeepExistingAction({ info, ev });
                     return;
                   }
                   if (decision.action === 'force') {
@@ -1309,7 +1624,7 @@
                   console.warn('eventDrop conflict detected', conflicts);
                   let decision = conflictDecisionCache || await resolveConflictModal(candidate, conflicts);
                   if (!decision || decision.action === 'omit') {
-                    if (typeof info.revert === 'function') info.revert();
+                    handleKeepExistingAction({ info, ev });
                     return;
                   }
                   if (decision.action === 'force') {
@@ -1437,7 +1752,7 @@
                   console.warn('eventResize conflict detected', conflicts);
                   let decision = conflictDecisionCache || await resolveConflictModal(candidate, conflicts);
                   if (!decision || decision.action === 'omit') {
-                    if (typeof info.revert === 'function') info.revert();
+                    handleKeepExistingAction({ info, ev });
                     return;
                   }
                   if (decision.action === 'force') {
@@ -2853,6 +3168,34 @@
       const decisionForceBtn = document.getElementById('conflict-decision-force');
       const decisionReschedBtn = document.getElementById('conflict-decision-resched-btn');
 
+      // Small result modal used for feedback (replaces native alert for operations)
+      const resultModalHtml = `
+      <div id="result-overlay" class="modal-overlay" style="display:none">
+        <div class="modal-box" role="dialog" aria-modal="true">
+          <div class="result-header">
+            <div id="result-icon" class="result-icon success">✓</div>
+            <div class="result-message" id="result-message">Operación completada.</div>
+          </div>
+          <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+            <button id="result-ok-btn" class="btn-conflict btn-close">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    `;
+      document.body.insertAdjacentHTML('beforeend', resultModalHtml);
+      const resultOverlay = document.getElementById('result-overlay');
+      const resultIcon = document.getElementById('result-icon');
+      const resultMessage = document.getElementById('result-message');
+      const resultOkBtn = document.getElementById('result-ok-btn');
+      function hideResultModal() { if (resultOverlay) resultOverlay.style.display = 'none'; }
+      function showResultModal(msg, type = 'success') {
+        if (!resultOverlay) { alert(msg); return; }
+        resultMessage.textContent = msg || '';
+        resultIcon.className = 'result-icon ' + (type === 'error' ? 'error' : (type === 'warn' ? 'warn' : 'success'));
+        resultOverlay.style.display = 'flex';
+      }
+      resultOkBtn.addEventListener('click', hideResultModal);
+
       // Open/close and helper functions for simple modal
       function openConflictModal(docenteId) {
         try {
@@ -3568,9 +3911,6 @@
 
             // En lugar de buscar ev.from (que no existe), agregamos el evento directamente
             try {
-              // Asegurarnos de que el evento tenga un ID único
-              if (!ev.id) ev.id = 'evt_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-
               storedEvents.push(ev);
               addedEvents.push(ev);
               applied.push(ev);
@@ -3789,8 +4129,8 @@
           // persist and refresh
           save(KEY_DOCENTES, docentes);
           persistEventsAndValidate();
-          alert(`Programación completada: ${added.length} eventos añadidos. ${skipped.length ? skipped.length + ' omitidos.' : ''}`);
-        } catch (err) { console.error('replicateCareerWeek error', err); alert('Error programando módulos: ' + (err && err.message ? err.message : String(err))); }
+          showResultModal(`Programación completada: ${added.length} eventos añadidos. ${skipped.length ? skipped.length + ' omitidos.' : ''}`, 'success');
+        } catch (err) { console.error('replicateCareerWeek error', err); showResultModal('Error programando módulos: ' + (err && err.message ? err.message : String(err)), 'error'); }
       }
 
       // Simplified resolver backed by the new lightweight overlay
@@ -3890,6 +4230,8 @@
           }
 
           function onKeep() {
+            // Mantener exactamente el estado existente: no tocar calendario ni storage aquí.
+            // Los handlers (add/drop/resize) harán revert/remove según corresponda.
             finish(keepAction);
           }
 
@@ -3922,6 +4264,31 @@
           decisionForceBtn.addEventListener('click', onForce);
           decisionReschedBtn.addEventListener('click', onResched);
         });
+      }
+
+      // Manejo centralizado para "Mantener existentes"/"Descartar cambios"
+      // Descarta el candidato, no persiste ni llama APIs, cierra modal y revierte UI
+      function handleKeepExistingAction(opts) {
+        try {
+          const info = opts && opts.info;
+          const ev = opts && opts.ev;
+          try { if (typeof decisionOverlay !== 'undefined' && decisionOverlay) decisionOverlay.style.display = 'none'; } catch (_) {}
+          if (info && typeof info.revert === 'function') {
+            try { info.revert(); } catch (e) { console.warn('Revert falló', e); }
+          } else if (ev && typeof ev.remove === 'function') {
+            try { ev.remove(); } catch (e) { console.warn('Remove falló', e); }
+          }
+          // Hook opcional para gestores de estado (Redux/Vuex, etc.)
+          try {
+            if (typeof window !== 'undefined' && typeof window.dispatchConflictAction === 'function') {
+              window.dispatchConflictAction({ type: 'DISMISS_CONFLICT', payload: { eventId: ev && ev.id ? ev.id : null } });
+            }
+          } catch (_) {}
+          return { ok: true };
+        } catch (err) {
+          console.warn('handleKeepExistingAction error', err);
+          return { ok: false, error: err };
+        }
       }
 
       function formatFriendlyRange(startIso, endIso) {
@@ -4379,7 +4746,11 @@
 
       function refreshCalendarEvents() {
         try {
-          storedEvents = load(KEY_EVENTS, []);
+          if (!USE_API) {
+            storedEvents = load(KEY_EVENTS, []);
+          } else if (!Array.isArray(storedEvents)) {
+            storedEvents = [];
+          }
           if (!calendar) { console.warn('Calendar not initialized yet'); return; }
 
           // Ejecutar limpieza de eventos antiguos
@@ -4412,60 +4783,8 @@
         refreshCalendarEvents();
       }
 
-      async function bootstrapAppData() {
-        if (!USE_API) {
-          updateApiModeIndicator('localStorage');
-          renderCarreras();
-          renderModulos();
-          renderDocentes();
-          renderRooms();
-          refreshCalendarEvents();
-          return;
-        }
-
-        updateApiModeIndicator('sincronizando...');
-        try {
-          const [apiCarreras, apiModulos, apiDocentes, apiSalas, apiTemplates, apiEventsPayload] = await Promise.all([
-            fetchCarreras(),
-            fetchModulos(),
-            fetchDocentes(),
-            fetchSalas(),
-            fetchTemplates(),
-            fetchEvents()
-          ]);
-          carreras = Array.isArray(apiCarreras) ? apiCarreras : [];
-          modulos = Array.isArray(apiModulos) ? apiModulos : [];
-          docentes = Array.isArray(apiDocentes) ? apiDocentes : [];
-          salas = Array.isArray(apiSalas) ? apiSalas : [];
-          templates = Array.isArray(apiTemplates) ? apiTemplates : [];
-          storedEvents = Array.isArray(apiEventsPayload) ? apiEventsPayload : [];
-          try {
-            save(KEY_CARRERAS, carreras);
-            save(KEY_MODULOS, modulos);
-            save(KEY_DOCENTES, docentes);
-            save(KEY_SALAS, salas);
-            save(KEY_TEMPLATES, templates);
-            save(KEY_EVENTS, storedEvents);
-          } catch (cacheErr) {
-            console.warn('No se pudo guardar snapshot de la API en localStorage', cacheErr);
-          }
-          diag(`Datos sincronizados desde API (${API_BASE})`, 'info');
-          updateApiModeIndicator('sincronizado');
-        } catch (err) {
-          console.error('bootstrapAppData error', err);
-          diag('Error sincronizando con el servidor: ' + (err && err.message ? err.message : err), 'error');
-          showValidationMessage('No se pudo cargar datos del servidor. Se utilizarán los datos almacenados localmente.', 'error');
-          updateApiModeIndicator('error API');
-        } finally {
-          renderCarreras();
-          renderModulos();
-          renderDocentes();
-          renderRooms();
-          refreshCalendarEvents();
-        }
-      }
-
-      bootstrapAppData();
+      // initial render
+      renderCarreras(); renderModulos(); renderDocentes(); refreshCalendarEvents();
       // Guardar automáticamente los eventos/estado antes de cerrar o recargar la página
       try { window.addEventListener('beforeunload', function () { try { persistEventsAndValidate(); } catch (e) { } }); } catch (e) { }
 
@@ -4548,41 +4867,84 @@
       const bodyObs = new MutationObserver(() => { makeDialogsDraggable(); }); bodyObs.observe(document.body, { childList: true, subtree: true });
 
       // API toggle wiring
+      const apiModeStored = localStorage.getItem('use_api_mode') === 'true';
+      const apiIndicator = document.getElementById('api-mode');
       const toggleApiBtn = document.getElementById('toggle-api');
-      updateApiModeIndicator(USE_API ? '' : 'localStorage');
-      if (toggleApiBtn) {
-        toggleApiBtn.addEventListener('click', () => {
-          const currentPref = readApiPreferenceFlag();
-          const next = !(typeof currentPref === 'boolean' ? currentPref : USE_API);
-          try {
-            localStorage.setItem(API_MODE_STORAGE_KEY, String(next));
-          } catch (err) {
-            alert('No se pudo guardar la preferencia del Modo API: ' + (err && err.message ? err.message : err));
-            return;
-          }
-          alert('Modo API cambiado a ' + (next ? 'ON' : 'OFF') + '. Recarga la página para aplicar.');
-        });
-      }
+      if (apiIndicator) { apiIndicator.innerHTML = `Modo API: <strong style="color:${apiModeStored ? 'green' : 'red'}">${apiModeStored ? 'ON' : 'OFF'}</strong>`; }
+      if (toggleApiBtn) { toggleApiBtn.addEventListener('click', () => { const next = !apiModeStored; localStorage.setItem('use_api_mode', String(next)); alert('Modo API cambiado a ' + (next ? 'ON' : 'OFF') + '. Recarga la página para aplicar.'); }); }
 
       // Migrate localStorage data to server endpoints (best-effort). Requires USE_API true and server running at API_BASE
       async function migrateToServer() {
-        if (!USE_API) { alert('Para migrar, activa el Modo API desde la barra lateral y asegúrate de que el servidor esté corriendo en ' + API_BASE); return; }
+        const btn = document.getElementById('migrate-server');
+        if (!USE_API) {
+          try { showResultModal('Para migrar, activa el Modo API y asegura que el servidor esté corriendo en ' + API_BASE, 'error'); } catch (e) { alert('Para migrar, activa el Modo API y asegúrate de que el servidor esté corriendo en ' + API_BASE); }
+          return;
+        }
+        if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Migrando...'; }
+        const base = API_BASE;
+        const jsonHeaders = { 'Content-Type': 'application/json' };
+        const summary = { carreras: 0, modulos: 0, docentes: 0, salas: 0, templates: 0, events: 0 };
+        const errors = [];
         try {
-          const base = API_BASE;
-          // send carreras
-          for (const c of carreras) { try { await fetch(base + '/carreras', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c) }); } catch (e) { console.warn('carrera post failed', e); } }
-          // send modulos
-          for (const m of modulos) { try { await fetch(base + '/modulos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) }); } catch (e) { console.warn('modulo post failed', e); } }
-          // send docentes
-          for (const d of docentes) { try { await fetch(base + '/docentes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }); } catch (e) { console.warn('docente post failed', e); } }
-          // send salas
-          for (const s of salas) { try { await fetch(base + '/salas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }); } catch (e) { console.warn('sala post failed', e); } }
-          // send templates
-          for (const t of templates) { try { await fetch(base + '/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(t) }); } catch (e) { console.warn('template post failed', e); } }
-          // send events
-          for (const e of storedEvents) { try { await fetch(base + '/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(e) }); } catch (e) { console.warn('event post failed', e); } }
-          alert('Migración completada (revisa el servidor para confirmar).');
-        } catch (err) { console.error('migrateToServer', err); alert('Error migrando datos: ' + (err && err.message ? err.message : String(err))); }
+          // Helper to POST each entity; falls back to PUT when el backend no soporta upsert nativo.
+          async function postMany(list, path, key) {
+            for (const item of (list || [])) {
+              const payload = JSON.stringify(item);
+              const itemId = item && item.id;
+              try {
+                const r = await authorizedFetch(base + path, { method: 'POST', headers: jsonHeaders, body: payload });
+                if (r.ok) {
+                  summary[key] += 1;
+                  continue;
+                }
+                let txt = await r.text().catch(() => '');
+                try { const j = JSON.parse(txt); txt = j && j.error ? j.error : JSON.stringify(j); } catch (_) { }
+                const lowerTxt = (txt || '').toLowerCase();
+                const looksLikeDuplicate = r.status === 409 || lowerTxt.includes('duplicate') || lowerTxt.includes('ya existe');
+                if (itemId && looksLikeDuplicate) {
+                  try {
+                    const fallback = await authorizedFetch(`${base + path}/${encodeURIComponent(itemId)}`, { method: 'PUT', headers: jsonHeaders, body: payload });
+                    if (fallback.ok) {
+                      summary[key] += 1;
+                      continue;
+                    }
+                    const fallbackTxt = await fallback.text().catch(() => '');
+                    errors.push({ path, itemId, status: fallback.status, body: fallbackTxt || txt, fallback: 'PUT failed after duplicate' });
+                    continue;
+                  } catch (fallbackErr) {
+                    console.warn(path + ' fallback PUT failed', fallbackErr);
+                    errors.push({ path, itemId, fallback: 'PUT exception', error: String(fallbackErr && fallbackErr.message ? fallbackErr.message : fallbackErr) });
+                    continue;
+                  }
+                }
+                errors.push({ path, itemId, status: r.status, body: txt });
+              } catch (err) {
+                console.warn(path + ' post failed', err);
+                errors.push({ path, itemId, error: String(err && err.message ? err.message : err) });
+              }
+            }
+          }
+
+          await postMany(carreras, '/carreras', 'carreras');
+          await postMany(modulos, '/modulos', 'modulos');
+          await postMany(docentes, '/docentes', 'docentes');
+          await postMany(salas, '/salas', 'salas');
+          await postMany(templates, '/templates', 'templates');
+          await postMany(storedEvents, '/events', 'events');
+
+          if (errors.length === 0) {
+            try { showResultModal('Los datos se migraron correctamente. Se migraron: ' + Object.entries(summary).map(([k,v])=>`${v} ${k}`).join(', ') + '.', 'success'); } catch (e) { alert('Los datos se migraron correctamente.'); }
+          } else {
+            console.error('Errores al migrar:', errors);
+            const errCount = errors.length;
+            try { showResultModal('Migración incompleta: ' + errCount + ' error(es). Revisa la consola para detalles.', 'error'); } catch (e) { alert('Migración incompleta: ' + errCount + ' error(es). Revisa la consola para detalles.'); }
+          }
+        } catch (err) {
+          console.error('migrateToServer', err);
+          try { showResultModal('Error migrando datos: ' + (err && err.message ? err.message : String(err)), 'error'); } catch (e) { alert('Error migrando datos: ' + (err && err.message ? err.message : String(err))); }
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || 'Migrar datos al servidor'; }
+        }
       }
 
       const migrateBtn = document.getElementById('migrate-server');
@@ -4711,24 +5073,58 @@
         });
       }
 
-      document.getElementById('clear-data').addEventListener('click', function () {
-        if (!confirm('Borrar datos guardados?')) return;
-        localStorage.removeItem(KEY_CARRERAS);
-        localStorage.removeItem(KEY_MODULOS);
-        localStorage.removeItem(KEY_DOCENTES);
-        localStorage.removeItem(KEY_EVENTS);
-        localStorage.removeItem(KEY_SALAS);
-        carreras = [];
-        modulos = [];
-        docentes = [];
-        salas = [];
-        storedEvents = [];
-        renderCarreras();
-        renderModulos();
-        renderDocentes();
-        renderRooms();
-        refreshCalendarEvents();
-      });
+      const clearDataBtn = document.getElementById('clear-data');
+      if (clearDataBtn) {
+        clearDataBtn.addEventListener('click', async function () {
+          if (!confirm('Borrar datos guardados?')) return;
+          if (USE_API) {
+            const base = API_BASE;
+            const pathsInOrder = ['/events', '/templates', '/salas', '/docentes', '/modulos', '/carreras'];
+            for (const path of pathsInOrder) {
+              try {
+                const response = await authorizedFetch(base + path);
+                const items = response.ok ? await response.json() : [];
+                for (const item of items || []) {
+                  const id = item && item.id;
+                  if (!id) continue;
+                  try {
+                    await authorizedFetch(base + path + '/' + encodeURIComponent(id), { method: 'DELETE' });
+                  } catch (err) {
+                    console.warn('No se pudo eliminar', path, id, err);
+                  }
+                }
+              } catch (err) {
+                console.warn('No se pudieron limpiar recursos en', path, err);
+              }
+            }
+          } else {
+            localStorage.removeItem(KEY_CARRERAS);
+            localStorage.removeItem(KEY_MODULOS);
+            localStorage.removeItem(KEY_DOCENTES);
+            localStorage.removeItem(KEY_EVENTS);
+            localStorage.removeItem(KEY_TEMPLATES);
+            localStorage.removeItem(KEY_SALAS);
+          }
+          carreras = [];
+          modulos = [];
+          docentes = [];
+          storedEvents = [];
+          templates = [];
+          salas = [];
+          save(KEY_CARRERAS, carreras);
+          save(KEY_MODULOS, modulos);
+          save(KEY_DOCENTES, docentes);
+          save(KEY_TEMPLATES, templates);
+          save(KEY_SALAS, salas);
+          persistEventsAndValidate();
+          renderCarreras();
+          renderModulos();
+          renderDocentes();
+          renderRooms();
+          refreshCalendarEvents();
+          try { showResultModal('Datos limpiados correctamente.', 'success'); } catch (_) { alert('Datos limpiados correctamente.'); }
+        });
+      }
 
       document.getElementById('run-acople').addEventListener('click', function () { if (!confirm('Abrir vista previa de acople para la semana seleccionada?')) return; const wk = document.getElementById('filter-week')?.value || getWeekRange()[0]; openAcoplePreview(wk); });
 
@@ -5682,8 +6078,8 @@
       <div class="auth-hero">
         <span class="auth-badge"><span aria-hidden="true">★</span> Inspirado en la bienvenida de inicioSesion</span>
         <h1>Bienvenido a</h1>
-        <h2>Horarium Pro · Gestión Horaria</h2>
-        <p>Este prototipo requiere credenciales de administrador para proteger la planificación horaria. Usa estos accesos provisionales y actualízalos más adelante.</p>
+        <h2>Conexia · Gestión Horaria</h2>
+        <p>Conexia requiere credenciales de administrador para proteger la planificación horaria. Usa estos accesos provisionales y actualízalos más adelante.</p>
       </div>
       <div class="auth-card">
         <h3>Acceso administrador</h3>
@@ -5697,7 +6093,11 @@
           </label>
           <button type="submit">Ingresar</button>
           <div id="auth-error" class="login-error" role="status"></div>
-          <div class="auth-hint">Temporal: usuario <strong>admin</strong> · clave <strong>ceduc123</strong>. Cámbialo pronto.</div>
+          <div class="auth-divider" aria-hidden="true"><span>ó</span></div>
+          <div class="google-login" id="google-login-container" aria-live="polite"></div>
+          <div id="google-login-status" class="login-error" role="status"></div>
+          <div id="google-login-hint" class="auth-hint">También puedes ingresar con tu correo institucional a través de Google.</div>
+          <div class="auth-hint">Fallback temporal: usuario <strong>admin</strong> · clave <strong>ceduc123</strong>.</div>
         </form>
       </div>
     </div>
@@ -5730,7 +6130,7 @@
             </picture>
           </div>
       </div>
-      <h2>Prototipo: Gestión Académica</h2>
+      <h2>Conexia · Gestión Académica</h2>
       <p>Crear y administrar carreras, módulos y docentes. Los eventos se guardan en <em>localStorage</em>.</p>
 
       <div class="sidebar-group" data-group="legend">
@@ -6055,25 +6455,22 @@
     })();
   </script>
 
-  <div id="chatbot-container" class="chatbot-container" aria-live="polite">
-    <div id="chatbot-window" class="chatbot-window" role="dialog" aria-label="Asistente virtual Conexia"
-      aria-modal="false" aria-hidden="true">
-      <div class="chatbot-header">Asistente Virtual</div>
-      <div id="chatbot-messages" class="chatbot-messages"></div>
-      <div class="chatbot-input-container">
-        <input type="text" id="chatbot-input" class="chatbot-input" placeholder="Escribe tu pregunta..."
-          aria-label="Mensaje para el asistente" tabindex="-1">
-        <button id="chatbot-send-button" class="chatbot-send-button" tabindex="-1">Enviar</button>
-      </div>
-    </div>
-    <button id="chatbot-button" class="chatbot-button" type="button" aria-haspopup="dialog"
-      aria-expanded="false">
+  <div id="chatbot-container" class="chatbot-container">
+    <button id="chatbot-button" class="chatbot-button">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
         class="feather feather-message-square">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
       </svg>
     </button>
+    <div id="chatbot-window" class="chatbot-window">
+      <div class="chatbot-header">Asistente Virtual</div>
+      <div id="chatbot-messages" class="chatbot-messages"></div>
+      <div class="chatbot-input-container">
+        <input type="text" id="chatbot-input" class="chatbot-input" placeholder="Escribe tu pregunta...">
+        <button id="chatbot-send-button" class="chatbot-send-button">Enviar</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -6082,10 +6479,9 @@
       const chatbotWindow = document.getElementById('chatbot-window');
       const chatbotMessages = document.getElementById('chatbot-messages');
       const chatbotInput = document.getElementById('chatbot-input');
-  const chatbotSendButton = document.getElementById('chatbot-send-button');
+      const chatbotSendButton = document.getElementById('chatbot-send-button');
 
-  let isChatbotOpen = false;
-  let hasWelcomed = false;
+      let isChatbotOpen = false;
 
       // Knowledge base for the chatbot
       const knowledgeBase = {
@@ -6128,33 +6524,11 @@
         }
       }
 
-      function setChatbotOpen(nextState) {
-        isChatbotOpen = nextState;
-        chatbotWindow.classList.toggle('is-open', isChatbotOpen);
-        chatbotWindow.setAttribute('aria-hidden', isChatbotOpen ? 'false' : 'true');
-        chatbotButton.setAttribute('data-open', isChatbotOpen ? 'true' : 'false');
-        chatbotButton.setAttribute('aria-expanded', isChatbotOpen ? 'true' : 'false');
-        chatbotInput.tabIndex = isChatbotOpen ? 0 : -1;
-        chatbotSendButton.tabIndex = isChatbotOpen ? 0 : -1;
-        if (isChatbotOpen) {
-          chatbotInput.focus();
-          if (!hasWelcomed) {
-            addMessage('¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte?', 'bot');
-            hasWelcomed = true;
-          }
-        } else {
-          chatbotButton.focus();
-        }
-      }
-
       chatbotButton.addEventListener('click', () => {
-        setChatbotOpen(!isChatbotOpen);
-      });
-
-      document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && isChatbotOpen) {
-          setChatbotOpen(false);
-          chatbotButton.focus();
+        isChatbotOpen = !isChatbotOpen;
+        chatbotWindow.style.display = isChatbotOpen ? 'flex' : 'none';
+        if (isChatbotOpen) {
+          addMessage("¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte?", 'bot');
         }
       });
 
