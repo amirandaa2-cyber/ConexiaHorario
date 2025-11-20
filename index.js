@@ -294,7 +294,15 @@ if(dbReady){
 		const id = c.id || uuidv4();
 		try{
 			await db.query(
-				'INSERT INTO carreras (id,nombre,totalHoras,practicaHoras,teoricaHoras,colorDiurno,colorVespertino) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+				`INSERT INTO carreras (id,nombre,totalHoras,practicaHoras,teoricaHoras,colorDiurno,colorVespertino)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7)
+				 ON CONFLICT (id) DO UPDATE
+				 SET nombre=EXCLUDED.nombre,
+				     totalHoras=EXCLUDED.totalHoras,
+				     practicaHoras=EXCLUDED.practicaHoras,
+				     teoricaHoras=EXCLUDED.teoricaHoras,
+				     colorDiurno=EXCLUDED.colorDiurno,
+				     colorVespertino=EXCLUDED.colorVespertino`,
 				[id, c.nombre, c.totalHoras||0, c.practicaHoras||0, c.teoricaHoras||0, c.colorDiurno||null, c.colorVespertino||null]
 			);
 			res.json({ok:true,id});
@@ -331,7 +339,13 @@ if(dbReady){
 		const id = m.id || uuidv4();
 		try{
 			await db.query(
-				'INSERT INTO modulos (id,nombre,carreraId,horas,tipo) VALUES ($1,$2,$3,$4,$5)',
+				`INSERT INTO modulos (id,nombre,carreraId,horas,tipo)
+				 VALUES ($1,$2,$3,$4,$5)
+				 ON CONFLICT (id) DO UPDATE
+				 SET nombre=EXCLUDED.nombre,
+				     carreraId=EXCLUDED.carreraId,
+				     horas=EXCLUDED.horas,
+				     tipo=EXCLUDED.tipo`,
 				[id, m.nombre, m.carreraId, m.horas||0, m.tipo||'Teórico']
 			);
 			res.json({ok:true,id});
@@ -368,7 +382,18 @@ if(dbReady){
 		const id = d.id || uuidv4();
 		try{
 			await db.query(
-				'INSERT INTO docentes (id,rut,nombre,edad,estadoCivil,contratoHoras,horasAsignadas,horasTrabajadas,turno,activo) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+				`INSERT INTO docentes (id,rut,nombre,edad,estadoCivil,contratoHoras,horasAsignadas,horasTrabajadas,turno,activo)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+				 ON CONFLICT (id) DO UPDATE
+				 SET rut=EXCLUDED.rut,
+				     nombre=EXCLUDED.nombre,
+				     edad=EXCLUDED.edad,
+				     estadoCivil=EXCLUDED.estadoCivil,
+				     contratoHoras=EXCLUDED.contratoHoras,
+				     horasAsignadas=EXCLUDED.horasAsignadas,
+				     horasTrabajadas=EXCLUDED.horasTrabajadas,
+				     turno=EXCLUDED.turno,
+				     activo=EXCLUDED.activo`,
 				[id, d.rut, d.nombre, d.edad||0, d.estadoCivil||'', d.contratoHoras||0, d.horasAsignadas||0, d.horasTrabajadas||0, d.turno||'Diurno', !!d.activo]
 			);
 			res.json({ok:true,id});
@@ -405,7 +430,11 @@ if(dbReady){
 		const id = s.id || uuidv4();
 		try{
 			await db.query(
-				'INSERT INTO salas (id,nombre,capacidad) VALUES ($1,$2,$3)',
+				`INSERT INTO salas (id,nombre,capacidad)
+				 VALUES ($1,$2,$3)
+				 ON CONFLICT (id) DO UPDATE
+				 SET nombre=EXCLUDED.nombre,
+				     capacidad=EXCLUDED.capacidad`,
 				[id, s.nombre, s.capacidad||0]
 			);
 			res.json({ok:true,id});
@@ -439,7 +468,16 @@ if(dbReady){
 		const id = t.id || uuidv4();
 		try{
 			await db.query(
-				'INSERT INTO templates (id,moduloId,docenteId,salaId,startDate,time,duration,until) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+				`INSERT INTO templates (id,moduloId,docenteId,salaId,startDate,time,duration,until)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+				 ON CONFLICT (id) DO UPDATE
+				 SET moduloId=EXCLUDED.moduloId,
+				     docenteId=EXCLUDED.docenteId,
+				     salaId=EXCLUDED.salaId,
+				     startDate=EXCLUDED.startDate,
+				     time=EXCLUDED.time,
+				     duration=EXCLUDED.duration,
+				     until=EXCLUDED.until`,
 				[id, t.moduloId, t.docenteId, t.salaId, t.startDate, t.time, t.duration, t.until]
 			);
 			res.json({ok:true,id});
