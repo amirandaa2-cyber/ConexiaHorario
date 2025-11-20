@@ -648,6 +648,13 @@
     const KEY_SALAS = 'conexia_salas_v1';
     const KEY_CALENDAR_STATE = 'conexia_calendar_state_v1';
     const SESSION_ROLES_KEY = 'conexia_admin_roles';
+    const REMOTE_API_BASE = 'https://conexiahorario.onrender.com/api';
+    const LOCAL_API_BASE = 'http://localhost:3001/api';
+
+    function normalizeApiBase(url) {
+      if (!url) return '';
+      return String(url).trim().replace(/\/+$/, '');
+    }
 
     function storageGet(key) {
       try { return window.localStorage.getItem(key); } catch (_) { return null; }
@@ -671,13 +678,40 @@
     }
 
     function detectDefaultApiBase() {
-      if (typeof window === 'undefined') return 'http://localhost:3001/api';
-      const fallbackOrigin = (window.location && window.location.origin && window.location.origin !== 'null')
-        ? window.location.origin.replace(/\/$/, '')
-        : 'http://localhost:3001';
-      const resolved = window.APP_API_URL || (fallbackOrigin + '/api');
-      window.APP_API_URL = resolved;
-      return resolved;
+      if (typeof window === 'undefined') return REMOTE_API_BASE;
+
+      let queryOverride = null;
+      try {
+        const params = new URLSearchParams(window.location?.search || '');
+        queryOverride = params.get('apiBase') || params.get('api');
+      } catch (_) {
+        queryOverride = null;
+      }
+
+      const forced = queryOverride || window.APP_API_URL;
+      if (forced) {
+        const normalized = normalizeApiBase(forced) || REMOTE_API_BASE;
+        window.APP_API_URL = normalized;
+        return normalized;
+      }
+
+      const loc = window.location || {};
+      const hostname = loc.hostname || '';
+      const protocol = loc.protocol || '';
+      const origin = (loc.origin && loc.origin !== 'null') ? loc.origin.replace(/\/$/, '') : '';
+
+      let resolvedBase = REMOTE_API_BASE;
+      if (/localhost|127\.0\.0\.1/i.test(hostname)) {
+        resolvedBase = origin ? `${origin}/api` : LOCAL_API_BASE;
+      } else if (hostname && /conexiahorario\.onrender\.com$/i.test(hostname)) {
+        resolvedBase = origin ? `${origin}/api` : REMOTE_API_BASE;
+      } else if (!hostname || protocol === 'file:') {
+        resolvedBase = REMOTE_API_BASE;
+      }
+
+      const normalizedBase = normalizeApiBase(resolvedBase) || REMOTE_API_BASE;
+      window.APP_API_URL = normalizedBase;
+      return normalizedBase;
     }
 
     function resolveApiMode() {
@@ -686,6 +720,7 @@
       const storedPref = storageGet('use_api_mode');
       if (storedPref === 'true') return true;
       if (storedPref === 'false') return false;
+      if (window.APP_API_URL && window.APP_API_URL.length) return true;
       return window.location ? window.location.protocol !== 'file:' : false;
     }
 
