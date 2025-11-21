@@ -716,9 +716,17 @@
 
     function resolveApiMode() {
       if (typeof window === 'undefined') return false;
+      const hostname = (window.location && window.location.hostname ? window.location.hostname : '').toLowerCase();
+      const isHostedDomain = /conexiahorario\.onrender\.com$/i.test(hostname);
       if ('APP_USE_API' in window) return Boolean(window.APP_USE_API);
       const storedPref = storageGet('use_api_mode');
       if (storedPref === 'true') return true;
+      if (isHostedDomain) {
+        if (storedPref === 'false') {
+          console.warn('Ignorando use_api_mode=false porque estamos en el dominio hospedado y la data debe venir desde la base de datos.');
+        }
+        return true;
+      }
       if (storedPref === 'false') return false;
       if (window.APP_API_URL && window.APP_API_URL.length) return true;
       return window.location ? window.location.protocol !== 'file:' : false;
@@ -4902,11 +4910,26 @@
       const bodyObs = new MutationObserver(() => { makeDialogsDraggable(); }); bodyObs.observe(document.body, { childList: true, subtree: true });
 
       // API toggle wiring
-      const apiModeStored = localStorage.getItem('use_api_mode') === 'true';
       const apiIndicator = document.getElementById('api-mode');
       const toggleApiBtn = document.getElementById('toggle-api');
-      if (apiIndicator) { apiIndicator.innerHTML = `Modo API: <strong style="color:${apiModeStored ? 'green' : 'red'}">${apiModeStored ? 'ON' : 'OFF'}</strong>`; }
-      if (toggleApiBtn) { toggleApiBtn.addEventListener('click', () => { const next = !apiModeStored; localStorage.setItem('use_api_mode', String(next)); alert('Modo API cambiado a ' + (next ? 'ON' : 'OFF') + '. Recarga la página para aplicar.'); }); }
+      const storedApiPref = storageGet('use_api_mode');
+      if (apiIndicator) {
+        const effective = USE_API;
+        const color = effective ? 'green' : 'red';
+        let label = `Modo API: <strong style="color:${color}">${effective ? 'ON' : 'OFF'}</strong>`;
+        if (effective && storedApiPref === 'false') {
+          label += ' <span style="color:#b45309">(forzado por dominio)</span>';
+        }
+        apiIndicator.innerHTML = label;
+      }
+      if (toggleApiBtn) {
+        toggleApiBtn.addEventListener('click', () => {
+          const currentPref = storageGet('use_api_mode') === 'true';
+          const next = !currentPref;
+          localStorage.setItem('use_api_mode', String(next));
+          alert('Modo API cambiado a ' + (next ? 'ON' : 'OFF') + '. Recarga la página para aplicar.');
+        });
+      }
 
       // Migrate localStorage data to server endpoints (best-effort). Requires USE_API true and server running at API_BASE
       async function migrateToServer() {
