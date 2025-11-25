@@ -716,10 +716,10 @@
 
     function resolveApiMode() {
       if (typeof window === 'undefined') return false;
-      const hostname = (window.location && window.location.hostname ? window.location.hostname : '').toLowerCase();
+      const hostname = (window.location?.hostname || '').toLowerCase();
       const isHostedDomain = /conexiahorario\.onrender\.com$/i.test(hostname);
-      const apiBase = (typeof window !== 'undefined' && window.APP_API_URL) ? window.APP_API_URL : '';
-      const usesRemoteCluster = /conexiahorario\.onrender\.com/i.test(apiBase || '') || isHostedDomain;
+      const apiBase = window.APP_API_URL || '';
+      const usesRemoteCluster = /conexiahorario\.onrender\.com/i.test(apiBase) || isHostedDomain;
       if ('APP_USE_API' in window) return Boolean(window.APP_USE_API);
       const storedPref = storageGet('use_api_mode');
       if (storedPref === 'true') return true;
@@ -730,7 +730,7 @@
         return true;
       }
       if (storedPref === 'false') return false;
-      if (apiBase && apiBase.length) return true;
+      if (apiBase) return true;
       return window.location ? window.location.protocol !== 'file:' : false;
     }
 
