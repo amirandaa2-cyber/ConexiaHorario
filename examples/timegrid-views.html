@@ -1059,18 +1059,22 @@
       }
       // If running with API mode, fetch initial data from the server so the app uses PostgreSQL
       if (USE_API) {
-        try {
-          try { carreras = await fetchCarreras(); } catch (e) { carreras = []; console.error('fetchCarreras error', e); }
-          try { modulos = await fetchModulos(); } catch (e) { modulos = []; console.error('fetchModulos error', e); }
-          try { docentes = await fetchDocentes(); } catch (e) { docentes = []; console.error('fetchDocentes error', e); }
-          try { templates = await fetchTemplates(); } catch (e) { templates = []; console.error('fetchTemplates error', e); }
-          try { storedEvents = await fetchEvents(); } catch (e) { storedEvents = []; console.error('fetchEvents error', e); }
-          try { const r = await authorizedFetch(API_BASE + '/salas'); salas = r.ok ? await r.json() : []; } catch (e) { salas = []; console.error('fetchSalas error', e); }
-        } catch (err) { console.error('Initial data load from API failed', err); }
+        try { carreras = await fetchCarreras(); } catch (e) { carreras = []; console.error('fetchCarreras error', e); }
+        try { modulos = await fetchModulos(); } catch (e) { modulos = []; console.error('fetchModulos error', e); }
+        try { docentes = await fetchDocentes(); } catch (e) { docentes = []; console.error('fetchDocentes error', e); }
+        try { templates = await fetchTemplates(); } catch (e) { templates = []; console.error('fetchTemplates error', e); }
+        try { storedEvents = await fetchEvents(); } catch (e) { storedEvents = []; console.error('fetchEvents error', e); }
+        try { const r = await authorizedFetch(API_BASE + '/salas'); salas = r.ok ? await r.json() : []; } catch (e) { salas = []; console.error('fetchSalas error', e); }
       } else {
-        // fall back to loading from localStorage when not using API
-        try { docentes = load(KEY_DOCENTES, []); carreras = load(KEY_CARRERAS, []); modulos = load(KEY_MODULOS, []); storedEvents = load(KEY_EVENTS, []); templates = load(KEY_TEMPLATES, []); salas = load(KEY_SALAS, []); } catch (e) { console.warn('local load failed', e); }
+        carreras = load(KEY_CARRERAS, []);
+        modulos = load(KEY_MODULOS, []);
+        docentes = load(KEY_DOCENTES, []);
+        templates = load(KEY_TEMPLATES, []);
+        storedEvents = load(KEY_EVENTS, []);
+        salas = load(KEY_SALAS, []);
       }
+
+      hydrateSchedulerUi();
       // (removed .fc-event.hidden CSS approach - rely on strict filtering instead)
       // --- DIAGNÓSTICO EN PÁGINA -------------------------------------------------
       // Visible diagnostics panel to capture runtime errors and status without opening devtools
@@ -4874,7 +4878,7 @@
       }
 
       // initial render
-      renderCarreras(); renderModulos(); renderDocentes(); refreshCalendarEvents();
+      hydrateSchedulerUi();
       // Guardar automáticamente los eventos/estado antes de cerrar o recargar la página
       try { window.addEventListener('beforeunload', function () { try { persistEventsAndValidate(); } catch (e) { } }); } catch (e) { }
 
