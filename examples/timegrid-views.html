@@ -650,6 +650,7 @@
     const SESSION_ROLES_KEY = 'conexia_admin_roles';
     const REMOTE_API_BASE = 'https://conexiahorario.onrender.com/api';
     const LOCAL_API_BASE = 'http://localhost:3001/api';
+    const API_BASE_OVERRIDE_KEY = 'conexia_api_base_override';
 
     function normalizeApiBase(url) {
       if (!url) return '';
@@ -688,7 +689,14 @@
         queryOverride = null;
       }
 
-      const forced = queryOverride || window.APP_API_URL;
+      let storedOverride = null;
+      try {
+        storedOverride = storageGet(API_BASE_OVERRIDE_KEY);
+      } catch (_) {
+        storedOverride = null;
+      }
+
+      const forced = queryOverride || storedOverride || window.APP_API_URL;
       if (forced) {
         const normalized = normalizeApiBase(forced) || REMOTE_API_BASE;
         window.APP_API_URL = normalized;
@@ -699,10 +707,11 @@
       const hostname = loc.hostname || '';
       const protocol = loc.protocol || '';
       const origin = (loc.origin && loc.origin !== 'null') ? loc.origin.replace(/\/$/, '') : '';
+      const isLocalhost = /localhost|127\.0\.0\.1/i.test(hostname);
 
       let resolvedBase = REMOTE_API_BASE;
-      if (/localhost|127\.0\.0\.1/i.test(hostname)) {
-        resolvedBase = origin ? `${origin}/api` : LOCAL_API_BASE;
+      if (isLocalhost) {
+        resolvedBase = REMOTE_API_BASE;
       } else if (hostname && /conexiahorario\.onrender\.com$/i.test(hostname)) {
         resolvedBase = origin ? `${origin}/api` : REMOTE_API_BASE;
       } else if (!hostname || protocol === 'file:') {
@@ -4958,8 +4967,14 @@
 
       // API toggle wiring
       const apiIndicator = document.getElementById('api-mode');
+      const apiBaseIndicator = document.getElementById('api-base-indicator');
       const toggleApiBtn = document.getElementById('toggle-api');
+      const toggleApiSourceBtn = document.getElementById('toggle-api-source');
       const storedApiPref = storageGet('use_api_mode');
+      const storedBaseOverride = storageGet(API_BASE_OVERRIDE_KEY);
+      const normalizedBase = normalizeApiBase(API_BASE);
+      const normalizedRemoteBase = normalizeApiBase(REMOTE_API_BASE);
+      const normalizedLocalBase = normalizeApiBase(LOCAL_API_BASE);
       if (apiIndicator) {
         const effective = USE_API;
         const color = effective ? 'green' : 'red';
@@ -4969,12 +4984,30 @@
         }
         apiIndicator.innerHTML = label;
       }
+      if (apiBaseIndicator) {
+        const overrideLabel = storedBaseOverride ? ' (preferencia)' : ' (auto)';
+        apiBaseIndicator.innerHTML = `Origen API${overrideLabel}: <code>${normalizedBase || 'desconocido'}</code>`;
+      }
       if (toggleApiBtn) {
         toggleApiBtn.addEventListener('click', () => {
           const currentPref = storageGet('use_api_mode') === 'true';
           const next = !currentPref;
           localStorage.setItem('use_api_mode', String(next));
           alert('Modo API cambiado a ' + (next ? 'ON' : 'OFF') + '. Recarga la página para aplicar.');
+        });
+      }
+      if (toggleApiSourceBtn) {
+        toggleApiSourceBtn.addEventListener('click', () => {
+          const currentOverride = storageGet(API_BASE_OVERRIDE_KEY);
+          const currentBase = normalizeApiBase(currentOverride || API_BASE);
+          const usingLocal = currentBase === normalizedLocalBase;
+          if (usingLocal) {
+            localStorage.removeItem(API_BASE_OVERRIDE_KEY);
+            alert('Ahora se usará la API remota (Render). Recarga la página para aplicar.');
+          } else {
+            localStorage.setItem(API_BASE_OVERRIDE_KEY, normalizedLocalBase);
+            alert('Ahora se usará la API local (localhost:3001). Recarga la página para aplicar.');
+          }
         });
       }
 
@@ -6373,9 +6406,11 @@
           </div>
           <div class="sidebar-field">
             <small id="api-mode">Modo API: <strong style="color:green">OFF</strong></small>
+            <small id="api-base-indicator" style="display:block;margin-top:4px;">Origen API: <code>--</code></small>
           </div>
           <div class="sidebar-button-stack">
             <button id="toggle-api" type="button">Alternar Modo API (requiere recargar)</button>
+            <button id="toggle-api-source" type="button">Cambiar origen API (Render/Local)</button>
           </div>
         </div>
       </div>
