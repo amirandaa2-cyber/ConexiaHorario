@@ -1998,9 +1998,14 @@
         // recolor events according to turno preference: diurno -> event-diurno, vespertino -> event-vespertino
         refreshCalendarEvents();
       }
-      turnoSelect.addEventListener('change', () => applyTheme(turnoSelect.value));
-      // initialize
-      applyTheme(turnoSelect.value || 'Diurno');
+      if (turnoSelect) {
+        turnoSelect.addEventListener('change', () => applyTheme(turnoSelect.value));
+        // initialize
+        applyTheme(turnoSelect.value || 'Diurno');
+      } else {
+        console.warn('turno-theme select no encontrado, aplicando tema por defecto.');
+        applyTheme('Diurno');
+      }
 
       // set default semester end date (Dec 16 current year) if empty
       try {
@@ -2023,8 +2028,17 @@
       // Renderers
       function renderCarreras() {
         // refresh select
-        selectCarreraForModulo.innerHTML = '';
-        listCarreras.innerHTML = '';
+        if (selectCarreraForModulo) {
+          selectCarreraForModulo.innerHTML = '';
+        } else {
+          console.warn('select-carrera no encontrado, el formulario de módulos no se actualizará.');
+        }
+        if (listCarreras) {
+          listCarreras.innerHTML = '';
+        } else {
+          console.warn('list-carreras no encontrado, no se puede mostrar el catálogo.');
+          return;
+        }
         const filterCarrera = document.getElementById('filter-carrera');
         if (filterCarrera) filterCarrera.innerHTML = '<option value="">-- Todas --</option>';
         carreras.forEach(c => {
@@ -2044,7 +2058,9 @@
           pal.innerHTML = `Diurno: <input type="color" data-cid="${c.id}" class="pal-diurno" value="${c.colorDiurno || '#3788d8'}"> Vespertino: <input type="color" data-cid="${c.id}" class="pal-vespertino" value="${c.colorVespertino || '#8b5cf6'}">`;
           li.appendChild(pal);
           listCarreras.appendChild(li);
-          const opt = document.createElement('option'); opt.value = c.id; opt.text = c.nombre; selectCarreraForModulo.appendChild(opt);
+          if (selectCarreraForModulo) {
+            const opt = document.createElement('option'); opt.value = c.id; opt.text = c.nombre; selectCarreraForModulo.appendChild(opt);
+          }
           if (filterCarrera) { const opt2 = document.createElement('option'); opt2.value = c.id; opt2.text = c.nombre; filterCarrera.appendChild(opt2); }
         });
         // initialize week filter to current week's Monday if empty
@@ -2546,49 +2562,68 @@
       }
 
       // Forms handling
-      formCarrera.addEventListener('submit', function (ev) {
-        ev.preventDefault();
-        const id = document.getElementById('carrera-id').value.trim();
-        const nombre = document.getElementById('carrera-nombre').value.trim();
-        const total = parseInt(document.getElementById('carrera-total').value || '0', 10);
-        const practica = parseInt(document.getElementById('carrera-practica').value || '0', 10);
-        const teorica = parseInt(document.getElementById('carrera-teorica').value || '0', 10);
-        if (!id || !nombre) { alert('ID y nombre son requeridos'); return; }
-        carreras.push({ id, nombre, totalHoras: total, practicaHoras: practica, teoricaHoras: teorica });
-        save(KEY_CARRERAS, carreras); renderCarreras(); formCarrera.reset();
-        const cm = document.getElementById('carrera-modal'); if (cm) hideModal(cm);
-      });
+      if (formCarrera) {
+        formCarrera.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          const id = document.getElementById('carrera-id').value.trim();
+          const nombre = document.getElementById('carrera-nombre').value.trim();
+          const total = parseInt(document.getElementById('carrera-total').value || '0', 10);
+          const practica = parseInt(document.getElementById('carrera-practica').value || '0', 10);
+          const teorica = parseInt(document.getElementById('carrera-teorica').value || '0', 10);
+          if (!id || !nombre) { alert('ID y nombre son requeridos'); return; }
+          carreras.push({ id, nombre, totalHoras: total, practicaHoras: practica, teoricaHoras: teorica });
+          save(KEY_CARRERAS, carreras); renderCarreras(); formCarrera.reset();
+          const cm = document.getElementById('carrera-modal'); if (cm) hideModal(cm);
+        });
+      } else {
+        console.warn('form-carrera no encontrado, omitiendo manejador.');
+      }
 
-      formModulo.addEventListener('submit', function (ev) {
-        ev.preventDefault();
-        const id = document.getElementById('modulo-id').value.trim();
-        const nombre = document.getElementById('modulo-nombre').value.trim();
-        const carreraId = selectCarreraForModulo.value;
-        const horas = parseFloat(document.getElementById('modulo-horas').value || '0');
-        const tipo = document.querySelector('input[name="mod-tipo"]:checked')?.value || 'Teórico';
-        if (!id || !nombre) { alert('ID y nombre requeridos'); return; }
-        modulos.push({ id, nombre, carreraId, horas, tipo }); save(KEY_MODULOS, modulos); renderModulos(); formModulo.reset();
-        const mm = document.getElementById('modulo-modal'); if (mm) hideModal(mm);
-      });
+      if (formModulo) {
+        formModulo.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          const id = document.getElementById('modulo-id').value.trim();
+          const nombre = document.getElementById('modulo-nombre').value.trim();
+          const carreraId = selectCarreraForModulo ? selectCarreraForModulo.value : '';
+          const horas = parseFloat(document.getElementById('modulo-horas').value || '0');
+          const tipo = document.querySelector('input[name="mod-tipo"]:checked')?.value || 'Teórico';
+          if (!id || !nombre) { alert('ID y nombre requeridos'); return; }
+          modulos.push({ id, nombre, carreraId, horas, tipo });
+          save(KEY_MODULOS, modulos);
+          renderModulos();
+          formModulo.reset();
+          const mm = document.getElementById('modulo-modal'); if (mm) hideModal(mm);
+        });
+      } else {
+        console.warn('form-modulo no encontrado, omitiendo manejador.');
+      }
 
-      formDocente.addEventListener('submit', function (ev) {
-        ev.preventDefault();
-        const id = 'doc_' + Date.now();
-        const rut = document.getElementById('doc-rut').value.trim();
-        const nombre = document.getElementById('doc-nombre').value.trim();
-        const edad = parseInt(document.getElementById('doc-edad').value || '0', 10);
-        const estadoCivil = document.getElementById('doc-estado').value.trim();
-        const contratoHoras = parseFloat(document.getElementById('doc-contrato').value || '0');
-        const turno = document.getElementById('doc-turno').value || 'Diurno';
-        const carreraId = document.getElementById('doc-carrera') ? document.getElementById('doc-carrera').value : null;
-        const activo = true;
-        if (!rut || !nombre) { alert('Rut y nombre son requeridos'); return; }
-        docentes.push({ id, rut, nombre, edad, estadoCivil, contratoHoras, horasAsignadas: 0, horasTrabajadas: 0, turno, activo, carreraId }); save(KEY_DOCENTES, docentes); renderDocentes(); formDocente.reset(); toggleDocModal(false);
-      });
+      if (formDocente) {
+        formDocente.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          const id = 'doc_' + Date.now();
+          const rut = document.getElementById('doc-rut').value.trim();
+          const nombre = document.getElementById('doc-nombre').value.trim();
+          const edad = parseInt(document.getElementById('doc-edad').value || '0', 10);
+          const estadoCivil = document.getElementById('doc-estado').value.trim();
+          const contratoHoras = parseFloat(document.getElementById('doc-contrato').value || '0');
+          const turno = document.getElementById('doc-turno').value || 'Diurno';
+          const carreraId = document.getElementById('doc-carrera') ? document.getElementById('doc-carrera').value : null;
+          const activo = true;
+          if (!rut || !nombre) { alert('Rut y nombre son requeridos'); return; }
+          docentes.push({ id, rut, nombre, edad, estadoCivil, contratoHoras, horasAsignadas: 0, horasTrabajadas: 0, turno, activo, carreraId });
+          save(KEY_DOCENTES, docentes);
+          renderDocentes();
+          formDocente.reset();
+          toggleDocModal(false);
+        });
+      } else {
+        console.warn('form-docente no encontrado, omitiendo manejador.');
+      }
 
       // modal controls
-      openDocModalBtn.addEventListener('click', () => toggleDocModal(true));
-      closeDocModalBtn.addEventListener('click', () => toggleDocModal(false));
+      if (openDocModalBtn) openDocModalBtn.addEventListener('click', () => toggleDocModal(true));
+      if (closeDocModalBtn) closeDocModalBtn.addEventListener('click', () => toggleDocModal(false));
       function toggleDocModal(show) {
         if (!docModal) return;
         if (show) {
@@ -2610,19 +2645,29 @@
       renderRooms();
 
       // Modal open/close buttons for Carrera, Modulo, Sala
-      document.getElementById('open-carrera-modal').addEventListener('click', () => { const cm = document.getElementById('carrera-modal'); if (cm) showModal(cm); document.getElementById('carrera-id').focus(); });
-      document.getElementById('close-carrera-modal').addEventListener('click', () => { const cm = document.getElementById('carrera-modal'); if (cm) hideModal(cm); });
-      document.getElementById('open-modulo-modal').addEventListener('click', () => { const mm = document.getElementById('modulo-modal'); if (mm) showModal(mm); document.getElementById('modulo-id').focus(); });
-      document.getElementById('close-modulo-modal').addEventListener('click', () => { const mm = document.getElementById('modulo-modal'); if (mm) hideModal(mm); });
+      const openCarreraBtn = document.getElementById('open-carrera-modal');
+      if (openCarreraBtn) openCarreraBtn.addEventListener('click', () => { const cm = document.getElementById('carrera-modal'); if (cm) showModal(cm); const input = document.getElementById('carrera-id'); if (input) input.focus(); });
+      const closeCarreraBtn = document.getElementById('close-carrera-modal');
+      if (closeCarreraBtn) closeCarreraBtn.addEventListener('click', () => { const cm = document.getElementById('carrera-modal'); if (cm) hideModal(cm); });
+      const openModuloBtn = document.getElementById('open-modulo-modal');
+      if (openModuloBtn) openModuloBtn.addEventListener('click', () => { const mm = document.getElementById('modulo-modal'); if (mm) showModal(mm); const input = document.getElementById('modulo-id'); if (input) input.focus(); });
+      const closeModuloBtn = document.getElementById('close-modulo-modal');
+      if (closeModuloBtn) closeModuloBtn.addEventListener('click', () => { const mm = document.getElementById('modulo-modal'); if (mm) hideModal(mm); });
       // close handlers for list modals
-      document.getElementById('close-list-modulos-modal').addEventListener('click', () => { const m = document.getElementById('list-modulos-modal'); if (m) hideModal(m); });
-      document.getElementById('close-list-docentes-modal').addEventListener('click', () => { const m = document.getElementById('list-docentes-modal'); if (m) hideModal(m); });
-      document.getElementById('close-list-salas-modal').addEventListener('click', () => { const m = document.getElementById('list-salas-modal'); if (m) hideModal(m); });
+      const closeListModBtn = document.getElementById('close-list-modulos-modal');
+      if (closeListModBtn) closeListModBtn.addEventListener('click', () => { const m = document.getElementById('list-modulos-modal'); if (m) hideModal(m); });
+      const closeListDocBtn = document.getElementById('close-list-docentes-modal');
+      if (closeListDocBtn) closeListDocBtn.addEventListener('click', () => { const m = document.getElementById('list-docentes-modal'); if (m) hideModal(m); });
+      const closeListSalaBtn = document.getElementById('close-list-salas-modal');
+      if (closeListSalaBtn) closeListSalaBtn.addEventListener('click', () => { const m = document.getElementById('list-salas-modal'); if (m) hideModal(m); });
       // map sala creation to modal form
-      document.getElementById('open-sala-modal').addEventListener('click', () => { const sm = document.getElementById('sala-modal'); if (sm) showModal(sm); document.getElementById('sala-id').focus(); });
-      document.getElementById('close-sala-modal').addEventListener('click', () => { const sm = document.getElementById('sala-modal'); if (sm) hideModal(sm); });
+      const openSalaBtn = document.getElementById('open-sala-modal');
+      if (openSalaBtn) openSalaBtn.addEventListener('click', () => { const sm = document.getElementById('sala-modal'); if (sm) showModal(sm); const sid = document.getElementById('sala-id'); if (sid) sid.focus(); });
+      const closeSalaBtn = document.getElementById('close-sala-modal');
+      if (closeSalaBtn) closeSalaBtn.addEventListener('click', () => { const sm = document.getElementById('sala-modal'); if (sm) hideModal(sm); });
       // ver salas button
-      document.getElementById('ver-salas').addEventListener('click', () => { openListSalasModal(); });
+      const verSalasBtn = document.getElementById('ver-salas');
+      if (verSalasBtn) verSalasBtn.addEventListener('click', () => { openListSalasModal(); });
       // handle sala form submit
       const formSala = document.getElementById('form-sala');
       if (formSala) {
