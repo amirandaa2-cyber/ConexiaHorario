@@ -1276,7 +1276,10 @@
         if (!USE_API) return load(KEY_CARRERAS, []);
         try {
           const r = await authorizedFetch(API_BASE + '/carreras');
-          return r.ok ? await r.json() : [];
+          console.log('fetchCarreras - HTTP status:', r.status, 'ok:', r.ok);
+          const data = await r.json().catch(() => null);
+          console.log('fetchCarreras - raw data:', data, 'isArray:', Array.isArray(data));
+          return r.ok && Array.isArray(data) ? data : [];
         } catch (err) {
           console.error('fetchCarreras falló', err);
           return [];
@@ -1287,7 +1290,10 @@
         if (!USE_API) return load(KEY_MODULOS, []);
         try {
           const r = await authorizedFetch(API_BASE + '/modulos');
-          return r.ok ? await r.json() : [];
+          console.log('fetchModulos - HTTP status:', r.status, 'ok:', r.ok);
+          const data = await r.json().catch(() => null);
+          console.log('fetchModulos - raw data:', data, 'isArray:', Array.isArray(data));
+          return r.ok && Array.isArray(data) ? data : [];
         } catch (err) {
           console.error('fetchModulos falló', err);
           return [];
@@ -1298,7 +1304,10 @@
         if (!USE_API) return load(KEY_DOCENTES, []);
         try {
           const r = await authorizedFetch(API_BASE + '/docentes');
-          return r.ok ? await r.json() : [];
+          console.log('fetchDocentes - HTTP status:', r.status, 'ok:', r.ok);
+          const data = await r.json().catch(() => null);
+          console.log('fetchDocentes - raw data:', data, 'isArray:', Array.isArray(data));
+          return r.ok && Array.isArray(data) ? data : [];
         } catch (err) {
           console.error('fetchDocentes falló', err);
           return [];
@@ -1309,7 +1318,10 @@
         if (!USE_API) return load(KEY_EVENTS, []);
         try {
           const r = await authorizedFetch(API_BASE + '/events');
-          return r.ok ? await r.json() : [];
+          console.log('fetchEvents - HTTP status:', r.status, 'ok:', r.ok);
+          const data = await r.json().catch(() => null);
+          console.log('fetchEvents - raw data:', data, 'isArray:', Array.isArray(data));
+          return r.ok && Array.isArray(data) ? data : [];
         } catch (err) {
           console.error('fetchEvents falló', err);
           return [];
@@ -1320,7 +1332,10 @@
         if (!USE_API) return load(KEY_TEMPLATES, []);
         try {
           const r = await authorizedFetch(API_BASE + '/templates');
-          return r.ok ? await r.json() : [];
+          console.log('fetchTemplates - HTTP status:', r.status, 'ok:', r.ok);
+          const data = await r.json().catch(() => null);
+          console.log('fetchTemplates - raw data:', data, 'isArray:', Array.isArray(data));
+          return r.ok && Array.isArray(data) ? data : [];
         } catch (err) {
           console.error('fetchTemplates falló', err);
           return [];
