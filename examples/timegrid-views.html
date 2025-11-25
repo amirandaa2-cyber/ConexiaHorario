@@ -718,17 +718,19 @@
       if (typeof window === 'undefined') return false;
       const hostname = (window.location && window.location.hostname ? window.location.hostname : '').toLowerCase();
       const isHostedDomain = /conexiahorario\.onrender\.com$/i.test(hostname);
+      const apiBase = (typeof window !== 'undefined' && window.APP_API_URL) ? window.APP_API_URL : '';
+      const usesRemoteCluster = /conexiahorario\.onrender\.com/i.test(apiBase || '') || isHostedDomain;
       if ('APP_USE_API' in window) return Boolean(window.APP_USE_API);
       const storedPref = storageGet('use_api_mode');
       if (storedPref === 'true') return true;
-      if (isHostedDomain) {
+      if (usesRemoteCluster) {
         if (storedPref === 'false') {
-          console.warn('Ignorando use_api_mode=false porque estamos en el dominio hospedado y la data debe venir desde la base de datos.');
+          console.warn('Ignorando use_api_mode=false porque se necesita consumir la base remota oficial. Elimina la preferencia desde Ajustes de interfaz si quieres volver al modo local.');
         }
         return true;
       }
       if (storedPref === 'false') return false;
-      if (window.APP_API_URL && window.APP_API_URL.length) return true;
+      if (apiBase && apiBase.length) return true;
       return window.location ? window.location.protocol !== 'file:' : false;
     }
 
@@ -4961,9 +4963,16 @@
       if (apiIndicator) {
         const effective = USE_API;
         const color = effective ? 'green' : 'red';
+        const apiBase = (typeof window !== 'undefined' && window.APP_API_URL) ? window.APP_API_URL : '';
+        const forcedRemote = effective && storedApiPref === 'false' && /conexiahorario\.onrender\.com/i.test(apiBase || '') && window.location?.protocol === 'file:';
+        const forcedDomain = effective && storedApiPref === 'false' && /conexiahorario\.onrender\.com$/i.test(window.location?.hostname || '');
         let label = `Modo API: <strong style="color:${color}">${effective ? 'ON' : 'OFF'}</strong>`;
         if (effective && storedApiPref === 'false') {
-          label += ' <span style="color:#b45309">(forzado por dominio)</span>';
+          if (forcedDomain) {
+            label += ' <span style="color:#b45309">(forzado por dominio)</span>';
+          } else if (forcedRemote) {
+            label += ' <span style="color:#b45309">(forzado por API remota)</span>';
+          }
         }
         apiIndicator.innerHTML = label;
       }
