@@ -716,10 +716,10 @@
 
     function resolveApiMode() {
       if (typeof window === 'undefined') return false;
-      const hostname = (window.location?.hostname || '').toLowerCase();
+      const hostname = (window.location && window.location.hostname ? window.location.hostname : '').toLowerCase();
       const isHostedDomain = /conexiahorario\.onrender\.com$/i.test(hostname);
-      const apiBase = window.APP_API_URL || '';
-      const usesRemoteCluster = /conexiahorario\.onrender\.com/i.test(apiBase) || isHostedDomain;
+      const apiBase = (typeof window !== 'undefined' && window.APP_API_URL) ? window.APP_API_URL : '';
+      const usesRemoteCluster = /conexiahorario\.onrender\.com/i.test(apiBase || '') || isHostedDomain;
       if ('APP_USE_API' in window) return Boolean(window.APP_USE_API);
       const storedPref = storageGet('use_api_mode');
       if (storedPref === 'true') return true;
@@ -730,7 +730,7 @@
         return true;
       }
       if (storedPref === 'false') return false;
-      if (apiBase) return true;
+      if (apiBase && apiBase.length) return true;
       return window.location ? window.location.protocol !== 'file:' : false;
     }
 
@@ -1059,22 +1059,18 @@
       }
       // If running with API mode, fetch initial data from the server so the app uses PostgreSQL
       if (USE_API) {
-        try { carreras = await fetchCarreras(); } catch (e) { carreras = []; console.error('fetchCarreras error', e); }
-        try { modulos = await fetchModulos(); } catch (e) { modulos = []; console.error('fetchModulos error', e); }
-        try { docentes = await fetchDocentes(); } catch (e) { docentes = []; console.error('fetchDocentes error', e); }
-        try { templates = await fetchTemplates(); } catch (e) { templates = []; console.error('fetchTemplates error', e); }
-        try { storedEvents = await fetchEvents(); } catch (e) { storedEvents = []; console.error('fetchEvents error', e); }
-        try { const r = await authorizedFetch(API_BASE + '/salas'); salas = r.ok ? await r.json() : []; } catch (e) { salas = []; console.error('fetchSalas error', e); }
+        try {
+          try { carreras = await fetchCarreras(); } catch (e) { carreras = []; console.error('fetchCarreras error', e); }
+          try { modulos = await fetchModulos(); } catch (e) { modulos = []; console.error('fetchModulos error', e); }
+          try { docentes = await fetchDocentes(); } catch (e) { docentes = []; console.error('fetchDocentes error', e); }
+          try { templates = await fetchTemplates(); } catch (e) { templates = []; console.error('fetchTemplates error', e); }
+          try { storedEvents = await fetchEvents(); } catch (e) { storedEvents = []; console.error('fetchEvents error', e); }
+          try { const r = await authorizedFetch(API_BASE + '/salas'); salas = r.ok ? await r.json() : []; } catch (e) { salas = []; console.error('fetchSalas error', e); }
+        } catch (err) { console.error('Initial data load from API failed', err); }
       } else {
-        carreras = load(KEY_CARRERAS, []);
-        modulos = load(KEY_MODULOS, []);
-        docentes = load(KEY_DOCENTES, []);
-        templates = load(KEY_TEMPLATES, []);
-        storedEvents = load(KEY_EVENTS, []);
-        salas = load(KEY_SALAS, []);
+        // fall back to loading from localStorage when not using API
+        try { docentes = load(KEY_DOCENTES, []); carreras = load(KEY_CARRERAS, []); modulos = load(KEY_MODULOS, []); storedEvents = load(KEY_EVENTS, []); templates = load(KEY_TEMPLATES, []); salas = load(KEY_SALAS, []); } catch (e) { console.warn('local load failed', e); }
       }
-
-      hydrateSchedulerUi();
       // (removed .fc-event.hidden CSS approach - rely on strict filtering instead)
       // --- DIAGNÓSTICO EN PÁGINA -------------------------------------------------
       // Visible diagnostics panel to capture runtime errors and status without opening devtools
@@ -1276,10 +1272,7 @@
         if (!USE_API) return load(KEY_CARRERAS, []);
         try {
           const r = await authorizedFetch(API_BASE + '/carreras');
-          console.log('fetchCarreras - HTTP status:', r.status, 'ok:', r.ok);
-          const data = await r.json().catch(() => null);
-          console.log('fetchCarreras - raw data:', data, 'isArray:', Array.isArray(data));
-          return r.ok && Array.isArray(data) ? data : [];
+          return r.ok ? await r.json() : [];
         } catch (err) {
           console.error('fetchCarreras falló', err);
           return [];
@@ -1290,10 +1283,7 @@
         if (!USE_API) return load(KEY_MODULOS, []);
         try {
           const r = await authorizedFetch(API_BASE + '/modulos');
-          console.log('fetchModulos - HTTP status:', r.status, 'ok:', r.ok);
-          const data = await r.json().catch(() => null);
-          console.log('fetchModulos - raw data:', data, 'isArray:', Array.isArray(data));
-          return r.ok && Array.isArray(data) ? data : [];
+          return r.ok ? await r.json() : [];
         } catch (err) {
           console.error('fetchModulos falló', err);
           return [];
@@ -1304,10 +1294,7 @@
         if (!USE_API) return load(KEY_DOCENTES, []);
         try {
           const r = await authorizedFetch(API_BASE + '/docentes');
-          console.log('fetchDocentes - HTTP status:', r.status, 'ok:', r.ok);
-          const data = await r.json().catch(() => null);
-          console.log('fetchDocentes - raw data:', data, 'isArray:', Array.isArray(data));
-          return r.ok && Array.isArray(data) ? data : [];
+          return r.ok ? await r.json() : [];
         } catch (err) {
           console.error('fetchDocentes falló', err);
           return [];
@@ -1318,10 +1305,7 @@
         if (!USE_API) return load(KEY_EVENTS, []);
         try {
           const r = await authorizedFetch(API_BASE + '/events');
-          console.log('fetchEvents - HTTP status:', r.status, 'ok:', r.ok);
-          const data = await r.json().catch(() => null);
-          console.log('fetchEvents - raw data:', data, 'isArray:', Array.isArray(data));
-          return r.ok && Array.isArray(data) ? data : [];
+          return r.ok ? await r.json() : [];
         } catch (err) {
           console.error('fetchEvents falló', err);
           return [];
@@ -1332,10 +1316,7 @@
         if (!USE_API) return load(KEY_TEMPLATES, []);
         try {
           const r = await authorizedFetch(API_BASE + '/templates');
-          console.log('fetchTemplates - HTTP status:', r.status, 'ok:', r.ok);
-          const data = await r.json().catch(() => null);
-          console.log('fetchTemplates - raw data:', data, 'isArray:', Array.isArray(data));
-          return r.ok && Array.isArray(data) ? data : [];
+          return r.ok ? await r.json() : [];
         } catch (err) {
           console.error('fetchTemplates falló', err);
           return [];
@@ -4893,7 +4874,7 @@
       }
 
       // initial render
-      hydrateSchedulerUi();
+      renderCarreras(); renderModulos(); renderDocentes(); refreshCalendarEvents();
       // Guardar automáticamente los eventos/estado antes de cerrar o recargar la página
       try { window.addEventListener('beforeunload', function () { try { persistEventsAndValidate(); } catch (e) { } }); } catch (e) { }
 
@@ -4982,16 +4963,9 @@
       if (apiIndicator) {
         const effective = USE_API;
         const color = effective ? 'green' : 'red';
-        const apiBase = (typeof window !== 'undefined' && window.APP_API_URL) ? window.APP_API_URL : '';
-        const forcedRemote = effective && storedApiPref === 'false' && /conexiahorario\.onrender\.com/i.test(apiBase || '') && window.location?.protocol === 'file:';
-        const forcedDomain = effective && storedApiPref === 'false' && /conexiahorario\.onrender\.com$/i.test(window.location?.hostname || '');
         let label = `Modo API: <strong style="color:${color}">${effective ? 'ON' : 'OFF'}</strong>`;
         if (effective && storedApiPref === 'false') {
-          if (forcedDomain) {
-            label += ' <span style="color:#b45309">(forzado por dominio)</span>';
-          } else if (forcedRemote) {
-            label += ' <span style="color:#b45309">(forzado por API remota)</span>';
-          }
+          label += ' <span style="color:#b45309">(forzado por dominio)</span>';
         }
         apiIndicator.innerHTML = label;
       }
