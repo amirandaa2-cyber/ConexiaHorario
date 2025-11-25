@@ -6,6 +6,9 @@ const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
 const db = require('./db');
 const { v4: uuidv4 } = require('uuid');
+const catalogRoutes = require('./routes/catalogRoutes');
+const requireDatabase = require('./middlewares/requireDatabase');
+const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
 // CORS: allow browsers from any origin to access API (adjust as needed)
@@ -31,6 +34,7 @@ app.use((req, res, next) => {
 // Serve static files from repository root so examples can be opened via http://localhost:3001/examples/...
 app.use(express.static(path.join(__dirname, '..')));
 app.use(bodyParser.json());
+app.use('/api', requireDatabase);
 
 const dbReady = db && db.ready;
 const AUTH_TOKEN_TTL_HOURS = parseInt(process.env.SESSION_TTL_HOURS || '12', 10);
@@ -192,6 +196,7 @@ app.get('/api/public-config', (req,res)=>{
 
 // Basic CRUD endpoints (only enabled if DB loaded)
 if(dbReady){
+	app.use('/api', catalogRoutes);
 	app.post('/api/auth/login', async (req,res)=>{
 		const { identifier, password } = req.body || {};
 		const email = normalizeEmail(identifier);
@@ -301,22 +306,6 @@ if(dbReady){
 		}
 	});
 
-	app.get('/api/carreras', async (req,res)=>{
-		try{
-			const { rows } = await db.query(`
-				SELECT id,
-				       nombre,
-				       totalHoras AS "totalHoras",
-				       practicaHoras AS "practicaHoras",
-				       teoricaHoras AS "teoricaHoras",
-				       colorDiurno AS "colorDiurno",
-				       colorVespertino AS "colorVespertino"
-				  FROM carreras
-				 ORDER BY nombre ASC`);
-			res.json(rows);
-		}catch(err){ handleDbError(res, err); }
-	});
-
 	app.post('/api/carreras', async (req,res)=>{
 		const c = req.body;
 		const id = c.id || uuidv4();
@@ -352,20 +341,6 @@ if(dbReady){
 		try{
 			await db.query('DELETE FROM carreras WHERE id=$1', [req.params.id]);
 			res.json({ok:true});
-		}catch(err){ handleDbError(res, err); }
-	});
-
-	app.get('/api/modulos', async (req,res)=>{
-		try{
-			const { rows } = await db.query(`
-				SELECT id,
-				       nombre,
-				       carreraId AS "carreraId",
-				       horas,
-				       tipo
-				  FROM modulos
-				 ORDER BY nombre ASC`);
-			res.json(rows);
 		}catch(err){ handleDbError(res, err); }
 	});
 
@@ -424,13 +399,6 @@ if(dbReady){
 		}catch(err){ handleDbError(res, err); }
 	});
 
-	app.post('/api/docentes', async (req,res)=>{
-		const d = req.body;
-		const id = d.id || uuidv4();
-		try{
-			await db.query(
-				`INSERT INTO docentes (id,rut,nombre,edad,estadoCivil,contratoHoras,horasAsignadas,horasTrabajadas,turno,activo)
-				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 				 ON CONFLICT (id) DO UPDATE
 				 SET rut=EXCLUDED.rut,
 				     nombre=EXCLUDED.nombre,
@@ -477,13 +445,6 @@ if(dbReady){
 		}catch(err){ handleDbError(res, err); }
 	});
 
-	app.post('/api/salas', async (req,res)=>{
-		const s = req.body;
-		const id = s.id || uuidv4();
-		try{
-			await db.query(
-				`INSERT INTO salas (id,nombre,capacidad)
-				 VALUES ($1,$2,$3)
 				 ON CONFLICT (id) DO UPDATE
 				 SET nombre=EXCLUDED.nombre,
 				     capacidad=EXCLUDED.capacidad`,
@@ -615,6 +576,8 @@ if(dbReady){
 	// DB missing — return 503 for API routes
 	app.get('/api/*', (req,res)=>{ res.status(503).json({ error: 'DB not available on server. Define DATABASE_URL to enable API endpoints.' }); });
 }
+
+app.use(errorHandler);
 
 const port = process.env.PORT || 3001;
 app.listen(port, ()=>{ console.log('Server listening on', port); });
