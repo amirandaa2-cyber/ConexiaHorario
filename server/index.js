@@ -8,7 +8,26 @@ const db = require('./db');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-app.use(cors());
+// CORS: allow browsers from any origin to access API (adjust as needed)
+const corsOptions = {
+	origin: function(origin, callback){
+		// allow any origin by default (you can restrict this in production)
+		callback(null, true);
+	},
+	credentials: true,
+	exposedHeaders: ['Authorization'],
+	allowedHeaders: ['Authorization', 'Content-Type']
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// Basic request logging to help debugging CORS/network issues
+app.use((req, res, next) => {
+	try{
+		console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ip=${req.ip} origin=${req.headers.origin || '-'} user-agent=${(req.headers['user-agent']||'').slice(0,80)}`);
+	}catch(e){/* ignore logging errors*/}
+	next();
+});
 // Serve static files from repository root so examples can be opened via http://localhost:3001/examples/...
 app.use(express.static(path.join(__dirname, '..')));
 app.use(bodyParser.json());
