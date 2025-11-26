@@ -1066,6 +1066,15 @@
       if (!authed) {
         return;
       }
+
+      // Data (start empty; if USE_API=true we'll fetch from the server at startup)
+      // docente fields: {id, rut, nombre, edad, estadoCivil, contratoHoras, horasAsignadas, horasTrabajadas, turno, activo}
+      let docentes = [];
+      let carreras = []; // {id, nombre, totalHoras, practicaHoras, teoricaHoras}
+      let modulos = [];   // {id, nombre, carreraId, horas, tipo}
+      let storedEvents = []; // FullCalendar event objects + metadata
+      let templates = []; // recurrence templates: {id, moduloId, docenteId, salaId, startDate, time, duration, until}
+      let salas = []; // {id, nombre, capacidad}
       // If running with API mode, fetch initial data from the server so the app uses PostgreSQL
       if (USE_API) {
         try {
@@ -1331,15 +1340,6 @@
           return [];
         }
       }
-
-      // Data (start empty; if USE_API=true we'll fetch from the server at startup)
-      // docente fields: {id, rut, nombre, edad, estadoCivil, contratoHoras, horasAsignadas, horasTrabajadas, turno, activo}
-      let docentes = [];
-      let carreras = []; // {id, nombre, totalHoras, practicaHoras, teoricaHoras}
-      let modulos = [];   // {id, nombre, carreraId, horas, tipo}
-      let storedEvents = []; // FullCalendar event objects + metadata
-      let templates = []; // recurrence templates: {id, moduloId, docenteId, salaId, startDate, time, duration, until}
-      let salas = []; // {id, nombre, capacidad}
 
       // Calendar
       const calendarEl = document.getElementById('calendar');
