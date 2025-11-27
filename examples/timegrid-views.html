@@ -1079,7 +1079,31 @@
       if (USE_API) {
         try {
           try { carreras = await fetchCarreras(); } catch (e) { carreras = []; console.error('fetchCarreras error', e); }
-          try { modulos = await fetchModulos(); } catch (e) { modulos = []; console.error('fetchModulos error', e); }
+          try {
+            modulos = await fetchModulos();
+            // === NORMALIZAR MÓDULOS QUE VIENEN DE LA API CON CARRERA VÁLIDA ===
+            const carreraIdsValidos = new Set((carreras || []).map(c => String(c.id)));
+            modulos = (modulos || []).map(m => {
+              if (!m) return m;
+
+              // id del módulo
+              let id = m.id ?? m.moduloId ?? m.codigo;
+              if (id != null) id = String(id);
+
+              // distintos posibles nombres del campo carrera
+              let carreraId = m.carreraId ?? m.carrera_id ?? m.id_carrera;
+              if (!carreraId && m.carrera && m.carrera.id != null) carreraId = m.carrera.id;
+              if (carreraId != null) carreraId = String(carreraId);
+
+              // si la carrera no existe en la lista de carreras, la dejamos sin asignar
+              if (carreraId && !carreraIdsValidos.has(carreraId)) {
+                console.warn('Modulo con carreraId no encontrado en carreras:', m.nombre, 'carreraId=', carreraId);
+                carreraId = null;
+              }
+
+              return { ...m, id, carreraId };
+            });
+          } catch (e) { modulos = []; console.error('fetchModulos error', e); }
           try { docentes = await fetchDocentes(); } catch (e) { docentes = []; console.error('fetchDocentes error', e); }
           try { templates = await fetchTemplates(); } catch (e) { templates = []; console.error('fetchTemplates error', e); }
           try { storedEvents = await fetchEvents(); } catch (e) { storedEvents = []; console.error('fetchEvents error', e); }
@@ -1301,7 +1325,16 @@
         if (!USE_API) return load(KEY_MODULOS, []);
         try {
           const r = await authorizedFetch(API_BASE + '/modulos');
-          return r.ok ? await r.json() : [];
+          const data = r.ok ? await r.json() : [];
+          return (data || []).map(m => {
+            if (!m) return m;
+            let id = m.id ?? m.moduloId ?? m.codigo;
+            if (id != null) id = String(id);
+            let carreraId = m.carreraId ?? m.carrera_id ?? m.id_carrera;
+            if (!carreraId && m.carrera && m.carrera.id != null) carreraId = m.carrera.id;
+            if (carreraId != null) carreraId = String(carreraId);
+            return { ...m, id, carreraId };
+          });
         } catch (err) {
           console.error('fetchModulos falló', err);
           return [];
