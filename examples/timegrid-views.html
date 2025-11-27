@@ -2069,6 +2069,48 @@
       const docModal = document.getElementById('doc-modal');
       const closeDocModalBtn = document.getElementById('close-doc-modal');
 
+      // Helper: generar colores aleatorios claros/oscuros por carrera
+      const carreraPaletteCache = new Map();
+      function generateRandomHue() {
+        return Math.floor(Math.random() * 360);
+      }
+      function hslToHex(h, s, l) {
+        h = h % 360;
+        s /= 100; l /= 100;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+        const m = l - c / 2;
+        let r = 0, g = 0, b = 0;
+        if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+        else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+        else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+        else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+        else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+        else { r = c; g = 0; b = x; }
+        const toHex = v => {
+          const hv = Math.round((v + m) * 255).toString(16).padStart(2, '0');
+          return hv;
+        };
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+      }
+      function getCareerPalette(carrera) {
+        if (!carrera) return { diurno: '#3788d8', vespertino: '#1d4ed8' };
+        if (carreraPaletteCache.has(carrera.id)) {
+          return carreraPaletteCache.get(carrera.id);
+        }
+        // Si ya tiene colores definidos en DB/localStorage, respetarlos
+        let light = carrera.colorDiurno;
+        let dark = carrera.colorVespertino;
+        if (!light || !dark) {
+          const hue = generateRandomHue();
+          light = hslToHex(hue, 70, 70);   // claro
+          dark = hslToHex(hue, 70, 40);    // mismo tono más oscuro
+        }
+        const palette = { diurno: light, vespertino: dark };
+        carreraPaletteCache.set(carrera.id, palette);
+        return palette;
+      }
+
       // Renderers
       function renderCarreras() {
         // refresh select
@@ -2086,8 +2128,12 @@
         const filterCarrera = document.getElementById('filter-carrera');
         if (filterCarrera) filterCarrera.innerHTML = '<option value="">-- Todas --</option>';
         carreras.forEach(c => {
+          const palette = getCareerPalette(c);
+          // sincronizar colores en el objeto carrera para que otras partes (leyenda, eventos) lo usen
+          c.colorDiurno = palette.diurno;
+          c.colorVespertino = palette.vespertino;
           const li = document.createElement('li');
-          li.innerHTML = `${c.nombre} (ID: ${c.id}) - Horas totales: ${c.totalHoras} | Practica: ${c.practicaHoras} Teórica: ${c.teoricaHoras}`;
+          li.innerHTML = `${c.nombre} (ID: ${c.id})`;
 
           const autoBtn = document.createElement('button'); autoBtn.textContent = 'Auto-organizar esta carrera'; autoBtn.style.marginLeft = '8px';
           autoBtn.addEventListener('click', () => {
@@ -2099,7 +2145,7 @@
 
           // palette editors
           const pal = document.createElement('div'); pal.style.marginTop = '6px';
-          pal.innerHTML = `Diurno: <input type="color" data-cid="${c.id}" class="pal-diurno" value="${c.colorDiurno || '#3788d8'}"> Vespertino: <input type="color" data-cid="${c.id}" class="pal-vespertino" value="${c.colorVespertino || '#8b5cf6'}">`;
+          pal.innerHTML = `Diurno: <input type="color" data-cid="${c.id}" class="pal-diurno" value="${c.colorDiurno}"> Vespertino: <input type="color" data-cid="${c.id}" class="pal-vespertino" value="${c.colorVespertino}">`;
           li.appendChild(pal);
           listCarreras.appendChild(li);
           if (selectCarreraForModulo) {
@@ -2134,6 +2180,9 @@
         try {
           const legend = document.getElementById('legend-items'); if (legend) legend.innerHTML = '';
           carreras.forEach(c => {
+            const palette = getCareerPalette(c);
+            c.colorDiurno = palette.diurno;
+            c.colorVespertino = palette.vespertino;
             const row = document.createElement('div'); row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '8px';
             const sw = document.createElement('div'); sw.style.width = '18px'; sw.style.height = '12px'; sw.style.background = c.colorDiurno || '#3788d8'; sw.style.border = '1px solid #ccc'; sw.style.borderRadius = '2px';
             const label = document.createElement('div'); label.textContent = c.nombre; label.style.flex = '1'; label.style.fontSize = '13px';
