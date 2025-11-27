@@ -284,7 +284,16 @@ if(dbReady){
 
 	app.get('/api/carreras', async (req,res)=>{
 		try{
-			const { rows } = await db.query('SELECT * FROM carreras ORDER BY nombre ASC');
+			const { rows } = await db.query(`
+				SELECT id,
+				       nombre,
+				       totalHoras AS "totalHoras",
+				       practicaHoras AS "practicaHoras",
+				       teoricaHoras AS "teoricaHoras",
+				       colorDiurno AS "colorDiurno",
+				       colorVespertino AS "colorVespertino"
+				  FROM carreras
+				 ORDER BY nombre ASC`);
 			res.json(rows);
 		}catch(err){ handleDbError(res, err); }
 	});
@@ -329,7 +338,14 @@ if(dbReady){
 
 	app.get('/api/modulos', async (req,res)=>{
 		try{
-			const { rows } = await db.query('SELECT * FROM modulos ORDER BY nombre ASC');
+			const { rows } = await db.query(`
+				SELECT id,
+				       nombre,
+				       carreraId AS "carreraId",
+				       horas,
+				       tipo
+				  FROM modulos
+				 ORDER BY nombre ASC`);
 			res.json(rows);
 		}catch(err){ handleDbError(res, err); }
 	});
@@ -372,7 +388,19 @@ if(dbReady){
 
 	app.get('/api/docentes', async (req,res)=>{
 		try{
-			const { rows } = await db.query('SELECT * FROM docentes ORDER BY nombre ASC');
+			const { rows } = await db.query(`
+				SELECT id,
+				       rut,
+				       nombre,
+				       edad,
+				       estadoCivil AS "estadoCivil",
+				       contratoHoras AS "contratoHoras",
+				       horasAsignadas AS "horasAsignadas",
+				       horasTrabajadas AS "horasTrabajadas",
+				       turno,
+				       activo
+				  FROM docentes
+				 ORDER BY nombre ASC`);
 			res.json(rows);
 		}catch(err){ handleDbError(res, err); }
 	});
@@ -420,7 +448,12 @@ if(dbReady){
 
 	app.get('/api/salas', async (req,res)=>{
 		try{
-			const { rows } = await db.query('SELECT * FROM salas ORDER BY nombre ASC');
+			const { rows } = await db.query(`
+				SELECT id,
+				       nombre,
+				       capacidad
+				  FROM salas
+				 ORDER BY nombre ASC`);
 			res.json(rows);
 		}catch(err){ handleDbError(res, err); }
 	});
@@ -458,7 +491,16 @@ if(dbReady){
 
 	app.get('/api/templates', async (req,res)=>{
 		try{
-			const { rows } = await db.query('SELECT * FROM templates');
+			const { rows } = await db.query(`
+				SELECT id,
+				       moduloId AS "moduloId",
+				       docenteId AS "docenteId",
+				       salaId AS "salaId",
+				       startDate AS "startDate",
+				       time,
+				       duration,
+				       until
+				  FROM templates`);
 			res.json(rows);
 		}catch(err){ handleDbError(res, err); }
 	});
@@ -526,8 +568,7 @@ if(dbReady){
 				 SET title=$2,
 				     start=$3,
 				     "end"=$4,
-				     extendedProps=$5,
-				     updated_at=now()`,
+				     extendedProps=$5`,
 				[id, e.title, e.start, e.end, e.extendedProps || {}]
 			);
 			res.json({ok:true,id});
@@ -558,3 +599,26 @@ if(dbReady){
 
 const port = process.env.PORT || 3001;
 app.listen(port, ()=>{ console.log('Server listening on', port); });
+
+async function fetchModulos() {
+  if (!USE_API) return load(KEY_MODULOS, []);
+  try {
+    const r = await authorizedFetch(API_BASE + '/modulos');
+    const data = r.ok ? await r.json() : [];
+    return (data || []).map(m => {
+      if (!m) return m;
+      let id = m.id ?? m.moduloId ?? m.codigo;
+      if (id != null) id = String(id);
+
+      // añadir carreraid aquí
+      let carreraId = m.carreraId ?? m.carrera_id ?? m.id_carrera ?? m.carreraid;
+      if (!carreraId && m.carrera && m.carrera.id != null) carreraId = m.carrera.id;
+      if (carreraId != null) carreraId = String(carreraId);
+
+      return { ...m, id, carreraId };
+    });
+  } catch (err) {
+    console.error('fetchModulos falló', err);
+    return [];
+  }
+}
