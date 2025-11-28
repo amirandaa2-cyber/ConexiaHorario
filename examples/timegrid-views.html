@@ -1333,7 +1333,19 @@
             let carreraId = m.carreraId ?? m.carrera_id ?? m.id_carrera;
             if (!carreraId && m.carrera && m.carrera.id != null) carreraId = m.carrera.id;
             if (carreraId != null) carreraId = String(carreraId);
-            return { ...m, id, carreraId };
+            const totalHoras = Number(m.totalHoras ?? 0) || 0;
+            const horasTeoricas = Number(m.horasTeoricas ?? 0) || 0;
+            const horasPracticas = Number(m.horasPracticas ?? 0) || 0;
+            const horasSemanales = Number(m.horasSemanales ?? 0) || 0; // bloques de 35 minutos por semana
+            return {
+              ...m,
+              id,
+              carreraId,
+              totalHoras,
+              horasTeoricas,
+              horasPracticas,
+              horasSemanales
+            };
           });
         } catch (err) {
           console.error('fetchModulos falló', err);
@@ -1438,26 +1450,30 @@
             // hide Sunday (0 = Sunday) so it's not visible or selectable
             hiddenDays: [0],
             // show time slots starting at 08:00 and label each hour (e.g. 8 am, 9 am, 12 pm)
-            // Configuración de horarios
-            slotMinTime: '08:00:00',
+            // Configuración de horarios (bloques cronológicos de 35 minutos)
+            slotMinTime: '08:30:00',
             slotMaxTime: '23:00:00',
-            // Intervalo de slots de 30 minutos para mayor flexibilidad
-            slotDuration: '00:30:00',
-            // Mostrar etiquetas cada hora
-            slotLabelInterval: '01:00:00',
+            // Cada slot representa 1 bloque de 35 minutos
+            slotDuration: '00:35:00',
+            // Mostrar etiquetas cada bloque, formateadas como tramo de inicio-fin
+            slotLabelInterval: '00:35:00',
             // Formato de 12 horas con meridiano
             slotLabelFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
             // Asegurar etiquetas correctas incluso con errores
             slotLabelContent: function (arg) {
               try {
-                const d = arg.date;
-                const h = d.getHours();
-                const m = d.getMinutes();
-                const hour = (h % 12) || 12;
-                const mer = h < 12 ? 'am' : 'pm';
-                return {
-                  html: hour + (m === 0 ? ':00' : ':' + m.toString().padStart(2, '0')) + ' ' + mer
-                };
+                const start = arg.date;
+                const end = new Date(start.getTime() + 35 * 60 * 1000);
+
+                function fmt(dt) {
+                  const h = dt.getHours();
+                  const m = dt.getMinutes();
+                  const hour = (h % 12) || 12;
+                  const mer = h < 12 ? 'am' : 'pm';
+                  return hour + ':' + m.toString().padStart(2, '0') + ' ' + mer;
+                }
+
+                return { html: fmt(start) + ' - ' + fmt(end) };
               } catch (e) {
                 console.error('Error en slotLabelContent:', e);
                 return { html: '' };
@@ -2788,8 +2804,8 @@
                 <input id="assign-time" type="time">
               </label>
             </div>
-            <label>Duración (horas)
-              <input id="assign-duration" type="number" step="0.5" min="0.5">
+            <label>Duración (bloques de 35 min)
+              <input id="assign-duration" type="number" step="1" min="1">
             </label>
             <div class="assign-repeat-section">
               <label class="assign-checkbox">
@@ -3146,7 +3162,8 @@
         const salaId = assignSalaSel.value || null;
         const date = assignDateInput.value;
         const time = assignTimeInput.value;
-        const duration = parseFloat(assignDurationInput.value) || 1;
+        // duración expresada en bloques cronológicos de 35 minutos
+        const blocks = parseInt(assignDurationInput.value, 10) || 1;
         const doRepeat = assignRepeatInput ? !!assignRepeatInput.checked : false;
         const until = assignUntilInput ? (assignUntilInput.value || null) : null;
         if (doRepeat && !until) { alert('Selecciona una fecha límite para la repetición semanal.'); return; }
@@ -3159,16 +3176,16 @@
         async function pushEventForDate(dDate, tplId = null) {
           // construir Date con zona local y luego almacenar ISO completa
           const startDate = new Date(dDate + 'T' + time + ':00');
-          const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000);
+          const endDate = new Date(startDate.getTime() + blocks * 35 * 60 * 1000);
           const ev = {
             title: `${modulo.nombre} - ${docente.nombre}`,
             start: startDate.toISOString(),    // <-- ISO completa
             end: endDate.toISOString(),        // <-- ISO completa
             editable: true,
-            extendedProps: { __meta: { templateId: tplId, moduloId: modulo.id, moduloName: modulo.nombre, docenteId: docente.id, docenteName: docente.nombre, horas: duration, salaId: salaId } }
+            extendedProps: { __meta: { templateId: tplId, moduloId: modulo.id, moduloName: modulo.nombre, docenteId: docente.id, docenteName: docente.nombre, horas: blocks * (35/60), bloques: blocks, salaId: salaId } }
           };
           // check weekly hours for this docente on the target week before attempting to create
-          const chk = canAssignHours(docente.id, duration, dDate);
+          const chk = canAssignHours(docente.id, blocks * (35/60), dDate);
           if (!chk.ok) { console.warn('Skipping occurrence — docente over capacity on', dDate, chk); return false; }
           return await tryCreateEvent(ev);
         }
