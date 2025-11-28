@@ -119,6 +119,49 @@
     .fc-view { transition: opacity 0.3s ease !important; }
     .fc-view.fc-timeGridWeek-view,
     .fc-view.fc-timeGridDay-view { opacity: 1 !important; }
+
+    /* CONSISTENCIA EN EVENTOS */
+    .fc-timegrid-event { font-family: 'Inter', sans-serif !important; text-rendering: optimizeLegibility !important; -webkit-font-smoothing: antialiased !important; }
+    .fc-timegrid-event-title { display: flex !important; flex-direction: column !important; align-items: flex-start !important; }
+    .evento-nombre { font-weight: 600 !important; line-height: 1.2 !important; margin-bottom: 1px !important; }
+    .evento-codigo { font-size: 10px !important; font-weight: 400 !important; opacity: 0.8 !important; letter-spacing: 0.5px !important; }
+
+    /* ESTILOS PARA TOOLTIPS */
+    .evento-tooltip { font-family: 'Inter', sans-serif; line-height: 1.4; }
+    .tooltip-header { font-weight: 600; font-size: 12px; color: #93c5fd; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .tooltip-titulo { font-weight: 600; font-size: 14px; margin-bottom: 6px; color: #f8fafc; }
+    .tooltip-horario { font-size: 12px; color: #cbd5e1; margin-bottom: 6px; font-weight: 500; }
+    .tooltip-info { font-size: 12px; color: #9ca3af; border-top: 1px solid #374151; padding-top: 6px; }
+
+    /* Estilos para el Modal de Edición */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); display: none; z-index: 10000; justify-content: center; align-items: center; }
+    .modal-overlay.show { display: flex; }
+    .modal-edicion { background: white; border-radius: 12px; padding: 24px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); transform: scale(0.8); transition: transform 0.3s ease; }
+    .modal-overlay.show .modal-edicion { transform: scale(1); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #f0f0f0; }
+    .modal-title { font-size: 1.5em; font-weight: 600; color: #2d3748; margin: 0; }
+    .modal-close { background: none; border: none; font-size: 24px; color: #718096; cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.2s; }
+    .modal-close:hover { background: #f7fafc; color: #2d3748; }
+    .modal-form { display: grid; gap: 20px; }
+    .form-group { display: flex; flex-direction: column; gap: 8px; }
+    .form-label { font-weight: 600; color: #2d3748; font-size: 0.95em; }
+    .form-input, .form-select, .form-textarea { padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: border-color 0.2s; font-family: inherit; }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+    .form-textarea { min-height: 80px; resize: vertical; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-buttons { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+    .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-primary { background: #4F46E5; color: white; }
+    .btn-primary:hover { background: #4338CA; transform: translateY(-1px); }
+    .btn-secondary { background: #f7fafc; color: #4a5568; border: 2px solid #e2e8f0; }
+    .btn-secondary:hover { background: #edf2f7; border-color: #cbd5e0; }
+    .btn-danger { background: #e53e3e; color: white; }
+    .btn-danger:hover { background: #c53030; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .form-error { color: #e53e3e; font-size: 0.875em; margin-top: 4px; min-height: 1em; }
+    .success-message { background: #c6f6d5; border: 1px solid #9ae6b4; color: #22543d; padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none; }
+    .success-message.show { display: block; }
+    @media (max-width: 768px) { .modal-edicion { width: 95%; padding: 20px; margin: 20px; } .form-row { grid-template-columns: 1fr; } .form-buttons { flex-direction: column; } }
     [role="dialog"] .modal-drag-handle {
       position: sticky;
       top: 0;
@@ -1599,6 +1642,18 @@
                 click: function() { if (calendar && typeof calendar.today === 'function') calendar.today(); }
               }
             },
+            eventDidMount: function(info) {
+              try { attachTooltipToEventEl(info.el, info.event); } catch (e) { /* noop */ }
+            },
+            eventContent: function(arg) {
+              try {
+                const parts = buildEventTitleParts(arg.event);
+                const codigoHtml = parts.codigo ? `<div class="evento-codigo">${parts.codigo}</div>` : '';
+                return { html: `<div class="evento-nombre">${parts.nombre}</div>${codigoHtml}` };
+              } catch (_) {
+                return { text: arg.event.title };
+              }
+            },
             headerToolbar: {
               left: 'prev,next today',
               center: 'title',
@@ -1663,7 +1718,7 @@
               });
               successCallback(filteredEvents);
             },
-            eventClick: function (info) { openEventEditModal(info.event); },
+            eventClick: function (info) { abrirModal(info.event); },
             eventAdd: async function (info) {
               try {
                 const ev = info.event;
@@ -2209,6 +2264,146 @@
           }
           // Stub para evitar errores por llamadas residuales si existen
           function realignToBlockRange(ev) { return ev; }
+
+          // ===== Tooltips y consistencia en títulos =====
+          function formatearHora(fecha) {
+            try { return fecha.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; }
+          }
+          function obtenerInfoEvento(evento) {
+            const meta = (evento.extendedProps && evento.extendedProps.__meta) || {};
+            const info = [];
+            if (meta.moduloId) {
+              const modulo = modulos.find(m => m.id === meta.moduloId);
+              if (modulo) {
+                info.push(`Código: ${modulo.codigo || 'N/A'}`);
+                info.push(`Carrera: ${modulo.carreraId || 'N/A'}`);
+              }
+            }
+            return info.length ? info.join(' • ') : 'Sin información adicional';
+          }
+          function crearTooltipEvento(eventoElement, evento) {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'evento-tooltip';
+            const bloque = (evento.extendedProps && evento.extendedProps.numeroBloque) || '?';
+            tooltip.innerHTML = `
+              <div class="tooltip-header">
+                <span class="tooltip-numero-bloque">Bloque ${bloque}</span>
+              </div>
+              <div class="tooltip-titulo">${formatearTituloEvento(evento) || ''}</div>
+              <div class="tooltip-horario">${formatearHora(evento.start)} - ${formatearHora(evento.end)}</div>
+              <div class="tooltip-info">${obtenerInfoEvento(evento)}</div>
+            `;
+            Object.assign(tooltip.style, {
+              position: 'absolute', background: '#1f2937', color: 'white', padding: '12px', borderRadius: '8px',
+              fontSize: '14px', zIndex: '10000', maxWidth: '280px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+              opacity: '0', transition: 'opacity 0.2s ease', pointerEvents: 'none'
+            });
+            return tooltip;
+          }
+          function attachTooltipToEventEl(el, event) {
+            let tooltip = null;
+            function showTooltip() {
+              try {
+                tooltip = crearTooltipEvento(el, event);
+                document.body.appendChild(tooltip);
+                const rect = el.getBoundingClientRect();
+                tooltip.style.left = (rect.right + 10) + 'px';
+                tooltip.style.top = rect.top + 'px';
+                requestAnimationFrame(() => { tooltip && (tooltip.style.opacity = '1'); });
+              } catch (_) { }
+            }
+            function hideTooltip() {
+              if (tooltip) {
+                tooltip.style.opacity = '0';
+                setTimeout(() => { if (tooltip && tooltip.parentNode) tooltip.parentNode.removeChild(tooltip); tooltip = null; }, 200);
+              }
+            }
+            el.addEventListener('mouseenter', showTooltip);
+            el.addEventListener('mouseleave', hideTooltip);
+          }
+          function estandarizarFormatoEvento(evento) {
+            const meta = (evento.extendedProps && evento.extendedProps.__meta) || {};
+            let tituloFormateado = evento.title || '';
+            let infoAdicional = '';
+            if (meta.moduloId) {
+              const modulo = modulos.find(m => m.id === meta.moduloId);
+              if (modulo && modulo.codigo) infoAdicional = ` - ${modulo.codigo}`;
+            }
+            return tituloFormateado + infoAdicional;
+          }
+          function formatearTituloEvento(evento) {
+            const tituloCompleto = estandarizarFormatoEvento(evento);
+            const maxLength = 28;
+            if ((tituloCompleto || '').length <= maxLength) return tituloCompleto;
+            const palabras = (tituloCompleto || '').split(' ');
+            let tituloCorto = '';
+            for (let palabra of palabras) {
+              if ((tituloCorto + ' ' + palabra).trim().length > maxLength) break;
+              tituloCorto += (tituloCorto ? ' ' : '') + palabra;
+            }
+            return tituloCorto + '...';
+          }
+          function buildEventTitleParts(evento) {
+            const meta = (evento.extendedProps && evento.extendedProps.__meta) || {};
+            const modulo = meta.moduloId ? modulos.find(m => m.id === meta.moduloId) : null;
+            const nombre = formatearTituloEvento(evento);
+            const codigo = (modulo && modulo.codigo) ? modulo.codigo : '';
+            return { nombre, codigo };
+          }
+
+          // ===== Conflictos por bloque y día =====
+          function detectarYMostrarConflictos() {
+            const eventos = (calendar && typeof calendar.getEvents === 'function') ? calendar.getEvents() : [];
+            const conflictos = [];
+            const eventosPorDia = {};
+            eventos.forEach(ev => {
+              if (!ev.start) return;
+              const fecha = ev.start.toDateString();
+              const bloque = calcularNumeroBloque(ev.start);
+              if (!eventosPorDia[fecha]) eventosPorDia[fecha] = {};
+              if (!eventosPorDia[fecha][bloque]) eventosPorDia[fecha][bloque] = [];
+              eventosPorDia[fecha][bloque].push(ev);
+            });
+            Object.keys(eventosPorDia).forEach(fecha => {
+              Object.keys(eventosPorDia[fecha]).forEach(bloque => {
+                const arr = eventosPorDia[fecha][bloque];
+                if (arr.length > 1) conflictos.push({ fecha, bloque, eventos: arr });
+              });
+            });
+            return conflictos;
+          }
+          function mostrarConflictos(conflictos) {
+            if (!conflictos || !conflictos.length) return;
+            const notificacion = document.createElement('div');
+            notificacion.className = 'conflicto-notification';
+            const resumen = conflictos.map(c => `Bloque ${c.bloque} (${c.eventos.length} eventos)`).join(', ');
+            notificacion.innerHTML = `
+              <div class="conflicto-content">
+                <div class="conflicto-icon">⚠️</div>
+                <div class="conflicto-text">
+                  <strong>Conflictos detectados:</strong><br>${resumen}
+                </div>
+              </div>
+              <button class="conflicto-close" aria-label="Cerrar">×</button>
+            `;
+            Object.assign(notificacion.style, {
+              position: 'fixed', top: '20px', right: '20px', background: '#fef2f2', border: '1px solid #fecaca',
+              borderRadius: '8px', padding: '12px', color: '#dc2626', zIndex: '10001', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              display: 'flex', alignItems: 'center', gap: '8px'
+            });
+            const closeBtn = notificacion.querySelector('.conflicto-close');
+            closeBtn && closeBtn.addEventListener('click', () => { if (notificacion.parentNode) notificacion.parentNode.removeChild(notificacion); });
+            document.body.appendChild(notificacion);
+            setTimeout(() => { if (notificacion.parentNode) notificacion.parentNode.removeChild(notificacion); }, 5000);
+          }
+
+          if (calendar && typeof calendar.on === 'function') {
+            calendar.on('datesSet', function() {
+              setTimeout(() => {
+                try { const conflictos = detectarYMostrarConflictos(); mostrarConflictos(conflictos); } catch (_) {}
+              }, 500);
+            });
+          }
         } catch (err) { console.error('Calendar init error', err); runtimeErrorEl.textContent = 'Error inicializando el calendario: ' + err.message; runtimeErrorEl.style.display = 'block'; }
       });
 
@@ -5795,6 +5990,309 @@
 
     });
   </script>
+
+  <script>
+    // PASO E: IMPLEMENTAR MODAL DE EDICIÓN DE EVENTOS
+    let eventoActual = null;
+    let opcionesSelectores = {};
+
+    function abrirModal(evento) {
+      try {
+        eventoActual = evento;
+        document.getElementById('evento-titulo').value = evento.title || '';
+        const start = evento.start ? new Date(evento.start) : null;
+        const end = evento.end ? new Date(evento.end) : null;
+        document.getElementById('evento-fecha').value = start ? start.toISOString().split('T')[0] : '';
+        document.getElementById('evento-inicio').value = start ? formatearHora(start) : '';
+        document.getElementById('evento-fin').value = end ? formatearHora(end) : '';
+        document.getElementById('evento-descripcion').value = (evento.extendedProps && evento.extendedProps.descripcion) || '';
+        // Llenar selectores
+        cargarOpcionesSelectores().then(() => {
+          llenarSelectores();
+          if (evento.extendedProps) {
+            document.getElementById('evento-bloque').value = evento.extendedProps.numeroBloque || '';
+            document.getElementById('evento-docente').value = evento.extendedProps.docenteId || '';
+            document.getElementById('evento-sala').value = evento.extendedProps.salaId || '';
+            document.getElementById('evento-carrera').value = evento.extendedProps.carreraId || '';
+            document.getElementById('evento-modulo').value = evento.extendedProps.moduloId || '';
+          }
+        });
+        const overlay = document.getElementById('modal-edicion');
+        overlay.classList.add('show');
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+      } catch (e) { console.error('abrirModal error', e); }
+    }
+
+    function cerrarModal() {
+      const overlay = document.getElementById('modal-edicion');
+      overlay.classList.remove('show');
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = 'auto';
+      limpiarFormulario();
+      limpiarErrores();
+      eventoActual = null;
+    }
+
+    function limpiarFormulario() {
+      const form = document.getElementById('form-edicion-evento');
+      if (form) form.reset();
+      const ok = document.getElementById('success-message'); if (ok) ok.classList.remove('show');
+    }
+
+    function limpiarErrores() { document.querySelectorAll('.form-error').forEach(e => e.textContent = ''); }
+
+    function llenarSelectores() {
+      const mapToOptions = (arr, nameKey = 'nombre') => (arr || []).map(x => ({ id: x.id, nombre: x[nameKey] || x.title || x.id }));
+      opcionesSelectores['evento-docente'] = opcionesSelectores['evento-docente'] || mapToOptions(window.docentes || []);
+      opcionesSelectores['evento-sala'] = opcionesSelectores['evento-sala'] || mapToOptions(window.salas || []);
+      opcionesSelectores['evento-carrera'] = opcionesSelectores['evento-carrera'] || mapToOptions(window.carreras || []);
+      opcionesSelectores['evento-modulo'] = opcionesSelectores['evento-modulo'] || mapToOptions(window.modulos || []);
+      Object.keys(opcionesSelectores).forEach(selectorId => {
+        const select = document.getElementById(selectorId);
+        if (select) {
+          const list = opcionesSelectores[selectorId] || [];
+          select.innerHTML = '<option value="">Seleccionar...</option>';
+          list.forEach(op => { const o = document.createElement('option'); o.value = op.id; o.textContent = op.nombre; select.appendChild(o); });
+        }
+      });
+      const selectBloque = document.getElementById('evento-bloque');
+      if (selectBloque && Array.isArray(window.CEDUC_BLOQUES)) {
+        selectBloque.innerHTML = '<option value="">Seleccionar bloque...</option>';
+        CEDUC_BLOQUES.forEach(b => { const o = document.createElement('option'); o.value = b.numero; o.textContent = `Bloque ${b.numero}: ${b.inicio} - ${b.fin}`; selectBloque.appendChild(o); });
+      }
+    }
+
+    async function cargarOpcionesSelectores() {
+      try {
+        if (!USE_API) { return; }
+        const base = API_BASE;
+        // Fetch only if arrays are empty
+        if (!Array.isArray(window.docentes) || window.docentes.length === 0) {
+          const r = await authorizedFetch(base + '/docentes'); window.docentes = r.ok ? await r.json() : [];
+        }
+        if (!Array.isArray(window.salas) || window.salas.length === 0) {
+          const r = await authorizedFetch(base + '/salas'); window.salas = r.ok ? await r.json() : [];
+        }
+        if (!Array.isArray(window.carreras) || window.carreras.length === 0) {
+          const r = await authorizedFetch(base + '/carreras'); window.carreras = r.ok ? await r.json() : [];
+        }
+        if (!Array.isArray(window.modulos) || window.modulos.length === 0) {
+          const r = await authorizedFetch(base + '/modulos'); window.modulos = r.ok ? await r.json() : [];
+        }
+      } catch (error) { console.error('Error cargando opciones:', error); }
+    }
+
+    function validarFormulario() {
+      limpiarErrores();
+      let valido = true;
+      const titulo = document.getElementById('evento-titulo').value.trim();
+      const fecha = document.getElementById('evento-fecha').value;
+      const inicio = document.getElementById('evento-inicio').value;
+      const fin = document.getElementById('evento-fin').value;
+      const docente = document.getElementById('evento-docente').value;
+      const sala = document.getElementById('evento-sala').value;
+      const carrera = document.getElementById('evento-carrera').value;
+      const modulo = document.getElementById('evento-modulo').value;
+      if (!titulo) { document.getElementById('error-titulo').textContent = 'El título es requerido'; valido = false; }
+      if (!fecha) { document.getElementById('error-fecha').textContent = 'La fecha es requerida'; valido = false; }
+      if (!inicio || !fin) { document.getElementById('error-inicio').textContent = 'Las horas de inicio y fin son requeridas'; document.getElementById('error-fin').textContent = 'Las horas de inicio y fin son requeridas'; valido = false; }
+      else if (inicio >= fin) { document.getElementById('error-inicio').textContent = 'La hora de inicio debe ser menor que la de fin'; document.getElementById('error-fin').textContent = 'La hora de fin debe ser mayor que la de inicio'; valido = false; }
+      if (!docente) { document.getElementById('error-docente').textContent = 'Selecciona un docente'; valido = false; }
+      if (!sala) { document.getElementById('error-sala').textContent = 'Selecciona una sala'; valido = false; }
+      if (!carrera) { document.getElementById('error-carrera').textContent = 'Selecciona una carrera'; valido = false; }
+      if (!modulo) { document.getElementById('error-modulo').textContent = 'Selecciona un módulo'; valido = false; }
+      return valido;
+    }
+
+    async function guardarEvento(ev) {
+      ev.preventDefault();
+      if (!eventoActual) return;
+      if (!validarFormulario()) return;
+      const btnGuardar = document.getElementById('btn-guardar');
+      btnGuardar.disabled = true; btnGuardar.textContent = '💾 Guardando...';
+      try {
+        const fecha = document.getElementById('evento-fecha').value;
+        const inicio = document.getElementById('evento-inicio').value;
+        const fin = document.getElementById('evento-fin').value;
+        const payload = {
+          title: document.getElementById('evento-titulo').value,
+          start: `${fecha}T${inicio}`,
+          end: `${fecha}T${fin}`,
+          extendedProps: {
+            numeroBloque: document.getElementById('evento-bloque').value || null,
+            docenteId: document.getElementById('evento-docente').value || null,
+            salaId: document.getElementById('evento-sala').value || null,
+            carreraId: document.getElementById('evento-carrera').value || null,
+            moduloId: document.getElementById('evento-modulo').value || null,
+            descripcion: document.getElementById('evento-descripcion').value || ''
+          }
+        };
+        if (USE_API) {
+          const r = await authorizedFetch(API_BASE + '/events/' + encodeURIComponent(eventoActual.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (!r.ok) throw new Error('API PUT /events failed');
+          try { storedEvents = await fetchEvents(); } catch (_) { /* keep old */ }
+        } else {
+          // actualizar en localStorage
+          const idx = storedEvents.findIndex(e => e.id === eventoActual.id);
+          if (idx !== -1) {
+            storedEvents[idx] = { ...(storedEvents[idx] || {}), ...payload };
+            save(KEY_EVENTS, storedEvents);
+          }
+        }
+        const ok = document.getElementById('success-message'); if (ok) { ok.textContent = 'Evento actualizado correctamente'; ok.className = 'success-message show'; }
+        refreshCalendarEvents();
+        setTimeout(() => { cerrarModal(); }, 1200);
+      } catch (error) {
+        console.error('Error guardando evento', error);
+        alert('Error al guardar el evento. Intenta nuevamente.');
+      } finally {
+        btnGuardar.disabled = false; btnGuardar.textContent = '💾 Guardar Cambios';
+      }
+    }
+
+    async function eliminarEvento() {
+      if (!eventoActual) return;
+      if (!confirm('¿Estás seguro de que quieres eliminar este evento?')) return;
+      const btnEliminar = document.getElementById('btn-eliminar');
+      btnEliminar.disabled = true; btnEliminar.textContent = '🗑️ Eliminando...';
+      try {
+        if (USE_API) {
+          const r = await authorizedFetch(API_BASE + '/events/' + encodeURIComponent(eventoActual.id), { method: 'DELETE' });
+          if (!r.ok) throw new Error('API DELETE /events failed');
+          try { storedEvents = await fetchEvents(); } catch (_) { }
+        } else {
+          storedEvents = storedEvents.filter(e => e.id !== eventoActual.id);
+          save(KEY_EVENTS, storedEvents);
+        }
+        const ok = document.getElementById('success-message'); if (ok) { ok.textContent = 'Evento eliminado correctamente'; ok.className = 'success-message show'; }
+        refreshCalendarEvents();
+        setTimeout(() => { cerrarModal(); }, 1200);
+      } catch (error) {
+        console.error('Error eliminando evento', error);
+        alert('Error al eliminar el evento. Intenta nuevamente.');
+      } finally {
+        btnEliminar.disabled = false; btnEliminar.textContent = '🗑️ Eliminar';
+      }
+    }
+
+    // Listeners del modal
+    document.addEventListener('DOMContentLoaded', function() {
+      const overlay = document.getElementById('modal-edicion');
+      const btnCerrar = document.getElementById('btn-cerrar-modal');
+      const btnCancelar = document.getElementById('btn-cancelar');
+      const btnEliminar = document.getElementById('btn-eliminar');
+      const form = document.getElementById('form-edicion-evento');
+      if (btnCerrar) btnCerrar.addEventListener('click', cerrarModal);
+      if (btnCancelar) btnCancelar.addEventListener('click', cerrarModal);
+      if (btnEliminar) btnEliminar.addEventListener('click', eliminarEvento);
+      if (form) form.addEventListener('submit', guardarEvento);
+      if (overlay) overlay.addEventListener('click', function(e) { if (e.target === overlay) cerrarModal(); });
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') cerrarModal(); });
+      // Auto-ajuste por bloque seleccionado
+      const selInicio = document.getElementById('evento-inicio');
+      const selFin = document.getElementById('evento-fin');
+      const selBloque = document.getElementById('evento-bloque');
+      if (selInicio && selBloque && selFin) {
+        selInicio.addEventListener('change', function() {
+          const num = parseInt(selBloque.value, 10);
+          if (num && Array.isArray(CEDUC_BLOQUES)) {
+            const b = CEDUC_BLOQUES.find(x => x.numero === num);
+            if (b) selFin.value = b.fin;
+          }
+        });
+        selBloque.addEventListener('change', function() {
+          const num = parseInt(selBloque.value, 10);
+          if (num && Array.isArray(CEDUC_BLOQUES)) {
+            const b = CEDUC_BLOQUES.find(x => x.numero === num);
+            if (b) { selInicio.value = b.inicio; selFin.value = b.fin; }
+          }
+        });
+      }
+    });
+  </script>
+
+  <!-- Modal de Edición de Eventos -->
+  <div id="modal-edicion" class="modal-overlay" aria-hidden="true">
+    <div class="modal-edicion" role="dialog" aria-modal="true" aria-labelledby="modal-edicion-title">
+      <div class="modal-header">
+        <h3 id="modal-edicion-title" class="modal-title">Editar Evento</h3>
+        <button type="button" id="btn-cerrar-modal" class="modal-close" aria-label="Cerrar">×</button>
+      </div>
+      <div id="success-message" class="success-message" role="status"></div>
+      <form id="form-edicion-evento" class="modal-form">
+        <div class="form-group">
+          <label for="evento-titulo" class="form-label">Título</label>
+          <input id="evento-titulo" class="form-input" type="text" placeholder="Nombre del curso / módulo" />
+          <div id="error-titulo" class="form-error"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="evento-fecha" class="form-label">Fecha</label>
+            <input id="evento-fecha" class="form-input" type="date" />
+            <div id="error-fecha" class="form-error"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Horario</label>
+            <div class="form-row">
+              <div>
+                <label for="evento-inicio" class="sr-only">Inicio</label>
+                <input id="evento-inicio" class="form-input" type="time" step="300" />
+                <div id="error-inicio" class="form-error"></div>
+              </div>
+              <div>
+                <label for="evento-fin" class="sr-only">Fin</label>
+                <input id="evento-fin" class="form-input" type="time" step="300" />
+                <div id="error-fin" class="form-error"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="evento-bloque" class="form-label">Bloque CEDUC</label>
+            <select id="evento-bloque" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label for="evento-docente" class="form-label">Docente</label>
+            <select id="evento-docente" class="form-select"></select>
+            <div id="error-docente" class="form-error"></div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="evento-sala" class="form-label">Sala</label>
+            <select id="evento-sala" class="form-select"></select>
+            <div id="error-sala" class="form-error"></div>
+          </div>
+          <div class="form-group">
+            <label for="evento-carrera" class="form-label">Carrera</label>
+            <select id="evento-carrera" class="form-select"></select>
+            <div id="error-carrera" class="form-error"></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="evento-modulo" class="form-label">Módulo</label>
+          <select id="evento-modulo" class="form-select"></select>
+          <div id="error-modulo" class="form-error"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="evento-descripcion" class="form-label">Descripción</label>
+          <textarea id="evento-descripcion" class="form-textarea" placeholder="Notas o descripción adicional..."></textarea>
+        </div>
+
+        <div class="form-buttons">
+          <button id="btn-eliminar" type="button" class="btn btn-danger">🗑️ Eliminar</button>
+          <button id="btn-cancelar" type="button" class="btn btn-secondary">Cancelar</button>
+          <button id="btn-guardar" type="submit" class="btn btn-primary">💾 Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <style>
     :root {
       --brand-orange: #f97316;
