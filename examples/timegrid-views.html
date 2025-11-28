@@ -16,6 +16,109 @@
     }
 
     /* Keep the draggable title/handle visible while scrolling inside the modal */
+    /* MEJORAR CABECERA DEL CALENDARIO */
+    .fc-header-toolbar {
+      margin-bottom: 20px !important;
+      background: #f8fafc !important;
+      border-radius: 12px !important;
+      padding: 12px 16px !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+    /* TÍTULO DEL CALENDARIO MÁS SUTIL */
+    .fc-toolbar-title {
+      font-size: 18px !important;
+      font-weight: 600 !important;
+      color: #1e293b !important;
+      margin: 0 !important;
+    }
+    /* BOTONES DE NAVEGACIÓN MEJORADOS */
+    .fc-button {
+      background: #ffffff !important;
+      border: 1px solid #d1d5db !important;
+      border-radius: 8px !important;
+      color: #374151 !important;
+      font-weight: 500 !important;
+      padding: 8px 12px !important;
+      margin: 0 2px !important;
+      transition: all 0.2s ease !important;
+    }
+    .fc-button:hover {
+      background: #f3f4f6 !important;
+      border-color: #9ca3af !important;
+      transform: translateY(-1px) !important;
+    }
+    .fc-button-primary {
+      background: #4f46e5 !important;
+      border-color: #4f46e5 !important;
+    }
+    .fc-button-primary:hover {
+      background: #4338ca !important;
+      border-color: #4338ca !important;
+    }
+    /* BOTÓN TODAY ESPECIAL */
+    .fc-today-button {
+      background: #10b981 !important;
+      border-color: #10b981 !important;
+      color: white !important;
+      font-weight: 600 !important;
+    }
+    .fc-today-button:hover {
+      background: #059669 !important;
+      border-color: #059669 !important;
+    }
+    /* SEPARACIÓN ENTRE GRUPOS DE BOTONES */
+    .fc-toolbar-chunk + .fc-toolbar-chunk {
+      margin-left: 16px !important;
+    }
+
+    /* ÁREA DE USUARIO MEJORADA */
+    .user-info-area {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border: 1px solid #e5e7eb;
+      z-index: 1000;
+      font-size: 14px;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .user-info-area .session-info,
+    .user-info-area .roles-info {
+      margin-bottom: 0;
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    /* RESPONSIVIDAD MEJORADA */
+    @media (max-width: 768px) {
+      .fc-header-toolbar { flex-direction: column !important; gap: 12px !important; align-items: center !important; }
+      .fc-toolbar-chunk { width: 100% !important; text-align: center !important; }
+      .fc-toolbar-chunk + .fc-toolbar-chunk { margin-left: 0 !important; margin-top: 8px !important; }
+      .user-info-area { position: relative !important; top: auto !important; right: auto !important; margin-bottom: 16px !important; width: fit-content !important; }
+    }
+    /* MEJORAR TOOLTIPS EN MÓVIL */
+    @media (hover: none) {
+      .fc-timegrid-event:hover { transform: none !important; }
+      .fc-timegrid-event:active { transform: scale(0.98) !important; }
+    }
+
+    /* INDICADORES DE VISTA ACTIVA */
+    .fc-button-group .fc-button[aria-pressed="true"] {
+      background: #4f46e5 !important;
+      color: white !important;
+      border-color: #4f46e5 !important;
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+    }
+    /* ANIMACIONES SUAVES PARA CAMBIOS DE VISTA */
+    .fc-view { transition: opacity 0.3s ease !important; }
+    .fc-view.fc-timeGridWeek-view,
+    .fc-view.fc-timeGridDay-view { opacity: 1 !important; }
     [role="dialog"] .modal-drag-handle {
       position: sticky;
       top: 0;
@@ -631,6 +734,13 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
+    // Mejorar el área de usuario tras cargar el DOM
+    document.addEventListener('DOMContentLoaded', function() {
+      const panel = document.getElementById('session-panel');
+      if (panel) {
+        panel.classList.add('user-info-area');
+      }
+    });
 
     const ADMIN_AUTH_KEY = 'conexia_admin_session_v1';
     const SESSION_TOKEN_KEY = 'conexia_admin_token';
@@ -1483,21 +1593,30 @@
             eventStartEditable: true,
             eventDurationEditable: true,
             dragScroll: true,
+            customButtons: {
+              today: {
+                text: 'Hoy',
+                click: function() { if (calendar && typeof calendar.today === 'function') calendar.today(); }
+              }
+            },
             headerToolbar: {
               left: 'prev,next today',
               center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+              right: 'timeGridWeek,timeGridDay'
             },
             navLinks: true,
             selectable: true,
             selectMirror: true,
             hiddenDays: [0],
+            // Ajustes de espaciado CEDUC
             slotMinTime: '08:00:00',
-            slotMaxTime: '23:00:00',
-            slotDuration: '00:30:00',
-            slotLabelInterval: '01:00:00',
-            slotLabelFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
-            dayMaxEvents: true,
+            slotMaxTime: '23:30:00',
+            slotDuration: '00:35:00',
+            slotLabelInterval: '01:10:00',
+            slotLabelFormat: { hour: '2-digit', minute: '2-digit' },
+            slotHeight: 60,
+            dayMaxEvents: false,
+            eventTimeFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
             datesSet: function (info) {
               try {
                 const state = {
@@ -1510,14 +1629,14 @@
             },
             events: function (fetchInfo, successCallback) {
               const filterCarrera = document.getElementById('filter-carrera')?.value || '';
-              // Ajustar cada evento al bloque CEDUC más cercano y añadir número de bloque en el título preservando colores
+              // Ajustar cada evento al bloque CEDUC más cercano preservando colores
               let bloquesEvents = storedEvents.map(event => {
                 try {
                   const bloqueAjustado = ajustarEventoABloque(event);
                   if (bloqueAjustado) {
                     const eventoConBloque = {
                       id: event.id,
-                      title: `Bloque ${bloqueAjustado.bloqueNumero}: ${event.title}`,
+                      title: event.title,
                       start: bloqueAjustado.start,
                       end: bloqueAjustado.end,
                       allDay: false,
@@ -6502,6 +6621,30 @@
     .fc .fc-daygrid-day-number {
       color: #10b981;
       font-weight: 500;
+    }
+
+    /* MEJORAR ESPACIADO ENTRE EVENTOS */
+    .fc-timegrid-event {
+      margin: 2px 4px !important;
+      border-radius: 6px !important;
+      min-height: 45px !important;
+    }
+    /* SEPARACIÓN ENTRE EVENTOS APILADOS */
+    .fc-timegrid-col-events {
+      margin-bottom: 1px !important;
+    }
+    /* MEJORAR VISIBILIDAD DE LAS LÍNEAS DE TIEMPO */
+    .fc-timegrid-slot {
+      border-bottom: 1px solid #e2e8f0 !important;
+      height: 60px !important;
+    }
+    .fc-timegrid-slot:nth-child(odd) { background-color: #fafafa; }
+    .fc-timegrid-slot:nth-child(even) { background-color: #ffffff; }
+    /* ETIQUETAS DE TIEMPO MÁS CLARAS */
+    .fc-timegrid-slot-label {
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 14px;
     }
   </style>
 </head>
