@@ -33,10 +33,14 @@ async function initializeSchema() {
 		)`,
 		`CREATE TABLE IF NOT EXISTS modulos (
 			id TEXT PRIMARY KEY,
-			nombre TEXT,
-			carreraId TEXT,
-			horas REAL,
-			tipo TEXT
+			nombre TEXT NOT NULL,
+			carreraId TEXT REFERENCES carreras(id) ON DELETE SET NULL,
+			totalHoras INTEGER DEFAULT 0,
+			horasTeoricas NUMERIC(4,1) DEFAULT 0,
+			horasPracticas NUMERIC(4,1) DEFAULT 0,
+			horasSemanales NUMERIC(4,1) DEFAULT 0,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
 		`CREATE TABLE IF NOT EXISTS docentes (
 			id TEXT PRIMARY KEY,

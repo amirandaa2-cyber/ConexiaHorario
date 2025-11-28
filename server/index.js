@@ -342,8 +342,10 @@ if(dbReady){
 				SELECT id,
 				       nombre,
 				       carreraId AS "carreraId",
-				       horas,
-				       tipo
+				       totalHoras,
+				       horasTeoricas,
+				       horasPracticas,
+				       horasSemanales
 				  FROM modulos
 				 ORDER BY nombre ASC`);
 			res.json(rows);
@@ -355,14 +357,24 @@ if(dbReady){
 		const id = m.id || uuidv4();
 		try{
 			await db.query(
-				`INSERT INTO modulos (id,nombre,carreraId,horas,tipo)
-				 VALUES ($1,$2,$3,$4,$5)
+				`INSERT INTO modulos (id,nombre,carreraId,totalHoras,horasTeoricas,horasPracticas,horasSemanales)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7)
 				 ON CONFLICT (id) DO UPDATE
 				 SET nombre=EXCLUDED.nombre,
 				     carreraId=EXCLUDED.carreraId,
-				     horas=EXCLUDED.horas,
-				     tipo=EXCLUDED.tipo`,
-				[id, m.nombre, m.carreraId, m.horas||0, m.tipo||'Teórico']
+				     totalHoras=EXCLUDED.totalHoras,
+				     horasTeoricas=EXCLUDED.horasTeoricas,
+				     horasPracticas=EXCLUDED.horasPracticas,
+				     horasSemanales=EXCLUDED.horasSemanales`,
+				[
+					id,
+					m.nombre,
+					m.carreraId || null,
+					m.totalHoras ?? 0,
+					m.horasTeoricas ?? 0,
+					m.horasPracticas ?? 0,
+					m.horasSemanales ?? 0
+				]
 			);
 			res.json({ok:true,id});
 		}catch(err){ handleDbError(res, err); }
@@ -372,8 +384,16 @@ if(dbReady){
 		const m = req.body;
 		try{
 			await db.query(
-				'UPDATE modulos SET nombre=$1, carreraId=$2, horas=$3, tipo=$4 WHERE id=$5',
-				[m.nombre, m.carreraId, m.horas||0, m.tipo||'Teórico', req.params.id]
+				'UPDATE modulos SET nombre=$1, carreraId=$2, totalHoras=$3, horasTeoricas=$4, horasPracticas=$5, horasSemanales=$6, updated_at=NOW() WHERE id=$7',
+				[
+					m.nombre,
+					m.carreraId || null,
+					m.totalHoras ?? 0,
+					m.horasTeoricas ?? 0,
+					m.horasPracticas ?? 0,
+					m.horasSemanales ?? 0,
+					req.params.id
+				]
 			);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }
