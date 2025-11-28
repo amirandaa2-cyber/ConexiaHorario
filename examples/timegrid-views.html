@@ -1643,7 +1643,24 @@
               }
             },
             eventDidMount: function(info) {
-              try { attachTooltipToEventEl(info.el, info.event); } catch (e) { /* noop */ }
+              try {
+                // Ensure elements are clearly clickable and carry ID
+                if (info.event && info.event.id) {
+                  info.el.setAttribute('data-event-id', info.event.id);
+                }
+                info.el.style.cursor = 'pointer';
+                info.el.style.userSelect = 'none';
+                // Remove any nested tooltips that may interfere
+                const tooltips = info.el.querySelectorAll('.tooltip, .event-tooltip, .evento-tooltip');
+                tooltips.forEach(t => t.remove());
+                // Attach our tooltip behavior
+                attachTooltipToEventEl(info.el, info.event);
+                // Also support direct click on element
+                info.el.addEventListener('click', function(ev) {
+                  ev.preventDefault(); ev.stopPropagation();
+                  if (typeof abrirModal === 'function') abrirModal(info.event);
+                });
+              } catch (e) { /* noop */ }
             },
             eventContent: function(arg) {
               try {
