@@ -412,13 +412,15 @@ if(dbReady){
 				SELECT id,
 				       rut,
 				       nombre,
-				       edad,
-				       estadoCivil AS "estadoCivil",
-				       contratoHoras AS "contratoHoras",
-				       horasAsignadas AS "horasAsignadas",
-				       horasTrabajadas AS "horasTrabajadas",
-				       turno,
-				       activo
+				       email,
+				       titulo,
+				       "contratoHoras" AS "contratoHoras",
+				       "TotalHrsModulos" AS "TotalHrsModulos",
+				       "Hrs Teóricas" AS "Hrs Teóricas",
+				       "Hrs Prácticas" AS "Hrs Prácticas",
+				       "Total hrs Semana" AS "Total hrs Semana",
+				       created_at,
+				       updated_at
 				  FROM docentes
 				 ORDER BY nombre ASC`);
 			res.json(rows);
@@ -430,19 +432,19 @@ if(dbReady){
 		const id = d.id || uuidv4();
 		try{
 			await db.query(
-				`INSERT INTO docentes (id,rut,nombre,edad,estadoCivil,contratoHoras,horasAsignadas,horasTrabajadas,turno,activo)
+				`INSERT INTO docentes (id,rut,nombre,email,titulo,"contratoHoras","TotalHrsModulos","Hrs Teóricas","Hrs Prácticas","Total hrs Semana")
 				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 				 ON CONFLICT (id) DO UPDATE
 				 SET rut=EXCLUDED.rut,
 				     nombre=EXCLUDED.nombre,
-				     edad=EXCLUDED.edad,
-				     estadoCivil=EXCLUDED.estadoCivil,
-				     contratoHoras=EXCLUDED.contratoHoras,
-				     horasAsignadas=EXCLUDED.horasAsignadas,
-				     horasTrabajadas=EXCLUDED.horasTrabajadas,
-				     turno=EXCLUDED.turno,
-				     activo=EXCLUDED.activo`,
-				[id, d.rut, d.nombre, d.edad||0, d.estadoCivil||'', d.contratoHoras||0, d.horasAsignadas||0, d.horasTrabajadas||0, d.turno||'Diurno', !!d.activo]
+				     email=EXCLUDED.email,
+				     titulo=EXCLUDED.titulo,
+				     "contratoHoras"=EXCLUDED."contratoHoras",
+				     "TotalHrsModulos"=EXCLUDED."TotalHrsModulos",
+				     "Hrs Teóricas"=EXCLUDED."Hrs Teóricas",
+				     "Hrs Prácticas"=EXCLUDED."Hrs Prácticas",
+				     "Total hrs Semana"=EXCLUDED."Total hrs Semana"`,
+				[id, d.rut, d.nombre, d.email||null, d.titulo||null, d.contratoHoras||0, d.TotalHrsModulos||0, d['Hrs Teóricas']||0, d['Hrs Prácticas']||0, d['Total hrs Semana']||0]
 			);
 			res.json({ok:true,id});
 		}catch(err){ handleDbError(res, err); }
@@ -452,8 +454,8 @@ if(dbReady){
 		const d = req.body;
 		try{
 			await db.query(
-				'UPDATE docentes SET rut=$1, nombre=$2, edad=$3, estadoCivil=$4, contratoHoras=$5, horasAsignadas=$6, horasTrabajadas=$7, turno=$8, activo=$9 WHERE id=$10',
-				[d.rut, d.nombre, d.edad||0, d.estadoCivil||'', d.contratoHoras||0, d.horasAsignadas||0, d.horasTrabajadas||0, d.turno||'Diurno', !!d.activo, req.params.id]
+				'UPDATE docentes SET rut=$1, nombre=$2, email=$3, titulo=$4, "contratoHoras"=$5, "TotalHrsModulos"=$6, "Hrs Teóricas"=$7, "Hrs Prácticas"=$8, "Total hrs Semana"=$9 WHERE id=$10',
+				[d.rut, d.nombre, d.email||null, d.titulo||null, d.contratoHoras||0, d.TotalHrsModulos||0, d['Hrs Teóricas']||0, d['Hrs Prácticas']||0, d['Total hrs Semana']||0, req.params.id]
 			);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }

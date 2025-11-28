@@ -43,17 +43,30 @@ async function initializeSchema() {
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
 		`CREATE TABLE IF NOT EXISTS docentes (
-			id TEXT PRIMARY KEY,
-			rut TEXT,
-			nombre TEXT,
-			edad INTEGER,
-			estadoCivil TEXT,
-			contratoHoras REAL,
-			horasAsignadas REAL,
-			horasTrabajadas REAL,
-			turno TEXT,
-			activo BOOLEAN
+			id VARCHAR(20) PRIMARY KEY,
+			rut VARCHAR(20) UNIQUE NOT NULL,
+			nombre VARCHAR(255) NOT NULL,
+			email VARCHAR(255),
+			titulo TEXT,
+			"contratoHoras" NUMERIC(5,2) DEFAULT 0,
+			"TotalHrsModulos" NUMERIC(6,1) DEFAULT 0,
+			"Hrs Teóricas" NUMERIC(4,1) DEFAULT 0,
+			"Hrs Prácticas" NUMERIC(4,1) DEFAULT 0,
+			"Total hrs Semana" NUMERIC(4,1) DEFAULT 0,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
+		`CREATE OR REPLACE FUNCTION update_modified_column()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			NEW.updated_at = NOW();
+			RETURN NEW;
+		END;
+		$$ language 'plpgsql'`,
+		`CREATE TRIGGER update_docentes_modtime
+		    BEFORE UPDATE ON docentes
+		    FOR EACH ROW
+		    EXECUTE FUNCTION update_modified_column()`,
 		`CREATE TABLE IF NOT EXISTS salas (
 			id TEXT PRIMARY KEY,
 			nombre TEXT,
