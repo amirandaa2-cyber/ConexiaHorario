@@ -162,6 +162,19 @@
     .success-message { background: #c6f6d5; border: 1px solid #9ae6b4; color: #22543d; padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none; }
     .success-message.show { display: block; }
     @media (max-width: 768px) { .modal-edicion { width: 95%; padding: 20px; margin: 20px; } .form-row { grid-template-columns: 1fr; } .form-buttons { flex-direction: column; } }
+    /* Estilos para el Modal de Asignación */
+    .modal-asignacion-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); display: none; z-index: 10001; justify-content: center; align-items: center; }
+    .modal-asignacion-overlay.show { display: flex; }
+    .modal-asignacion { background: white; border-radius: 12px; padding: 24px; max-width: 700px; width: 95%; max-height: 95vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); transform: scale(0.8); transition: transform 0.3s ease; }
+    .modal-asignacion-overlay.show .modal-asignacion { transform: scale(1); }
+    .modal-asignacion-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #f0f0f0; }
+    .modal-asignacion-title { font-size: 1.4em; font-weight: 600; color: #2d3748; margin: 0; }
+    .modal-asignacion-close { background: none; border: none; font-size: 24px; color: #718096; cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.2s; }
+    .modal-asignacion-close:hover { background: #f7fafc; color: #2d3748; }
+    .asignacion-form { display: grid; gap: 18px; }
+    .asignacion-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .asignacion-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+    @media (max-width: 768px) { .asignacion-row { grid-template-columns: 1fr; } }
     [role="dialog"] .modal-drag-handle {
       position: sticky;
       top: 0;
@@ -773,6 +786,153 @@
       }
     }
   </style>
+
+  <script>
+    // ===== Re-implementación Modal Asignación (versión bloques CEDUC 22) =====
+    (function(){
+      const modalAsignacion = document.getElementById('modal-asignacion');
+      if(!modalAsignacion) return; // seguridad
+      const form = document.getElementById('form-asignacion');
+      const selCarrera = document.getElementById('asig-carrera');
+      const selModulo = document.getElementById('asig-modulo');
+      const selDocente = document.getElementById('asig-docente');
+      const selSala = document.getElementById('asig-sala');
+      const inputFecha = document.getElementById('asig-fecha');
+      const selBloque = document.getElementById('asig-bloque');
+      const selRepetir = document.getElementById('asig-repetir');
+      const inputDuracion = document.getElementById('asig-duracion-bloques');
+      const txtDescripcion = document.getElementById('asig-descripcion');
+      const btnCerrar = document.getElementById('btn-cerrar-asignacion');
+      const btnCancelar = document.getElementById('btn-cancelar-asignacion');
+
+      function abrirModalAsignacion(context={}) {
+        try {
+          cargarOpciones();
+          precargarContexto(context);
+          modalAsignacion.style.display='flex';
+          modalAsignacion.setAttribute('aria-hidden','false');
+          selCarrera && selCarrera.focus();
+        } catch(e){ console.error('abrirModalAsignacion', e); }
+      }
+      function cerrarModalAsignacion(){
+        modalAsignacion.style.display='none';
+        modalAsignacion.setAttribute('aria-hidden','true');
+        form && form.reset();
+      }
+      function cargarOpciones(){
+        try {
+          // Carreras
+          selCarrera.innerHTML='';
+          (window.carreras||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.nombre; selCarrera.appendChild(o); });
+          // Modulos
+          selModulo.innerHTML='';
+          (window.modulos||[]).forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=`${m.codigo||m.id} - ${m.nombre}`; selModulo.appendChild(o); });
+          // Docentes
+          selDocente.innerHTML='';
+          (window.docentes||[]).filter(d=>d.activo!==false).forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=d.nombre; selDocente.appendChild(o); });
+          // Salas
+          selSala.innerHTML='';
+          (window.salas||[]).forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=s.nombre; selSala.appendChild(o); });
+          // Bloques
+          selBloque.innerHTML='';
+          (window.CEDUC_BLOQUES||[]).forEach(b=>{ const o=document.createElement('option'); o.value=b.numero; o.textContent=`Bloque ${b.numero} (${b.inicio}-${b.fin})`; selBloque.appendChild(o); });
+        } catch(e){ console.error('cargarOpciones asignación', e); }
+      }
+      selCarrera && selCarrera.addEventListener('change', ()=>{
+        const cid = selCarrera.value;
+        // Filtrar módulos por carrera
+        selModulo.innerHTML='';
+        (window.modulos||[]).filter(m=> String(m.carreraId)===String(cid)).forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=`${m.codigo||m.id} - ${m.nombre}`; selModulo.appendChild(o); });
+      });
+
+      function precargarContexto(ctx){
+        const hoy = new Date();
+        inputFecha.value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+        if(ctx.carreraId){ selCarrera.value = ctx.carreraId; selCarrera.dispatchEvent(new Event('change')); }
+        if(ctx.moduloId){
+          // asegurar carrera si no viene
+          const modulo = (window.modulos||[]).find(m=>String(m.id)===String(ctx.moduloId));
+          if(modulo && !ctx.carreraId){ selCarrera.value = modulo.carreraId; selCarrera.dispatchEvent(new Event('change')); }
+          selModulo.value = ctx.moduloId;
+        }
+        if(ctx.docenteId){ selDocente.value = ctx.docenteId; }
+        if(ctx.salaId){ selSala.value = ctx.salaId; }
+        if(ctx.bloqueNumero){ selBloque.value = ctx.bloqueNumero; }
+      }
+
+      function validar(){
+        const errs=[];
+        if(!selCarrera.value) errs.push('Carrera');
+        if(!selModulo.value) errs.push('Módulo');
+        if(!selDocente.value) errs.push('Docente');
+        if(!selSala.value) errs.push('Sala');
+        if(!inputFecha.value) errs.push('Fecha');
+        if(!selBloque.value) errs.push('Bloque');
+        const dur = parseInt(inputDuracion.value||'1',10);
+        if(isNaN(dur)||dur<1) errs.push('Duración');
+        return errs;
+      }
+
+      function construirEvento(semanaOffset){
+        const bloqueNum = parseInt(selBloque.value,10);
+        const durBloques = parseInt(inputDuracion.value||'1',10);
+        const bloque = (window.CEDUC_BLOQUES||[]).find(b=>b.numero===bloqueNum);
+        if(!bloque) throw new Error('Bloque inválido');
+        const base = new Date(inputFecha.value+'T00:00:00');
+        if(semanaOffset) base.setDate(base.getDate()+7*semanaOffset);
+        const yyyy=base.getFullYear(); const mm=String(base.getMonth()+1).padStart(2,'0'); const dd=String(base.getDate()).padStart(2,'0');
+        const startStr=`${yyyy}-${mm}-${dd}T${bloque.inicio}:00`;
+        const startDate=new Date(startStr); const endDate=new Date(startDate); endDate.setMinutes(endDate.getMinutes()+35*durBloques);
+        const endStr=`${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}T${String(endDate.getHours()).padStart(2,'0')}:${String(endDate.getMinutes()).padStart(2,'0')}:00`;
+        const modulo=(window.modulos||[]).find(m=>String(m.id)===String(selModulo.value));
+        const carrera=(window.carreras||[]).find(c=>String(c.id)===String(selCarrera.value));
+        const color = modulo && modulo.color ? modulo.color : '#3788d8';
+        const ev={
+          id:`evt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+          title: modulo? modulo.nombre : 'Módulo',
+          start:startStr,
+          end:endStr,
+          backgroundColor:color,
+          borderColor:color,
+          textColor:'#fff',
+          extendedProps:{ __meta:{ carreraId:carrera?carrera.id:null, moduloId:modulo?modulo.id:null, docenteId:selDocente.value||null, salaId:selSala.value||null, descripcion:txtDescripcion.value||'' } }
+        };
+        return ajustarEventoABloque(ev);
+      }
+
+      async function submitAsignacion(e){
+        e.preventDefault();
+        const errs = validar();
+        if(errs.length){ alert('Faltan: '+errs.join(', ')); return; }
+        const semanas = parseInt(selRepetir.value||'0',10);
+        const crear=[]; crear.push(construirEvento(0));
+        for(let i=1;i<=semanas;i++) crear.push(construirEvento(i));
+        try {
+          if(window.USE_API){
+            for(const ev of crear){ await authorizedFetch(API_BASE+'/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ev)}); }
+          } else {
+            const current = JSON.parse(localStorage.getItem(KEY_EVENTS)||'[]');
+            current.push(...crear); localStorage.setItem(KEY_EVENTS, JSON.stringify(current));
+          }
+          cerrarModalAsignacion();
+          window.calendar && calendar.refetchEvents();
+        } catch(err){ console.error('submitAsignacion', err); alert('Error creando asignación'); }
+      }
+
+      // Sustituye la versión antigua si existe
+      window.openAssignModalForModule = function(moduloId){
+        const modulo=(window.modulos||[]).find(m=>m.id===moduloId);
+        if(!modulo){ alert('Módulo no encontrado'); return; }
+        abrirModalAsignacion({ moduloId: modulo.id, carreraId: modulo.carreraId });
+      };
+
+      btnCerrar && btnCerrar.addEventListener('click', cerrarModalAsignacion);
+      btnCancelar && btnCancelar.addEventListener('click', cerrarModalAsignacion);
+      form && form.addEventListener('submit', submitAsignacion);
+      modalAsignacion.addEventListener('click', (ev)=>{ if(ev.target===modalAsignacion) cerrarModalAsignacion(); });
+      document.addEventListener('keydown', (ev)=>{ if(ev.key==='Escape' && modalAsignacion.getAttribute('aria-hidden')==='false') cerrarModalAsignacion(); });
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -2319,24 +2479,69 @@
           }
           function attachTooltipToEventEl(el, event) {
             let tooltip = null;
+            let docMoveHandler = null;
+            let scrollHandler = null;
             function showTooltip() {
               try {
+                if (tooltip) return; // evita duplicados
                 tooltip = crearTooltipEvento(el, event);
                 document.body.appendChild(tooltip);
-                const rect = el.getBoundingClientRect();
-                tooltip.style.left = (rect.right + 10) + 'px';
-                tooltip.style.top = rect.top + 'px';
+                posicionarTooltip();
                 requestAnimationFrame(() => { tooltip && (tooltip.style.opacity = '1'); });
+                // Registrar listeners globales para detectar salida real
+                docMoveHandler = (ev) => {
+                  if (!tooltip) return;
+                  const overEl = el.contains(ev.target);
+                  const overTooltip = tooltip.contains(ev.target);
+                  if (!overEl && !overTooltip) {
+                    // comprobar distancia del cursor respecto al rect original
+                    const rect = el.getBoundingClientRect();
+                    if (ev.clientX < rect.left - 8 || ev.clientX > rect.right + 8 || ev.clientY < rect.top - 8 || ev.clientY > rect.bottom + 8) {
+                      hideTooltip();
+                    }
+                  }
+                };
+                document.addEventListener('mousemove', docMoveHandler, true);
+                scrollHandler = () => { hideTooltip(); };
+                window.addEventListener('scroll', scrollHandler, true);
               } catch (_) { }
+            }
+            function posicionarTooltip() {
+              if (!tooltip || !el) return;
+              const rect = el.getBoundingClientRect();
+              const leftPref = rect.right + 10;
+              const topPref = rect.top;
+              // Ajuste para evitar que se salga por la derecha
+              const maxRight = leftPref + (tooltip.offsetWidth || 280);
+              let left = leftPref;
+              if (maxRight > window.innerWidth - 10) {
+                left = rect.left - (tooltip.offsetWidth || 280) - 10;
+              }
+              tooltip.style.left = left + 'px';
+              tooltip.style.top = topPref + 'px';
             }
             function hideTooltip() {
               if (tooltip) {
                 tooltip.style.opacity = '0';
-                setTimeout(() => { if (tooltip && tooltip.parentNode) tooltip.parentNode.removeChild(tooltip); tooltip = null; }, 200);
+                const t = tooltip;
+                setTimeout(() => { if (t && t.parentNode) t.parentNode.removeChild(t); }, 180);
+                tooltip = null;
               }
+              if (docMoveHandler) document.removeEventListener('mousemove', docMoveHandler, true);
+              if (scrollHandler) window.removeEventListener('scroll', scrollHandler, true);
+              docMoveHandler = null;
+              scrollHandler = null;
             }
             el.addEventListener('mouseenter', showTooltip);
             el.addEventListener('mouseleave', hideTooltip);
+            // Limpieza si el nodo se elimina
+            const observer = new MutationObserver(() => {
+              if (!document.body.contains(el)) {
+                hideTooltip();
+                observer.disconnect();
+              }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
           }
           function estandarizarFormatoEvento(evento) {
             const meta = (evento.extendedProps && evento.extendedProps.__meta) || {};
@@ -6306,6 +6511,71 @@
           <button id="btn-eliminar" type="button" class="btn btn-danger">🗑️ Eliminar</button>
           <button id="btn-cancelar" type="button" class="btn btn-secondary">Cancelar</button>
           <button id="btn-guardar" type="submit" class="btn btn-primary">💾 Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de Asignación de Módulos -->
+  <div id="modal-asignacion" class="modal-asignacion-overlay" aria-hidden="true">
+    <div class="modal-asignacion" role="dialog" aria-modal="true" aria-labelledby="modal-asignacion-title">
+      <div class="modal-asignacion-header">
+        <h3 id="modal-asignacion-title" class="modal-asignacion-title">Asignar Módulo</h3>
+        <button type="button" id="btn-cerrar-asignacion" class="modal-asignacion-close" aria-label="Cerrar">×</button>
+      </div>
+      <form id="form-asignacion" class="asignacion-form">
+        <div class="asignacion-row">
+          <div class="form-group">
+            <label for="asig-carrera" class="form-label">Carrera</label>
+            <select id="asig-carrera" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label for="asig-modulo" class="form-label">Módulo</label>
+            <select id="asig-modulo" class="form-select"></select>
+          </div>
+        </div>
+        <div class="asignacion-row">
+          <div class="form-group">
+            <label for="asig-docente" class="form-label">Docente</label>
+            <select id="asig-docente" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label for="asig-sala" class="form-label">Sala</label>
+            <select id="asig-sala" class="form-select"></select>
+          </div>
+        </div>
+        <div class="asignacion-row">
+          <div class="form-group">
+            <label for="asig-fecha" class="form-label">Fecha de inicio</label>
+            <input id="asig-fecha" class="form-input" type="date" />
+          </div>
+          <div class="form-group">
+            <label for="asig-bloque" class="form-label">Bloque CEDUC</label>
+            <select id="asig-bloque" class="form-select"></select>
+          </div>
+        </div>
+        <div class="asignacion-row">
+          <div class="form-group">
+            <label for="asig-repetir" class="form-label">Repetir semanalmente</label>
+            <select id="asig-repetir" class="form-select">
+              <option value="0">No repetir</option>
+              <option value="4">4 semanas</option>
+              <option value="8">8 semanas</option>
+              <option value="16">16 semanas</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="asig-duracion-bloques" class="form-label">Duración (bloques)</label>
+            <input id="asig-duracion-bloques" class="form-input" type="number" min="1" max="4" value="1" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="asig-descripcion" class="form-label">Descripción</label>
+          <textarea id="asig-descripcion" class="form-textarea" placeholder="Notas..."></textarea>
+        </div>
+        <div class="asignacion-actions">
+          <button id="btn-cancelar-asignacion" type="button" class="btn btn-secondary">Cancelar</button>
+          <button id="btn-crear-asignacion" type="submit" class="btn btn-primary">➕ Crear</button>
         </div>
       </form>
     </div>
