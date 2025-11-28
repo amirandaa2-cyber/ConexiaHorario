@@ -926,6 +926,11 @@
         abrirModalAsignacion({ moduloId: modulo.id, carreraId: modulo.carreraId });
       };
 
+      // Exponer apertura manual desde el calendario (dateClick)
+      window.openManualAssignModal = function(context){
+        abrirModalAsignacion(context||{});
+      };
+
       btnCerrar && btnCerrar.addEventListener('click', cerrarModalAsignacion);
       btnCancelar && btnCancelar.addEventListener('click', cerrarModalAsignacion);
       form && form.addEventListener('submit', submitAsignacion);
@@ -1849,6 +1854,17 @@
             slotHeight: 60,
             dayMaxEvents: false,
             eventTimeFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
+            dateClick: function(info) {
+              try {
+                if (info && info.allDay) return;
+                let bloqueNumero = null;
+                try { bloqueNumero = calcularNumeroBloque(info.date); } catch (_) { /* ignore */ }
+                const ctx = { dateStr: info.dateStr, bloqueNumero };
+                if (window.openManualAssignModal) {
+                  window.openManualAssignModal(ctx);
+                }
+              } catch (e) { console.error('dateClick -> abrir modal asignación', e); }
+            },
             datesSet: function (info) {
               try {
                 const state = {
