@@ -1608,6 +1608,7 @@
             }
           } catch (err) { console.warn('No se pudo leer estado de calendario guardado', err); }
 
+          // Configuración del sistema de 22 bloques cronológicos
           calendar = new FullCalendar.Calendar(calendarEl, {
             locale: 'es',
             initialDate: _initialDate,
@@ -1620,58 +1621,32 @@
             headerToolbar: {
               left: 'prev,next today',
               center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+              right: 'timeGridWeek,timeGridDay'
             },
             navLinks: true,
             selectable: true,
             selectMirror: true,
-            // hide Sunday (0 = Sunday) so it's not visible or selectable
+            // Ocultar domingos (0 = domingo)
             hiddenDays: [0],
-            // show time slots starting at 08:00 and label each hour (e.g. 8 am, 9 am, 12 pm)
-            // Configuración de horarios siguiendo exactamente los bloques oficiales CEDUC
-            slotMinTime: FIRST_BLOCK_START,
-            slotMaxTime: LAST_BLOCK_END,
-            // Usamos bloques de 35 minutos como única unidad visible y de movimiento
-            slotDuration: '00:35:00',
-            slotLabelInterval: '00:35:00',
-            snapDuration: '00:35:00',
-            slotLabelContent: function (arg) {
-              try {
-                const timeStr = timeStrFromDate(arg.date);
-                const block = getBlockByStart(timeStr);
-                if (!block) return { html: '' };
-                return {
-                  html: `<div class="ceduc-slot-label"><span class="ceduc-slot-index">${block.index}</span><span class="ceduc-slot-range">${block.start} - ${block.end}</span></div>`
-                };
-              } catch (e) {
-                console.error('Error en slotLabelContent:', e);
-                return { html: '' };
-              }
-            },
-            // Cada slot del timegrid ahora ES un bloque, así que marcamos todas las filas como bloque
-            slotLabelDidMount: function (arg) {
-              try {
-                arg.el.classList.add('ceduc-block-label');
-                arg.el.classList.remove('ceduc-gap-label');
-              } catch (e) {
-                console.warn('slotLabelDidMount issue', e);
-              }
-            },
-            slotLaneDidMount: function (arg) {
-              try {
-                arg.el.classList.add('ceduc-block-lane', 'ceduc-block-start');
-                arg.el.classList.remove('ceduc-gap-lane');
-              } catch (e) {
-                console.warn('slotLaneDidMount issue', e);
-              }
-            },
-            dayMaxEvents: true,
-            // Guardar automáticamente cuando el usuario cambia de fecha o vista
+
+            // CONFIGURACIÓN DE 22 BLOQUES DE 35 MINUTOS
+            slotMinTime: '08:00:00',    // Inicio: 8:00 AM
+            slotMaxTime: '20:45:00',    // Fin: 8:45 PM (después del último bloque)
+            slotDuration: '00:35:00',   // Cada bloque = 35 minutos
+            slotLabelInterval: '01:10:00', // Etiquetas cada 2 bloques (70 min)
+            slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+
+            // Evitar etiquetas truncadas
+            dayMaxEvents: false,
+            eventTimeFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
+
             datesSet: function (info) {
               try {
-                const state = { currentDate: info.startStr || (info.start ? info.start.toISOString().slice(0, 10) : null), view: info.view ? info.view.type : null };
+                const state = {
+                  currentDate: info.startStr || (info.start ? info.start.toISOString().slice(0, 10) : null),
+                  view: info.view ? info.view.type : null
+                };
                 localStorage.setItem(KEY_CALENDAR_STATE, JSON.stringify(state));
-                // Aseguramos guardar eventos en disco por si hay cambios pendientes
                 try { persistEventsAndValidate(); } catch (_) { }
               } catch (err) { console.error('datesSet handler error', err); }
             },
@@ -1679,23 +1654,43 @@
               const filterCarrera = document.getElementById('filter-carrera')?.value || '';
               const filterWeek = document.getElementById('filter-week')?.value || '';
 
-              // Filtrar los eventos según la carrera seleccionada
-              let filteredEvents = storedEvents.filter(e => {
-                // Si no hay filtro de carrera, mostrar todos
-                if (!filterCarrera) return true;
+              // Convertir eventos al sistema de bloques
+              let bloquesEvents = (storedEvents || []).map(event => {
+                try {
+                  const startDate = (event.start instanceof Date) ? event.start : new Date(event.start);
+                  const endDate = (event.end instanceof Date) ? event.end : new Date(event.end);
+                  const minutos = Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+                  const bloques = Math.max(1, Math.ceil(minutos / 35));
+                  const totalMin = bloques * 35;
+                  const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
+                  const mm = String(totalMin % 60).padStart(2, '0');
 
-                const meta = (e.extendedProps && e.extendedProps.__meta) || {};
-                if (!meta.moduloId) return false;
-
-                const mod = modulos.find(m => m.id === meta.moduloId);
-                if (!mod) return false;
-
-                return mod.carreraId === filterCarrera;
+                  return {
+                    id: event.id,
+                    title: event.title,
+                    start: startDate.toISOString(),
+                    end: endDate.toISOString(),
+                    allDay: false,
+                    backgroundColor: event.backgroundColor,
+                    borderColor: event.borderColor,
+                    textColor: event.textColor,
+                    extendedProps: event.extendedProps,
+                    duration: `${hh}:${mm}:00`
+                  };
+                } catch (_) {
+                  return event;
+                }
               });
 
-              // Aplicar el estado del docente a los eventos filtrados
-              const mappedEvents = filteredEvents.map(e => applyDocenteStateToEvent(e));
-              successCallback(mappedEvents);
+              let filteredEvents = bloquesEvents.filter(e => {
+                if (!filterCarrera) return true;
+                const meta = (e.extendedProps && e.extendedProps.__meta) || {};
+                if (!meta.moduloId) return false;
+                const mod = modulos.find(m => m.id === meta.moduloId);
+                if (!mod) return false;
+                return mod.carreraId === filterCarrera;
+              });
+              successCallback(filteredEvents);
             },
             eventClick: function (info) { openEventEditModal(info.event); },
             eventAdd: async function (info) {
