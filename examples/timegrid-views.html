@@ -1450,30 +1450,48 @@
             // hide Sunday (0 = Sunday) so it's not visible or selectable
             hiddenDays: [0],
             // show time slots starting at 08:00 and label each hour (e.g. 8 am, 9 am, 12 pm)
-            // Configuración de horarios (bloques cronológicos de 35 minutos)
+            // Configuración de horarios. Usamos 15 minutos como unidad base
+            // para poder representar los bloques exactos de CEDUC (35 min + pausas).
             slotMinTime: '08:30:00',
             slotMaxTime: '23:00:00',
-            // Cada slot representa 1 bloque de 35 minutos
-            slotDuration: '00:35:00',
-            // Mostrar etiquetas cada bloque, formateadas como tramo de inicio-fin
-            slotLabelInterval: '00:35:00',
+            // Duración mínima de slot: 15 minutos (permite 35 min apilando slots)
+            slotDuration: '00:15:00',
+            // Etiqueta cada bloque CEDUC completo usando la fecha de inicio del bloque
+            // y calculando el final exacto según la tabla de bloques.
+            slotLabelInterval: '00:15:00',
             // Formato de 12 horas con meridiano
             slotLabelFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
             // Asegurar etiquetas correctas incluso con errores
             slotLabelContent: function (arg) {
               try {
                 const start = arg.date;
-                const end = new Date(start.getTime() + 35 * 60 * 1000);
 
-                function fmt(dt) {
-                  const h = dt.getHours();
-                  const m = dt.getMinutes();
-                  const hour = (h % 12) || 12;
-                  const mer = h < 12 ? 'am' : 'pm';
-                  return hour + ':' + m.toString().padStart(2, '0') + ' ' + mer;
+                // Definición de bloques CEDUC (inicio y fin exactos)
+                const bloques = [
+                  ['08:30','09:05'], ['09:05','09:40'], ['09:50','10:25'], ['10:25','11:00'],
+                  ['11:10','11:45'], ['11:45','12:20'], ['12:30','13:05'], ['13:05','13:40'],
+                  ['13:50','14:25'], ['14:25','15:00'], ['15:10','15:45'], ['15:45','16:20'],
+                  ['16:30','17:05'], ['17:05','17:40'], ['17:50','18:25'], ['18:35','19:10'],
+                  ['19:10','19:45'], ['19:55','20:30'], ['20:30','21:05'], ['21:15','21:50'],
+                  ['21:50','22:25'], ['22:25','23:00']
+                ];
+
+                const h = start.getHours();
+                const m = start.getMinutes();
+                const key = h.toString().padStart(2,'0') + ':' + m.toString().padStart(2,'0');
+                const idx = bloques.findIndex(b => b[0] === key);
+                if (idx === -1) return { html: '' };
+
+                function fmt(str) {
+                  const [hh,mm] = str.split(':').map(x=>parseInt(x,10));
+                  const hour12 = (hh % 12) || 12;
+                  const mer = hh < 12 ? 'am' : 'pm';
+                  return hour12 + ':' + mm.toString().padStart(2,'0') + ' ' + mer;
                 }
 
-                return { html: fmt(start) + ' - ' + fmt(end) };
+                const bloqueNumero = idx + 1;
+                const label = bloqueNumero + '. ' + fmt(bloques[idx][0]) + ' - ' + fmt(bloques[idx][1]);
+                return { html: label };
               } catch (e) {
                 console.error('Error en slotLabelContent:', e);
                 return { html: '' };
@@ -3293,7 +3311,7 @@
           <form id="form-event-edit">
             <div><label>Evento: <span id="edit-ev-title"></span></label></div>
             <div style="display:flex;gap:8px;"><label>Fecha <input id="edit-start-date" type="date"></label><label>Hora <input id="edit-start-time" type="time"></label></div>
-            <div><label>Duración (horas) <input id="edit-duration" type="number" step="0.5" min="0.5"></label></div>
+            <div><label>Duración (bloques de 35 min) <input id="edit-duration" type="number" step="1" min="1"></label></div>
             <div><label>Docente <select id="edit-docente"></select></label></div>
             <div><label>Sala <select id="edit-sala"><option value="">(ninguna)</option></select></label></div>
             <div><label>Horas trabajadas ahora <input id="edit-hours-worked" type="number" step="0.5" min="0"></label></div>
@@ -4780,8 +4798,9 @@
         const s = new Date(eventApi.start);
         document.getElementById('edit-start-date').value = s.toISOString().slice(0, 10);
         document.getElementById('edit-start-time').value = s.toTimeString().slice(0, 5);
-        const hours = (new Date(eventApi.end).getTime() - new Date(eventApi.start).getTime()) / (1000 * 60 * 60);
-        document.getElementById('edit-duration').value = hours;
+        const minutes = (new Date(eventApi.end).getTime() - new Date(eventApi.start).getTime()) / (1000 * 60);
+        const blocks = Math.max(1, Math.round(minutes / 35));
+        document.getElementById('edit-duration').value = blocks;
         // populate docentes and salas selects
         const docSel = document.getElementById('edit-docente'); docSel.innerHTML = ''; docentes.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.text = d.nombre + ' (' + (d.contratoHoras || 24) + 'h)'; docSel.appendChild(o); });
         const salaSel = document.getElementById('edit-sala'); salaSel.innerHTML = '<option value="">(ninguna)</option>'; salas.forEach(sal => { const o = document.createElement('option'); o.value = sal.id; o.text = sal.nombre + ' (' + sal.id + ')'; salaSel.appendChild(o); });
@@ -4802,7 +4821,7 @@
         // apply basic edits: start/date/time, duration, docente, sala
         const newDate = document.getElementById('edit-start-date').value;
         const newTime = document.getElementById('edit-start-time').value;
-        const newDuration = parseFloat(document.getElementById('edit-duration').value) || 1;
+        const newBlocks = parseInt(document.getElementById('edit-duration').value, 10) || 1;
         const newDocenteId = document.getElementById('edit-docente').value || null;
         const newSalaId = document.getElementById('edit-sala').value || null;
 
@@ -4821,7 +4840,7 @@
           // update start/end
           const startIsoLocal = newDate + 'T' + newTime + ':00';
           const startDateObj = new Date(startIsoLocal);
-          const endDateObj = new Date(startDateObj.getTime() + newDuration * 60 * 60 * 1000);
+          const endDateObj = new Date(startDateObj.getTime() + newBlocks * 35 * 60 * 1000);
           const startIsoUtc = startDateObj.toISOString();
           const endIsoUtc = endDateObj.toISOString();
           se.start = startIsoUtc;
@@ -4832,7 +4851,8 @@
           se.extendedProps.__meta.docenteId = newDocenteId;
           se.extendedProps.__meta.docenteName = (docentes.find(d => d.id === newDocenteId) || {}).nombre || null;
           se.extendedProps.__meta.salaId = newSalaId;
-          se.extendedProps.__meta.horas = newDuration;
+          se.extendedProps.__meta.horas = newBlocks * (35/60);
+          se.extendedProps.__meta.bloques = newBlocks;
           try {
             currentEditingEvent.setStart(startDateObj);
             currentEditingEvent.setEnd(endDateObj);
