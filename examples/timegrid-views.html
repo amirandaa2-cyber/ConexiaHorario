@@ -652,6 +652,176 @@
     const LOCAL_API_BASE = 'http://localhost:3001/api';
     const API_BASE_OVERRIDE_KEY = 'conexia_api_base_override';
 
+    // Definición oficial de bloques cronológicos CEDUC (35 minutos cada uno)
+    const CEDUC_BLOCKS = [
+      { index: 1, start: '08:30', end: '09:05' },
+      { index: 2, start: '09:05', end: '09:40' },
+      { index: 3, start: '09:50', end: '10:25' },
+      { index: 4, start: '10:25', end: '11:00' },
+      { index: 5, start: '11:10', end: '11:45' },
+      { index: 6, start: '11:45', end: '12:20' },
+      { index: 7, start: '12:30', end: '13:05' },
+      { index: 8, start: '13:05', end: '13:40' },
+      { index: 9, start: '13:50', end: '14:25' },
+      { index: 10, start: '14:25', end: '15:00' },
+      { index: 11, start: '15:10', end: '15:45' },
+      { index: 12, start: '15:45', end: '16:20' },
+      { index: 13, start: '16:30', end: '17:05' },
+      { index: 14, start: '17:05', end: '17:40' },
+      { index: 15, start: '17:50', end: '18:25' },
+      { index: 16, start: '18:35', end: '19:10' },
+      { index: 17, start: '19:10', end: '19:45' },
+      { index: 18, start: '19:55', end: '20:30' },
+      { index: 19, start: '20:30', end: '21:05' },
+      { index: 20, start: '21:15', end: '21:50' },
+      { index: 21, start: '21:50', end: '22:25' },
+      { index: 22, start: '22:25', end: '23:00' }
+    ];
+    const BLOCK_DURATION_MINUTES = 35;
+    const BLOCK_DURATION_HOURS = BLOCK_DURATION_MINUTES / 60;
+    const FIRST_BLOCK_START = (CEDUC_BLOCKS[0]?.start || '08:30') + ':00';
+    const LAST_BLOCK_END = (CEDUC_BLOCKS[CEDUC_BLOCKS.length - 1]?.end || '23:00') + ':00';
+
+    function pad2(num) {
+      return String(num).padStart(2, '0');
+    }
+
+    function timeStrFromDate(date) {
+      if (!(date instanceof Date)) return '';
+      return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+    }
+
+    function normalizeTimeStr(value) {
+      if (typeof value !== 'string') return '';
+      const match = value.trim().match(/^([0-2]?\d):([0-5]\d)/);
+      if (!match) return '';
+      return `${pad2(parseInt(match[1], 10))}:${match[2]}`;
+    }
+
+    function findBlockIndexByStart(startStr) {
+      const normalized = normalizeTimeStr(startStr);
+      if (!normalized) return -1;
+      return CEDUC_BLOCKS.findIndex(block => block.start === normalized);
+    }
+
+    function getBlockByStart(startStr) {
+      const idx = findBlockIndexByStart(startStr);
+      return idx >= 0 ? CEDUC_BLOCKS[idx] : null;
+    }
+
+    function getBlockForTime(timeStr) {
+      const normalized = normalizeTimeStr(timeStr);
+      if (!normalized) return null;
+      return CEDUC_BLOCKS.find(block => normalized >= block.start && normalized < block.end) || null;
+    }
+
+    function computeEndDateFromBlocks(dateStr, startTime, blockCount) {
+      const normalizedTime = normalizeTimeStr(startTime);
+      const startIdx = findBlockIndexByStart(normalizedTime);
+      if (startIdx === -1) return null;
+      const endIdx = startIdx + Math.max(0, blockCount - 1);
+      if (endIdx >= CEDUC_BLOCKS.length) return null;
+      const startDate = new Date(`${dateStr}T${normalizedTime}:00`);
+      const endTime = CEDUC_BLOCKS[endIdx].end;
+      const endDate = new Date(`${dateStr}T${endTime}:00`);
+      return { startDate, endDate, startIdx, endIdx };
+    }
+
+    function computeBlocksBetweenDates(startDate, endDate) {
+      try {
+        const startStr = timeStrFromDate(startDate);
+        const endStr = timeStrFromDate(endDate);
+        const startIdx = findBlockIndexByStart(startStr);
+        if (startIdx === -1) {
+          const minutes = Math.max(1, Math.round((endDate - startDate) / 60000));
+          return Math.max(1, Math.round(minutes / BLOCK_DURATION_MINUTES));
+        }
+        for (let idx = startIdx; idx < CEDUC_BLOCKS.length; idx++) {
+          if (CEDUC_BLOCKS[idx].end === endStr) {
+            return (idx - startIdx) + 1;
+          }
+        }
+        const minutes = Math.max(1, Math.round((endDate - startDate) / 60000));
+        return Math.max(1, Math.round(minutes / BLOCK_DURATION_MINUTES));
+      } catch (err) {
+        console.warn('computeBlocksBetweenDates fallback', err);
+        const minutes = Math.max(1, Math.round((endDate - startDate) / 60000));
+        return Math.max(1, Math.round(minutes / BLOCK_DURATION_MINUTES));
+      }
+    }
+
+    function buildDateTime(dateStr, timeStr) {
+      const normalized = normalizeTimeStr(timeStr);
+      if (!normalized) return null;
+      return new Date(`${dateStr}T${normalized}:00`);
+    }
+
+    function isValidBlockRange(startTime, blockCount) {
+      const startIdx = findBlockIndexByStart(startTime);
+      if (startIdx === -1) return false;
+      const endIdx = startIdx + Math.max(0, blockCount - 1);
+      return endIdx < CEDUC_BLOCKS.length;
+    }
+
+    function realignToBlockRange(eventLike) {
+      if (!eventLike) return null;
+      const rawStart = eventLike.start instanceof Date ? eventLike.start : new Date(eventLike.start);
+      const rawEnd = eventLike.end instanceof Date ? eventLike.end : (eventLike.end ? new Date(eventLike.end) : new Date(eventLike.start));
+      if (!(rawStart instanceof Date) || isNaN(rawStart)) return null;
+      const startTimeStr = normalizeTimeStr(timeStrFromDate(rawStart));
+      const blockStart = getBlockForTime(startTimeStr) || getBlockByStart(startTimeStr);
+      if (!blockStart) return null;
+      const meta = ensureEventBlockMeta(eventLike) || {};
+      const blockCount = Number.isInteger(meta.bloques) && meta.bloques > 0
+        ? meta.bloques
+        : computeBlocksBetweenDates(rawStart, rawEnd);
+      const dateStr = rawStart.toISOString().slice(0, 10);
+      const range = computeEndDateFromBlocks(dateStr, blockStart.start, blockCount);
+      if (!range) return null;
+      meta.bloques = blockCount;
+      meta.bloqueInicio = range.startIdx + 1;
+      meta.bloqueFin = range.endIdx + 1;
+      meta.horas = blockCount * BLOCK_DURATION_HOURS;
+      if (typeof eventLike.setStart === 'function') {
+        eventLike.setStart(range.startDate);
+        eventLike.setEnd(range.endDate);
+      } else {
+        eventLike.start = range.startDate.toISOString();
+        eventLike.end = range.endDate.toISOString();
+      }
+      return { ...range, blockCount, durationHours: meta.horas };
+    }
+
+    function ensureEventBlockMeta(event) {
+      if (!event) return null;
+      event.extendedProps = event.extendedProps || {};
+      event.extendedProps.__meta = event.extendedProps.__meta || {};
+      const meta = event.extendedProps.__meta;
+      const start = event.start ? new Date(event.start) : null;
+      const end = event.end ? new Date(event.end) : null;
+      if (start && end) {
+        if (!Number.isInteger(meta.bloques) || meta.bloques <= 0) {
+          meta.bloques = computeBlocksBetweenDates(start, end);
+        }
+        meta.horas = meta.bloques * BLOCK_DURATION_HOURS;
+        if (meta.bloqueInicio == null) {
+          const idx = findBlockIndexByStart(timeStrFromDate(start));
+          meta.bloqueInicio = idx >= 0 ? (idx + 1) : null;
+        }
+        if (meta.bloqueFin == null && Number.isInteger(meta.bloques)) {
+          const idx = (meta.bloqueInicio || 1) + meta.bloques - 1;
+          meta.bloqueFin = idx > 0 ? idx : null;
+        }
+      }
+      return meta;
+    }
+
+    function populateBlockSelect(selectEl) {
+      if (!selectEl) return;
+      const options = CEDUC_BLOCKS.map(block => `<option value="${block.start}">Bloque ${block.index} (${block.start} - ${block.end})</option>`).join('');
+      selectEl.innerHTML = options;
+    }
+
     function normalizeApiBase(url) {
       if (!url) return '';
       return String(url).trim().replace(/\/+$/, '');
@@ -1113,6 +1283,14 @@
         // fall back to loading from localStorage when not using API
         try { docentes = load(KEY_DOCENTES, []); carreras = load(KEY_CARRERAS, []); modulos = load(KEY_MODULOS, []); storedEvents = load(KEY_EVENTS, []); templates = load(KEY_TEMPLATES, []); salas = load(KEY_SALAS, []); } catch (e) { console.warn('local load failed', e); }
       }
+
+      storedEvents = (storedEvents || []).map(ev => {
+        try {
+          realignToBlockRange(ev);
+          ensureEventBlockMeta(ev);
+        } catch (metaErr) { console.warn('No se pudo normalizar bloques para un evento', metaErr); }
+        return ev;
+      });
       // (removed .fc-event.hidden CSS approach - rely on strict filtering instead)
       // --- DIAGNÓSTICO EN PÁGINA -------------------------------------------------
       // Visible diagnostics panel to capture runtime errors and status without opening devtools
@@ -1450,33 +1628,45 @@
             // hide Sunday (0 = Sunday) so it's not visible or selectable
             hiddenDays: [0],
             // show time slots starting at 08:00 and label each hour (e.g. 8 am, 9 am, 12 pm)
-            // Configuración de horarios (bloques cronológicos de 35 minutos)
-            slotMinTime: '08:30:00',
-            slotMaxTime: '23:00:00',
-            // Cada slot representa 1 bloque de 35 minutos
-            slotDuration: '00:35:00',
-            // Mostrar etiquetas cada bloque, formateadas como tramo de inicio-fin
-            slotLabelInterval: '00:35:00',
-            // Formato de 12 horas con meridiano
-            slotLabelFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
-            // Asegurar etiquetas correctas incluso con errores
+            // Configuración de horarios siguiendo exactamente los bloques oficiales CEDUC
+            slotMinTime: FIRST_BLOCK_START,
+            slotMaxTime: LAST_BLOCK_END,
+            slotDuration: '00:05:00', // granularidad mínima para representar las pausas de 10 minutos
+            slotLabelInterval: '00:05:00',
+            snapDuration: '00:05:00',
             slotLabelContent: function (arg) {
               try {
-                const start = arg.date;
-                const end = new Date(start.getTime() + 35 * 60 * 1000);
-
-                function fmt(dt) {
-                  const h = dt.getHours();
-                  const m = dt.getMinutes();
-                  const hour = (h % 12) || 12;
-                  const mer = h < 12 ? 'am' : 'pm';
-                  return hour + ':' + m.toString().padStart(2, '0') + ' ' + mer;
-                }
-
-                return { html: fmt(start) + ' - ' + fmt(end) };
+                const timeStr = timeStrFromDate(arg.date);
+                const block = getBlockByStart(timeStr);
+                if (!block) return { html: '' };
+                return {
+                  html: `<div class="ceduc-slot-label"><span class="ceduc-slot-index">${block.index}</span><span class="ceduc-slot-range">${block.start} - ${block.end}</span></div>`
+                };
               } catch (e) {
                 console.error('Error en slotLabelContent:', e);
                 return { html: '' };
+              }
+            },
+            slotLabelDidMount: function (arg) {
+              try {
+                const block = getBlockByStart(timeStrFromDate(arg.date));
+                arg.el.classList.toggle('ceduc-block-label', Boolean(block));
+                arg.el.classList.toggle('ceduc-gap-label', !block);
+              } catch (e) {
+                console.warn('slotLabelDidMount issue', e);
+              }
+            },
+            slotLaneDidMount: function (arg) {
+              try {
+                const timeStr = timeStrFromDate(arg.date);
+                const block = getBlockForTime(timeStr);
+                arg.el.classList.toggle('ceduc-block-lane', Boolean(block));
+                arg.el.classList.toggle('ceduc-gap-lane', !block);
+                if (block && block.start === normalizeTimeStr(timeStr)) {
+                  arg.el.classList.add('ceduc-block-start');
+                }
+              } catch (e) {
+                console.warn('slotLaneDidMount issue', e);
               }
             },
             dayMaxEvents: true,
@@ -1544,8 +1734,12 @@
                   extendedProps: { __meta: (ev.extendedProps && ev.extendedProps.__meta) || {} }
                 };
 
+                realignToBlockRange(candidate);
+                ensureEventBlockMeta(candidate);
                 const candidateMeta = (candidate.extendedProps && candidate.extendedProps.__meta) || {};
-                const durationHours = candidate.end ? ((new Date(candidate.end).getTime() - new Date(candidate.start).getTime()) / (1000 * 60 * 60)) : 0;
+                const durationHours = typeof candidateMeta.horas === 'number'
+                  ? candidateMeta.horas
+                  : (candidate.end ? ((new Date(candidate.end).getTime() - new Date(candidate.start).getTime()) / (1000 * 60 * 60)) : 0);
                 if (candidateMeta.docenteId) {
                   const docenteCheck = canAssignHours(candidateMeta.docenteId, durationHours, candidate.start ? candidate.start.slice(0, 10) : null);
                   if (!docenteCheck.ok) {
@@ -1691,6 +1885,13 @@
                 const ev = info.event;
                 console.debug('eventDrop invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
 
+                const snapResult = realignToBlockRange(ev);
+                if (!snapResult) {
+                  alert('Debes ajustar el evento a un bloque válido.');
+                  if (typeof info.revert === 'function') info.revert();
+                  return;
+                }
+
                 // VALIDACIÓN CRÍTICA: Verificar fin de semestre
                 const semesterEndInput = document.getElementById('semester-end')?.value;
                 if (semesterEndInput) {
@@ -1717,6 +1918,7 @@
                   editable: true,
                   extendedProps: ev.extendedProps || {}  // Preservar todos los metadatos
                 };
+                ensureEventBlockMeta(candidate);
 
                 // Verificar conflictos excluyendo el evento actual
                 const conflicts = findConflicts(candidate).filter(c => {
@@ -1763,7 +1965,9 @@
                 try {
                   const meta = (candidate.extendedProps && candidate.extendedProps.__meta) || {};
                   if (meta.docenteId && candidate.start && candidate.end) {
-                    const hours = (new Date(candidate.end).getTime() - new Date(candidate.start).getTime()) / (1000 * 60 * 60);
+                    const hours = typeof meta.horas === 'number'
+                      ? meta.horas
+                      : Math.max(0, (new Date(candidate.end).getTime() - new Date(candidate.start).getTime()) / (1000 * 60 * 60));
                     const weekRange = getWeekRange(candidate.start.slice(0, 10));
                     const assignedCommitted = computeAssignedHoursForDocente(meta.docenteId, weekRange[0], weekRange[1]);
                     let existingHoursInWeek = 0;
@@ -1799,10 +2003,12 @@
                 if (idx !== -1) {
                   // Actualizar manteniendo todos los metadatos originales
                   storedEvents[idx] = {
-                    ...storedEvents[idx],  // Mantener propiedades existentes
+                    ...storedEvents[idx],
                     start: startIso,
                     end: endIso
                   };
+                  ensureEventBlockMeta(storedEvents[idx]);
+                  ev.setExtendedProp('__meta', storedEvents[idx].extendedProps.__meta);
                   persistEventsAndValidate();
                   console.debug('Event updated in storedEvents:', storedEvents[idx]);
                 } else {
@@ -1819,6 +2025,13 @@
               try {
                 const ev = info.event;
                 console.debug('eventResize invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
+
+                const snapResult = realignToBlockRange(ev);
+                if (!snapResult) {
+                  alert('Debes ajustar el evento a un bloque válido.');
+                  if (typeof info.revert === 'function') info.revert();
+                  return;
+                }
 
                 // VALIDACIÓN CRÍTICA: Verificar fin de semestre
                 const semesterEndInput = document.getElementById('semester-end')?.value;
@@ -1845,6 +2058,7 @@
                   end: endIso,
                   extendedProps: { __meta: (ev.extendedProps && ev.extendedProps.__meta) || {} }
                 };
+                ensureEventBlockMeta(candidate);
 
                 // Verificar conflictos excluyendo el evento actual
                 const conflicts = findConflicts(candidate).filter(c => {
@@ -1891,7 +2105,9 @@
                 try {
                   const meta = (candidate.extendedProps && candidate.extendedProps.__meta) || {};
                   if (meta.docenteId && candidate.start && candidate.end) {
-                    const hours = (new Date(candidate.end).getTime() - new Date(candidate.start).getTime()) / (1000 * 60 * 60);
+                    const hours = typeof meta.horas === 'number'
+                      ? meta.horas
+                      : Math.max(0, (new Date(candidate.end).getTime() - new Date(candidate.start).getTime()) / (1000 * 60 * 60));
                     const weekRange = getWeekRange(candidate.start.slice(0, 10));
                     const assignedCommitted = computeAssignedHoursForDocente(meta.docenteId, weekRange[0], weekRange[1]);
                     let existingHoursInWeek = 0;
@@ -1927,6 +2143,8 @@
                 if (idx !== -1) {
                   storedEvents[idx].start = startIso;
                   storedEvents[idx].end = endIso;
+                  ensureEventBlockMeta(storedEvents[idx]);
+                  ev.setExtendedProp('__meta', storedEvents[idx].extendedProps.__meta);
                   persistEventsAndValidate();
                   console.log('Evento redimensionado exitosamente:', storedEvents[idx].title);
                 }
@@ -1944,6 +2162,7 @@
 
       function applyDocenteStateToEvent(e) {
         // color events according to the docente's turno (Diurno = claro, Vespertino = oscuro)
+        ensureEventBlockMeta(e);
         const evt = Object.assign({}, e);
         const meta = (e.extendedProps && e.extendedProps.__meta) || {};
         const doc = docentes.find(d => d.id === meta.docenteId);
@@ -2800,12 +3019,12 @@
               <label>Fecha
                 <input id="assign-date" type="date">
               </label>
-              <label>Hora
-                <input id="assign-time" type="time">
+              <label>Bloque de inicio
+                <select id="assign-time"></select>
               </label>
             </div>
             <label>Duración (bloques de 35 min)
-              <input id="assign-duration" type="number" step="1" min="1">
+              <input id="assign-duration" type="number" step="1" min="1" max="22">
             </label>
             <div class="assign-repeat-section">
               <label class="assign-checkbox">
@@ -2845,6 +3064,11 @@
       const assignRepeatSemesterInput = document.getElementById('assign-repeat-semester');
       const assignSemesterHint = document.getElementById('assign-semester-hint');
       document.getElementById('assign-cancel').addEventListener('click', () => toggleAssignModal(false));
+
+      populateBlockSelect(assignTimeInput);
+      if (assignTimeInput && !assignTimeInput.value) {
+        assignTimeInput.value = CEDUC_BLOCKS[0]?.start || '';
+      }
 
       function getSemesterEndValue() {
         const semesterInput = document.getElementById('semester-end');
@@ -3145,9 +3369,10 @@
         assignSalaSel.innerHTML = '<option value="">(ninguna)</option>';
         salas.forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.text = `${s.nombre} (${s.id})`; assignSalaSel.appendChild(opt); });
         assignModuloIdInput.value = moduloId;
-        assignDurationInput.value = modulo.horas || 1;
+        const defaultBlocks = Number(modulo.horasSemanales ?? modulo.horas ?? 1) || 1;
+        assignDurationInput.value = Math.max(1, Math.round(defaultBlocks));
         assignDateInput.value = new Date().toISOString().slice(0, 10);
-        assignTimeInput.value = '09:00';
+        assignTimeInput.value = CEDUC_BLOCKS[0]?.start || '';
         if (assignRepeatInput) assignRepeatInput.checked = false;
         if (assignRepeatSemesterInput) assignRepeatSemesterInput.checked = false;
         if (assignUntilInput) { assignUntilInput.value = ''; assignUntilInput.removeAttribute('disabled'); }
@@ -3161,31 +3386,51 @@
         const docenteId = assignDocenteSel.value;
         const salaId = assignSalaSel.value || null;
         const date = assignDateInput.value;
-        const time = assignTimeInput.value;
-        // duración expresada en bloques cronológicos de 35 minutos
-        const blocks = parseInt(assignDurationInput.value, 10) || 1;
+        const time = normalizeTimeStr(assignTimeInput.value);
+        const blocks = Math.max(1, parseInt(assignDurationInput.value, 10) || 1);
         const doRepeat = assignRepeatInput ? !!assignRepeatInput.checked : false;
         const until = assignUntilInput ? (assignUntilInput.value || null) : null;
         if (doRepeat && !until) { alert('Selecciona una fecha límite para la repetición semanal.'); return; }
         const modulo = modulos.find(m => m.id === moduloId);
         const docente = docentes.find(d => d.id === docenteId);
         if (!modulo || !docente) { alert('Módulo o docente inválido'); return; }
-        if (!date || !time) { alert('Fecha y hora requeridas'); return; }
+        if (!date || !time) { alert('Fecha y bloque requeridos'); return; }
+        if (!isValidBlockRange(time, blocks)) {
+          alert('La duración seleccionada excede los bloques disponibles del día.');
+          return;
+        }
+        const durationHours = blocks * BLOCK_DURATION_HOURS;
 
         // helper to push single event; accepts optional templateId
         async function pushEventForDate(dDate, tplId = null) {
-          // construir Date con zona local y luego almacenar ISO completa
-          const startDate = new Date(dDate + 'T' + time + ':00');
-          const endDate = new Date(startDate.getTime() + blocks * 35 * 60 * 1000);
+          const range = computeEndDateFromBlocks(dDate, time, blocks);
+          if (!range) {
+            alert('No se pudo calcular el rango horario para los bloques seleccionados.');
+            return false;
+          }
+          const { startDate, endDate, startIdx, endIdx } = range;
           const ev = {
             title: `${modulo.nombre} - ${docente.nombre}`,
             start: startDate.toISOString(),    // <-- ISO completa
             end: endDate.toISOString(),        // <-- ISO completa
             editable: true,
-            extendedProps: { __meta: { templateId: tplId, moduloId: modulo.id, moduloName: modulo.nombre, docenteId: docente.id, docenteName: docente.nombre, horas: blocks * (35/60), bloques: blocks, salaId: salaId } }
+            extendedProps: {
+              __meta: {
+                templateId: tplId,
+                moduloId: modulo.id,
+                moduloName: modulo.nombre,
+                docenteId: docente.id,
+                docenteName: docente.nombre,
+                horas: durationHours,
+                bloques: blocks,
+                bloqueInicio: startIdx + 1,
+                bloqueFin: endIdx + 1,
+                salaId: salaId
+              }
+            }
           };
           // check weekly hours for this docente on the target week before attempting to create
-          const chk = canAssignHours(docente.id, blocks * (35/60), dDate);
+          const chk = canAssignHours(docente.id, durationHours, dDate);
           if (!chk.ok) { console.warn('Skipping occurrence — docente over capacity on', dDate, chk); return false; }
           return await tryCreateEvent(ev);
         }
@@ -3271,13 +3516,13 @@
           }
         } else {
           // single event
-          const can = canAssignHours(docente.id, duration, date);
+          const can = canAssignHours(docente.id, durationHours, date);
           if (!can.ok) { alert(`No se puede asignar: docente ${docente.nombre} excedería su contrato semanal (${can.contrato}h). Asignadas: ${can.assigned.toFixed(2)}h`); return; }
           if (await pushEventForDate(date, null)) createdCount = 1;
         }
 
         // update docente horasAsignadas based on actually created occurrences
-        docente.horasAsignadas = (docente.horasAsignadas || 0) + duration * createdCount;
+        docente.horasAsignadas = (docente.horasAsignadas || 0) + durationHours * createdCount;
         save(KEY_DOCENTES, docentes);
         save(KEY_TEMPLATES, templates);
         persistEventsAndValidate();
@@ -3292,8 +3537,8 @@
         <div class="modal-body">
           <form id="form-event-edit">
             <div><label>Evento: <span id="edit-ev-title"></span></label></div>
-            <div style="display:flex;gap:8px;"><label>Fecha <input id="edit-start-date" type="date"></label><label>Hora <input id="edit-start-time" type="time"></label></div>
-            <div><label>Duración (horas) <input id="edit-duration" type="number" step="0.5" min="0.5"></label></div>
+            <div style="display:flex;gap:8px;"><label>Fecha <input id="edit-start-date" type="date"></label><label>Bloque <select id="edit-start-time"></select></label></div>
+            <div><label>Duración (bloques de 35 min) <input id="edit-duration" type="number" step="1" min="1" max="22"></label></div>
             <div><label>Docente <select id="edit-docente"></select></label></div>
             <div><label>Sala <select id="edit-sala"><option value="">(ninguna)</option></select></label></div>
             <div><label>Horas trabajadas ahora <input id="edit-hours-worked" type="number" step="0.5" min="0"></label></div>
@@ -3659,7 +3904,11 @@
             const s = new Date(ev.start); const e = new Date(ev.end);
             if (rangeStart && e < new Date(rangeStart + 'T00:00:00')) continue;
             if (rangeEnd && s >= new Date(rangeEnd + 'T00:00:00')) continue;
-            const hours = (new Date(ev.end).getTime() - new Date(ev.start).getTime()) / (1000 * 60 * 60);
+            ensureEventBlockMeta(ev);
+            const normalizedMeta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+            const hours = typeof normalizedMeta.horas === 'number'
+              ? normalizedMeta.horas
+              : (Math.max(0, (new Date(ev.end).getTime() - new Date(ev.start).getTime())) / (1000 * 60 * 60));
             total += hours;
           }
         } catch (err) { console.error('computeAssignedHoursForDocente', err); }
@@ -3699,18 +3948,22 @@
       function validateCandidateEvent(candidate) {
         const msgs = [];
         try {
+          realignToBlockRange(candidate);
+          ensureEventBlockMeta(candidate);
           const meta = (candidate.extendedProps && candidate.extendedProps.__meta) || {};
           const startTime = new Date(candidate.start);
           const endTime = new Date(candidate.end);
-          const hours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+          const hours = typeof meta.horas === 'number'
+            ? meta.horas
+            : Math.max(0, (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60));
 
-          // Validar horario dentro de los límites permitidos
-          const startHour = startTime.getHours() + (startTime.getMinutes() / 60);
-          if (startHour < 8) {
-            msgs.push(`La hora de inicio (${startTime.toLocaleTimeString()}) está fuera del horario permitido (mínimo 8:00 AM)`);
+          const startBlock = getBlockForTime(timeStrFromDate(startTime)) || getBlockByStart(timeStrFromDate(startTime));
+          const endBlockMatch = CEDUC_BLOCKS.find(b => b.end === normalizeTimeStr(timeStrFromDate(endTime)));
+          if (!startBlock) {
+            msgs.push('El inicio debe coincidir con uno de los bloques oficiales (1-22).');
           }
-          if (endTime.getHours() >= 24 || (endTime.getHours() === 23 && endTime.getMinutes() > 0)) {
-            msgs.push(`La hora de fin (${endTime.toLocaleTimeString()}) está fuera del horario permitido (máximo 23:00)`);
+          if (!endBlockMatch) {
+            msgs.push('El término debe coincidir con el fin de un bloque oficial.');
           }
 
           // docente hours
@@ -4771,6 +5024,8 @@
       const eventEditModal = document.getElementById('event-edit-modal');
       const editForm = document.getElementById('form-event-edit');
       let currentEditingEvent = null; // FullCalendar EventApi
+      const editStartTimeSel = document.getElementById('edit-start-time');
+      populateBlockSelect(editStartTimeSel);
       document.getElementById('edit-cancel').addEventListener('click', () => { hideModal(eventEditModal); currentEditingEvent = null; });
 
       function openEventEditModal(eventApi) {
@@ -4779,9 +5034,13 @@
         // populate form with current event data
         const s = new Date(eventApi.start);
         document.getElementById('edit-start-date').value = s.toISOString().slice(0, 10);
-        document.getElementById('edit-start-time').value = s.toTimeString().slice(0, 5);
-        const hours = (new Date(eventApi.end).getTime() - new Date(eventApi.start).getTime()) / (1000 * 60 * 60);
-        document.getElementById('edit-duration').value = hours;
+        const startTimeStr = normalizeTimeStr(timeStrFromDate(s));
+        if (editStartTimeSel) {
+          const block = getBlockForTime(startTimeStr) || getBlockByStart(startTimeStr);
+          editStartTimeSel.value = block ? block.start : (CEDUC_BLOCKS[0]?.start || '');
+        }
+        const blockCount = computeBlocksBetweenDates(new Date(eventApi.start), new Date(eventApi.end));
+        document.getElementById('edit-duration').value = blockCount;
         // populate docentes and salas selects
         const docSel = document.getElementById('edit-docente'); docSel.innerHTML = ''; docentes.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.text = d.nombre + ' (' + (d.contratoHoras || 24) + 'h)'; docSel.appendChild(o); });
         const salaSel = document.getElementById('edit-sala'); salaSel.innerHTML = '<option value="">(ninguna)</option>'; salas.forEach(sal => { const o = document.createElement('option'); o.value = sal.id; o.text = sal.nombre + ' (' + sal.id + ')'; salaSel.appendChild(o); });
@@ -4801,10 +5060,15 @@
         const meta = (currentEditingEvent.extendedProps && currentEditingEvent.extendedProps.__meta) || {};
         // apply basic edits: start/date/time, duration, docente, sala
         const newDate = document.getElementById('edit-start-date').value;
-        const newTime = document.getElementById('edit-start-time').value;
-        const newDuration = parseFloat(document.getElementById('edit-duration').value) || 1;
+        const newTime = normalizeTimeStr(document.getElementById('edit-start-time').value);
+        const newBlocks = Math.max(1, parseInt(document.getElementById('edit-duration').value, 10) || 1);
         const newDocenteId = document.getElementById('edit-docente').value || null;
         const newSalaId = document.getElementById('edit-sala').value || null;
+        if (!newDate || !newTime) { alert('Fecha y bloque requeridos'); return; }
+        if (!isValidBlockRange(newTime, newBlocks)) { alert('Los bloques seleccionados exceden la jornada disponible.'); return; }
+        const updatedRange = computeEndDateFromBlocks(newDate, newTime, newBlocks);
+        if (!updatedRange) { alert('No se pudo calcular el rango horario para los bloques seleccionados.'); return; }
+        const durationHours = newBlocks * BLOCK_DURATION_HOURS;
 
         // find the stored event that corresponds to currentEditingEvent (match by start/title/meta)
         // Prefer matching by id when possible (more robust); fall back to title+start/meta match
@@ -4818,21 +5082,19 @@
         if (evIndex === -1) { console.warn('Evento no encontrado en storedEvents'); }
         else {
           const se = storedEvents[evIndex];
-          // update start/end
-          const startIsoLocal = newDate + 'T' + newTime + ':00';
-          const startDateObj = new Date(startIsoLocal);
-          const endDateObj = new Date(startDateObj.getTime() + newDuration * 60 * 60 * 1000);
-          const startIsoUtc = startDateObj.toISOString();
-          const endIsoUtc = endDateObj.toISOString();
-          se.start = startIsoUtc;
-          se.end = endIsoUtc;
+          const { startDate: startDateObj, endDate: endDateObj, startIdx, endIdx } = updatedRange;
+          se.start = startDateObj.toISOString();
+          se.end = endDateObj.toISOString();
           // update meta
           se.extendedProps = se.extendedProps || {};
           se.extendedProps.__meta = se.extendedProps.__meta || {};
           se.extendedProps.__meta.docenteId = newDocenteId;
           se.extendedProps.__meta.docenteName = (docentes.find(d => d.id === newDocenteId) || {}).nombre || null;
           se.extendedProps.__meta.salaId = newSalaId;
-          se.extendedProps.__meta.horas = newDuration;
+          se.extendedProps.__meta.horas = durationHours;
+          se.extendedProps.__meta.bloques = newBlocks;
+          se.extendedProps.__meta.bloqueInicio = startIdx + 1;
+          se.extendedProps.__meta.bloqueFin = endIdx + 1;
           try {
             currentEditingEvent.setStart(startDateObj);
             currentEditingEvent.setEnd(endDateObj);
@@ -5976,6 +6238,48 @@
     .fc .fc-daygrid,
     .fc .fc-timegrid {
       min-width: 0;
+    }
+
+    .fc .ceduc-slot-label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.8rem;
+      font-weight: 600;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .fc .ceduc-slot-index {
+      color: #ca8a04;
+      font-size: 0.75rem;
+    }
+
+    .fc .ceduc-slot-range {
+      color: #0f172a;
+      font-size: 0.78rem;
+    }
+
+    .fc .ceduc-block-label {
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .fc .ceduc-gap-label {
+      color: transparent;
+      border-top: none;
+    }
+
+    .fc .ceduc-block-lane {
+      background: #fff;
+      border-top: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .fc .ceduc-block-lane.ceduc-block-start {
+      border-top: 2px solid rgba(234, 179, 8, 0.6);
+    }
+
+    .fc .ceduc-gap-lane {
+      background: #f8fafc;
+      border-top: none;
     }
 
     /* small-screen layout: sidebar on top, calendar full width below */
