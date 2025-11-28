@@ -1631,9 +1631,10 @@
             // Configuración de horarios siguiendo exactamente los bloques oficiales CEDUC
             slotMinTime: FIRST_BLOCK_START,
             slotMaxTime: LAST_BLOCK_END,
-            slotDuration: '00:05:00', // granularidad mínima para representar las pausas de 10 minutos
-            slotLabelInterval: '00:05:00',
-            snapDuration: '00:05:00',
+            // Usamos bloques de 35 minutos como única unidad visible y de movimiento
+            slotDuration: '00:35:00',
+            slotLabelInterval: '00:35:00',
+            snapDuration: '00:35:00',
             slotLabelContent: function (arg) {
               try {
                 const timeStr = timeStrFromDate(arg.date);
@@ -1647,24 +1648,19 @@
                 return { html: '' };
               }
             },
+            // Cada slot del timegrid ahora ES un bloque, así que marcamos todas las filas como bloque
             slotLabelDidMount: function (arg) {
               try {
-                const block = getBlockByStart(timeStrFromDate(arg.date));
-                arg.el.classList.toggle('ceduc-block-label', Boolean(block));
-                arg.el.classList.toggle('ceduc-gap-label', !block);
+                arg.el.classList.add('ceduc-block-label');
+                arg.el.classList.remove('ceduc-gap-label');
               } catch (e) {
                 console.warn('slotLabelDidMount issue', e);
               }
             },
             slotLaneDidMount: function (arg) {
               try {
-                const timeStr = timeStrFromDate(arg.date);
-                const block = getBlockForTime(timeStr);
-                arg.el.classList.toggle('ceduc-block-lane', Boolean(block));
-                arg.el.classList.toggle('ceduc-gap-lane', !block);
-                if (block && block.start === normalizeTimeStr(timeStr)) {
-                  arg.el.classList.add('ceduc-block-start');
-                }
+                arg.el.classList.add('ceduc-block-lane', 'ceduc-block-start');
+                arg.el.classList.remove('ceduc-gap-lane');
               } catch (e) {
                 console.warn('slotLaneDidMount issue', e);
               }
@@ -1875,8 +1871,15 @@
             eventRemove: function (info) {
               try {
                 const ev = info.event;
-                if (ev && ev.id) { storedEvents = storedEvents.filter(se => se.id !== ev.id); }
-                else { storedEvents = storedEvents.filter(se => !(se.title === ev.title && se.start === ev.start.toISOString().slice(0, 19))); }
+                if (ev && ev.id) {
+                  storedEvents = storedEvents.filter(se => se.id !== ev.id);
+                } else if (ev && ev.title && ev.start) {
+                  // Fallback seguro: comparar por título y fecha sin asumir que start es siempre Date
+                  const startIso = (ev.start instanceof Date)
+                    ? ev.start.toISOString().slice(0, 19)
+                    : (typeof ev.start === 'string' ? ev.start.slice(0, 19) : '');
+                  storedEvents = storedEvents.filter(se => !(se.title === ev.title && String(se.start).slice(0, 19) === startIso));
+                }
                 persistEventsAndValidate();
               } catch (e) { console.error('eventRemove sync error', e); }
             },
