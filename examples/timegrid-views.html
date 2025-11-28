@@ -6282,6 +6282,39 @@
       border-top: none;
     }
 
+    /* Compact the timegrid rows/events so 35 min blocks do not feel oversized */
+    .fc .fc-timegrid-slot {
+      height: 15px;
+      padding: 0 4px;
+      line-height: 1.1;
+    }
+
+    .fc .fc-timegrid-slot-label-cushion,
+    .fc .fc-timegrid-axis-cushion {
+      padding: 0 4px;
+      font-size: 0.72rem;
+      line-height: 1.1;
+    }
+
+    .fc .fc-timegrid-slot-lane {
+      padding: 0;
+    }
+
+    .fc .fc-timegrid-event .fc-event-main-frame {
+      padding: 2px 4px;
+      font-size: 0.78rem;
+      line-height: 1.2;
+    }
+
+    .fc .fc-timegrid-event .fc-event-time,
+    .fc .fc-timegrid-event .fc-event-title {
+      font-size: 0.78rem;
+    }
+
+    .fc .fc-timegrid-slot.fc-timegrid-slot-label {
+      height: auto;
+    }
+
     /* small-screen layout: sidebar on top, calendar full width below */
     @media (max-width: 980px) {
       #app {
