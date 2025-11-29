@@ -4095,15 +4095,13 @@
         listDocentes.innerHTML = '';
         docentes.forEach(d => {
           const li = document.createElement('li');
-          // compute weekly assigned hours for display
           const weekRange = getWeekRange();
           const weeklyAssigned = computeAssignedHoursForDocente(d.id, weekRange[0], weekRange[1]);
           const carreraName = (carreras.find(c => c.id === d.carreraId) || {}).nombre || '(sin)';
           const contratoSemanalMostrar = (d.ContratoHoraSemanal != null ? d.ContratoHoraSemanal : d.contratoHoras) || 0;
-          li.innerHTML = `<strong>${d.nombre}</strong> (RUT:${d.rut}) - Carrera:${carreraName} - Edad:${d.edad} - EstadoCivil:${d.estadoCivil} - Contrato semanal:${contratoSemanalMostrar}h - Asignadas (semana):${weeklyAssigned.toFixed(1)}h - Total asignadas:${d.horasAsignadas || 0}h - Trabajadas:${d.horasTrabajadas || 0}h - Turno:${d.turno || 'Diurno'} - Activo:${d.activo ? 'Sí' : 'No'}`;
-          const toggle = document.createElement('button'); toggle.textContent = d.activo ? 'Desvincular' : 'Re-vincular'; toggle.style.marginLeft = '8px';
-          toggle.addEventListener('click', () => { d.activo = !d.activo; save(KEY_DOCENTES, docentes); renderDocentes(); refreshCalendarEvents(); });
-          li.appendChild(toggle);
+          li.innerHTML = `<strong>${d.nombre}</strong> (RUT:${d.rut}) - Carrera:${carreraName} - Edad:${d.edad ?? ''} - EstadoCivil:${d.estadoCivil ?? ''} - Contrato semanal:${contratoSemanalMostrar}h - Asignadas (semana):${weeklyAssigned.toFixed(1)}h - Total asignadas:${d.horasAsignadas || 0}h - Trabajadas:${d.horasTrabajadas || 0}h - Turno:${d.turno || 'Diurno'} - Activo:${d.activo ? 'Sí' : 'No'}`;
+
+          // Botón Ver datos
           const viewBtn = document.createElement('button'); viewBtn.textContent = 'Ver datos'; viewBtn.style.marginLeft = '8px';
           viewBtn.addEventListener('click', async () => {
             try {
@@ -4114,82 +4112,112 @@
               }
               const modal = document.createElement('div');
               modal.style.position = 'fixed'; modal.style.left = '50%'; modal.style.top = '50%'; modal.style.transform = 'translate(-50%, -50%)';
-              modal.style.background = '#fff'; modal.style.color = '#0f172a'; modal.style.padding = '20px'; modal.style.borderRadius = '16px'; modal.style.boxShadow = '0 20px 50px rgba(0,0,0,0.35)'; modal.style.width = 'min(480px,94vw)'; modal.style.maxHeight = '80vh'; modal.style.overflowY = 'auto'; modal.style.zIndex = '13000';
+              modal.style.background = '#fff'; modal.style.color = '#0f172a'; modal.style.padding = '20px'; modal.style.borderRadius = '16px'; modal.style.boxShadow = '0 20px 50px rgba(0,0,0,0.35)'; modal.style.width = 'min(520px,94vw)'; modal.style.maxHeight = '80vh'; modal.style.overflowY = 'auto'; modal.style.zIndex = '13000';
               const cerrar = document.createElement('button'); cerrar.textContent = 'Cerrar'; cerrar.style.position = 'absolute'; cerrar.style.top = '10px'; cerrar.style.right = '14px'; cerrar.addEventListener('click', ()=>{ document.body.removeChild(modal); });
-              const fields = Object.entries(detail).map(([k,v]) => `<tr><td style='font-weight:600;padding:4px 8px;border-bottom:1px solid #eef;'>${k}</td><td style='padding:4px 8px;border-bottom:1px solid #eef;'>${v==null?'':v}</td></tr>`).join('');
+              const fields = Object.entries(detail).map(([k,v]) => `<tr><td style='font-weight:600;padding:6px 10px;border-bottom:1px solid #eef;'>${k}</td><td style='padding:6px 10px;border-bottom:1px solid #eef;'>${v==null?'':v}</td></tr>`).join('');
               modal.innerHTML = `<h3 style='margin:0 0 12px;font-size:20px;'>Datos del Docente</h3><table style='width:100%;border-collapse:collapse;font-size:13px;'>${fields}</table>`;
               modal.appendChild(cerrar);
               document.body.appendChild(modal);
             } catch(err){ console.error('ver datos docente error', err); alert('No se pudo cargar el detalle del docente.'); }
           });
           li.appendChild(viewBtn);
-          const del = document.createElement('button'); del.textContent = 'Eliminar'; del.style.marginLeft = '8px';
-          del.style.backgroundColor = '#dc2626';
-          del.style.color = 'white';
-          del.addEventListener('click', () => {
-            // Verificar si tiene eventos asociados
+
+          // Botón de tres puntos (menú de acciones)
+          const menuWrapper = document.createElement('div');
+          menuWrapper.style.display = 'inline-block';
+          menuWrapper.style.position = 'relative';
+          menuWrapper.style.marginLeft = '8px';
+
+          const menuButton = document.createElement('button');
+          menuButton.setAttribute('aria-label', 'Más opciones');
+          menuButton.textContent = '⋮';
+          menuButton.style.border = '1px solid #d1d5db';
+          menuButton.style.background = '#fff';
+          menuButton.style.borderRadius = '8px';
+          menuButton.style.width = '32px';
+          menuButton.style.height = '32px';
+          menuButton.style.cursor = 'pointer';
+
+          const menu = document.createElement('div');
+          menu.style.position = 'absolute';
+          menu.style.top = '36px';
+          menu.style.right = '0';
+          menu.style.minWidth = '220px';
+          menu.style.padding = '8px';
+          menu.style.borderRadius = '12px';
+          menu.style.border = '1px solid #e5e7eb';
+          menu.style.background = '#ffffff';
+          menu.style.boxShadow = '0 10px 24px rgba(15,23,42,0.18)';
+          menu.style.display = 'none';
+
+          function addMenuItem(label, handler, danger = false){
+            const item = document.createElement('button');
+            item.textContent = label;
+            item.style.display = 'block';
+            item.style.width = '100%';
+            item.style.textAlign = 'left';
+            item.style.padding = '8px 10px';
+            item.style.border = 'none';
+            item.style.background = 'transparent';
+            item.style.borderRadius = '8px';
+            item.style.cursor = 'pointer';
+            item.style.color = danger ? '#b91c1c' : '#0f172a';
+            item.addEventListener('click', ()=>{ handler(); menu.style.display='none'; });
+            item.addEventListener('mouseover', ()=>{ item.style.background = '#f8fafc'; });
+            item.addEventListener('mouseout', ()=>{ item.style.background = 'transparent'; });
+            menu.appendChild(item);
+          }
+
+          // Acción: Desvinculación
+          addMenuItem('Desvinculación', () => {
             const eventosAsociados = storedEvents.filter(e => {
               const meta = (e.extendedProps && e.extendedProps.__meta) || {};
               return meta.docenteId === d.id;
             });
-
-            let warningMsg = `¿Está seguro de eliminar al docente "${d.nombre}"?`;
-            if (eventosAsociados.length > 0) {
-              warningMsg += `\n\nEsto desvinculará al docente de ${eventosAsociados.length} evento(s) programado(s).`;
-            }
-
-            if (confirm(warningMsg)) {
-              const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
-              if (segundoPaso !== 'ELIMINAR') {
-                alert('Eliminación cancelada.');
-                return;
+            let warningMsg = `¿Desea desvincular al docente "${d.nombre}" de sus eventos?`;
+            if (eventosAsociados.length > 0) warningMsg += `\n\nSe actualizarán ${eventosAsociados.length} evento(s).`;
+            if (!confirm(warningMsg)) return;
+            eventosAsociados.forEach(evento => {
+              const index = storedEvents.findIndex(e => e.id === evento.id);
+              if (index !== -1) {
+                const ep = storedEvents[index].extendedProps || (storedEvents[index].extendedProps = {});
+                const meta = ep.__meta || (ep.__meta = {});
+                meta.docenteId = null;
+                meta.docenteName = null;
               }
-              // Desvincular eventos (cambiar docenteId a null)
-              eventosAsociados.forEach(evento => {
-                const index = storedEvents.findIndex(e => e.id === evento.id);
-                if (index !== -1) {
-                  if (storedEvents[index].extendedProps && storedEvents[index].extendedProps.__meta) {
-                    storedEvents[index].extendedProps.__meta.docenteId = null;
-                    storedEvents[index].extendedProps.__meta.docenteName = null;
-                  }
-                }
-              });
+            });
+            d.activo = false;
+            save(KEY_EVENTS, storedEvents);
+            save(KEY_DOCENTES, docentes);
+            renderDocentes();
+            refreshCalendarEvents();
+            alert(`Docente "${d.nombre}" desvinculado.`);
+          }, true);
 
-              // Eliminar el docente
-              docentes = docentes.filter(x => x.id !== d.id);
-
-              // Guardar cambios
-              save(KEY_DOCENTES, docentes);
-              save(KEY_EVENTS, storedEvents);
-
-              // Actualizar UI
-              renderDocentes();
-              refreshCalendarEvents();
-
-              alert(`Docente "${d.nombre}" eliminado exitosamente.`);
-            }
+          // Acción: Re-vincular
+          addMenuItem('Re-vincular', () => {
+            d.activo = true;
+            save(KEY_DOCENTES, docentes);
+            renderDocentes();
+            refreshCalendarEvents();
           });
-          li.appendChild(del);
+
+          // Acción: Ver datos (también en menú)
+          addMenuItem('Ver datos', () => { viewBtn.click(); });
+
+          menuButton.addEventListener('click', ()=>{
+            menu.style.display = (menu.style.display === 'none' ? 'block' : 'none');
+          });
+          document.addEventListener('click', (ev)=>{
+            if (!menuWrapper.contains(ev.target)) menu.style.display = 'none';
+          });
+
+          menuWrapper.appendChild(menuButton);
+          menuWrapper.appendChild(menu);
+          li.appendChild(menuWrapper);
+
           listDocentes.appendChild(li);
         });
-      }
-
-      // Forms handling
-      if (formCarrera) {
-        formCarrera.addEventListener('submit', function (ev) {
-          ev.preventDefault();
-          const id = document.getElementById('carrera-id').value.trim();
-          const nombre = document.getElementById('carrera-nombre').value.trim();
-          const total = parseInt(document.getElementById('carrera-total').value || '0', 10);
-          const practica = parseInt(document.getElementById('carrera-practica').value || '0', 10);
-          const teorica = parseInt(document.getElementById('carrera-teorica').value || '0', 10);
-          if (!id || !nombre) { alert('ID y nombre son requeridos'); return; }
-          carreras.push({ id, nombre, totalHoras: total, practicaHoras: practica, teoricaHoras: teorica });
-          save(KEY_CARRERAS, carreras); renderCarreras(); formCarrera.reset();
-          const cm = document.getElementById('carrera-modal'); if (cm) hideModal(cm);
-        });
-      } else {
-        console.warn('form-carrera no encontrado, omitiendo manejador.');
       }
 
       if (formModulo) {
