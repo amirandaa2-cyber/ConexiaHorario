@@ -175,6 +175,9 @@
     .asignacion-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .asignacion-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
     @media (max-width: 768px) { .asignacion-row { grid-template-columns: 1fr; } }
+    #modal-asignacion-manual .modal-asignacion { max-width: 540px; width: min(92vw, 540px); max-height: 82vh; padding: 20px; }
+    #modal-asignacion-manual .asignacion-form { max-height: calc(82vh - 130px); overflow-y: auto; padding-right: 4px; }
+    #modal-asignacion-manual .asignacion-actions { position: sticky; bottom: 0; background: #fff; padding-top: 12px; }
     [role="dialog"] .modal-drag-handle {
       position: sticky;
       top: 0;
@@ -1595,6 +1598,18 @@
         const getModulosList = () => safeWindowList('modulos') || modulos || [];
         const getDocentesList = () => safeWindowList('docentes') || docentes || [];
         const getSalasList = () => safeWindowList('salas') || salas || [];
+        const getBlockList = () => safeWindowList('CEDUC_BLOQUES') || window.CEDUC_BLOQUES || [];
+
+        function parseTimeParts(value) {
+          if (!value || typeof value !== 'string') return null;
+          const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+          if (!match) return null;
+          const hours = parseInt(match[1], 10);
+          const minutes = parseInt(match[2], 10);
+          if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+          if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+          return { hours, minutes };
+        }
 
         function formatDateValue(date) {
           if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
@@ -1621,6 +1636,13 @@
           return (eh * 60 + em) - (sh * 60 + sm);
         }
 
+        function createDateFromParts(dateStr, timeStr) {
+          if (!dateStr || !timeStr) return null;
+          const candidate = new Date(`${dateStr}T${timeStr}:00`);
+          if (Number.isNaN(candidate.getTime())) return null;
+          return candidate;
+        }
+
         function formatLocalDateTime(date) {
           return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
         }
@@ -1631,17 +1653,49 @@
           return clone;
         }
 
+        function snapDateRange(referenceDate, blockCount) {
+          const blocks = getBlockList();
+          if (!(referenceDate instanceof Date) || Number.isNaN(referenceDate.getTime()) || !blocks.length) return null;
+          const normalizedBlocks = Math.max(1, blockCount || 1);
+          let closestIndex = 0;
+          let closestDiff = Infinity;
+          blocks.forEach((block, idx) => {
+            const [h, m] = block.inicio.split(':').map(Number);
+            const candidate = new Date(referenceDate);
+            candidate.setHours(h, m, 0, 0);
+            const diff = Math.abs(candidate.getTime() - referenceDate.getTime());
+            if (diff < closestDiff) {
+              closestDiff = diff;
+              closestIndex = idx;
+            }
+          });
+          const startBlock = blocks[closestIndex];
+          const snappedStart = new Date(referenceDate);
+          const [startH, startM] = startBlock.inicio.split(':').map(Number);
+          snappedStart.setHours(startH, startM, 0, 0);
+          const endIndex = Math.min(closestIndex + normalizedBlocks - 1, blocks.length - 1);
+          const endBlock = blocks[endIndex];
+          const snappedEnd = new Date(snappedStart);
+          if (endBlock) {
+            const [endH, endM] = endBlock.fin.split(':').map(Number);
+            snappedEnd.setHours(endH, endM, 0, 0);
+          } else {
+            snappedEnd.setMinutes(snappedEnd.getMinutes() + normalizedBlocks * BLOCK_MINUTES);
+          }
+          return { start: snappedStart, end: snappedEnd, startBlock, endBlock, startIndex: closestIndex, endIndex };
+        }
+
         function inferBlockNumber(dateObj) {
-          const bloques = window.CEDUC_BLOQUES || [];
-          if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime()) || !bloques.length) return null;
+          const blocks = getBlockList();
+          if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime()) || !blocks.length) return null;
           const minutes = dateObj.getHours() * 60 + dateObj.getMinutes();
-          for (const bloque of bloques) {
-            const [hInicio, mInicio] = bloque.inicio.split(':').map(Number);
-            const [hFin, mFin] = bloque.fin.split(':').map(Number);
-            const startMinutes = hInicio * 60 + mInicio;
-            const endMinutes = hFin * 60 + mFin;
+          for (const block of blocks) {
+            const [startH, startM] = (block.inicio || block.start || '00:00').split(':').map(Number);
+            const [endH, endM] = (block.fin || block.end || '00:00').split(':').map(Number);
+            const startMinutes = startH * 60 + startM;
+            const endMinutes = endH * 60 + endM;
             if (minutes >= startMinutes && minutes < endMinutes) {
-              return bloque.numero;
+              return block.numero != null ? block.numero : (block.number != null ? block.number : null);
             }
           }
           return null;
@@ -1701,36 +1755,133 @@
 
         function syncEndFromDuration() {
           if (!horaInicioInput || !horaFinInput || !duracionInput) return;
-          const startVal = horaInicioInput.value;
           const blocks = parseInt(duracionInput.value || '1', 10);
-          if (!startVal || Number.isNaN(blocks) || blocks <= 0) return;
-          horaFinInput.value = addMinutesToTime(startVal, blocks * BLOCK_MINUTES);
+          if (Number.isNaN(blocks) || blocks <= 0) {
+            duracionInput.value = '1';
+            return syncEndFromDuration();
+          }
+          const dateStr = fechaInput?.value || formatDateValue(new Date());
+          const startDate = createDateFromParts(dateStr, horaInicioInput.value);
+          if (!startDate) {
+            if (horaInicioInput.value) {
+              horaFinInput.value = addMinutesToTime(horaInicioInput.value, blocks * BLOCK_MINUTES);
+            }
+            return;
+          }
+          const snapped = snapDateRange(startDate, blocks);
+          if (snapped) {
+            horaInicioInput.value = formatTimeValue(snapped.start);
+            horaFinInput.value = formatTimeValue(snapped.end);
+          } else if (horaInicioInput.value) {
+            horaFinInput.value = addMinutesToTime(horaInicioInput.value, blocks * BLOCK_MINUTES);
+          }
         }
 
-        function syncDurationFromTimes() {
-          if (!horaInicioInput || !horaFinInput || !duracionInput) return;
-          const minutes = diffMinutes(horaFinInput.value, horaInicioInput.value);
-          if (minutes > 0) {
-            const blocks = Math.max(1, Math.round(minutes / BLOCK_MINUTES));
-            duracionInput.value = blocks;
+        function handleStartChange() {
+          if (!horaInicioInput) return;
+          const dateStr = fechaInput?.value || formatDateValue(new Date());
+          const blocks = parseInt(duracionInput?.value || '1', 10) || 1;
+          const startDate = createDateFromParts(dateStr, horaInicioInput.value);
+          if (!startDate) return;
+          const snapped = snapDateRange(startDate, blocks);
+          if (snapped) {
+            horaInicioInput.value = formatTimeValue(snapped.start);
+            horaFinInput.value = formatTimeValue(snapped.end);
+          } else {
+            syncEndFromDuration();
+          }
+        }
+
+        function handleEndChange() {
+          if (!horaInicioInput || !horaFinInput) return;
+          const dateStr = fechaInput?.value || formatDateValue(new Date());
+          const startDate = createDateFromParts(dateStr, horaInicioInput.value);
+          const endDate = createDateFromParts(dateStr, horaFinInput.value);
+          if (!startDate || !endDate) return;
+          const minutes = Math.max(BLOCK_MINUTES, (endDate.getTime() - startDate.getTime()) / 60000);
+          const blocks = Math.max(1, Math.round(minutes / BLOCK_MINUTES));
+          duracionInput.value = blocks;
+          const snapped = snapDateRange(startDate, blocks);
+          if (snapped) {
+            horaInicioInput.value = formatTimeValue(snapped.start);
+            horaFinInput.value = formatTimeValue(snapped.end);
+          } else {
+            horaFinInput.value = addMinutesToTime(horaInicioInput.value, blocks * BLOCK_MINUTES);
           }
         }
 
         function prefillFromSelection(selection = {}) {
-          const start = (selection.start instanceof Date && !Number.isNaN(selection.start.getTime())) ? selection.start : new Date();
-          const endCandidate = (selection.end instanceof Date && selection.end > start)
+          selectionSnapshot = selection || null;
+          const startRaw = (selection.start instanceof Date && !Number.isNaN(selection.start.getTime())) ? selection.start : new Date();
+          const endCandidate = (selection.end instanceof Date && selection.end > startRaw)
             ? selection.end
-            : new Date(start.getTime() + BLOCK_MINUTES * 60000);
-          if (fechaInput) fechaInput.value = formatDateValue(start);
-          if (horaInicioInput) horaInicioInput.value = formatTimeValue(start);
-          if (horaFinInput) horaFinInput.value = formatTimeValue(endCandidate);
+            : new Date(startRaw.getTime() + BLOCK_MINUTES * 60000);
+          if (fechaInput) fechaInput.value = formatDateValue(startRaw);
+          const approxMinutes = Math.max(BLOCK_MINUTES, (endCandidate.getTime() - startRaw.getTime()) / 60000);
+          const approxBlocks = Math.max(1, Math.round(approxMinutes / BLOCK_MINUTES));
+          const snapped = snapDateRange(startRaw, approxBlocks);
+          const startForInputs = snapped ? snapped.start : startRaw;
+          const endForInputs = snapped ? snapped.end : endCandidate;
+          if (horaInicioInput) horaInicioInput.value = formatTimeValue(startForInputs);
+          if (horaFinInput) horaFinInput.value = formatTimeValue(endForInputs);
           if (duracionInput) {
-            const minutes = Math.max(BLOCK_MINUTES, (endCandidate - start) / 60000);
+            const minutes = Math.max(BLOCK_MINUTES, (endForInputs.getTime() - startForInputs.getTime()) / 60000);
             duracionInput.value = Math.max(1, Math.round(minutes / BLOCK_MINUTES));
           }
           if (descripcionInput) descripcionInput.value = '';
           if (repetirSelect) repetirSelect.value = '0';
-          syncDurationFromTimes();
+        }
+
+        function populateCarrerasSelect(selectedId = '') {
+          if (!carreraSelect) return;
+          carreraSelect.innerHTML = '<option value="">Seleccionar...</option>';
+          getCarrerasList().forEach(c => {
+            const option = document.createElement('option');
+            option.value = c.id;
+            option.textContent = c.nombre || c.id;
+            if (selectedId && String(c.id) === String(selectedId)) option.selected = true;
+            carreraSelect.appendChild(option);
+          });
+        }
+
+        function populateModulosSelect(carreraId = '', selectedId = '') {
+          if (!moduloSelect) return;
+          moduloSelect.innerHTML = '<option value="">Seleccionar...</option>';
+          const list = getModulosList().filter(m => {
+            if (!carreraId) return true;
+            return String(m.carreraId) === String(carreraId);
+          });
+          list.forEach(m => {
+            const option = document.createElement('option');
+            option.value = m.id;
+            option.textContent = `${m.codigo || m.id} - ${m.nombre || ''}`.trim();
+            if (selectedId && String(m.id) === String(selectedId)) option.selected = true;
+            moduloSelect.appendChild(option);
+          });
+        }
+
+        function populateDocentesSelect(selectedId = '') {
+          if (!docenteSelect) return;
+          docenteSelect.innerHTML = '<option value="">Seleccionar...</option>';
+          getDocentesList().filter(d => d.activo !== false).forEach(d => {
+            const option = document.createElement('option');
+            option.value = d.id;
+            option.textContent = d.nombre || d.id;
+            if (selectedId && String(d.id) === String(selectedId)) option.selected = true;
+            docenteSelect.appendChild(option);
+          });
+        }
+
+        function populateSalasSelect(selectedId = '') {
+          if (!salaSelect) return;
+          salaSelect.innerHTML = '<option value="">Seleccionar...</option>';
+          getSalasList().forEach(s => {
+            const option = document.createElement('option');
+            option.value = s.id;
+            option.textContent = s.nombre || s.id;
+            if (selectedId && String(s.id) === String(selectedId)) option.selected = true;
+            salaSelect.appendChild(option);
+          });
         }
 
         function handleManualSubmit(ev) {
@@ -1743,6 +1894,8 @@
             return;
           }
           try {
+            handleStartChange();
+            handleEndChange();
             const fecha = fechaInput?.value;
             const horaInicio = horaInicioInput?.value;
             const horaFin = horaFinInput?.value;
@@ -1761,9 +1914,9 @@
               alert('La hora de fin debe ser mayor al inicio.');
               return;
             }
-            const startDate = new Date(`${fecha}T${horaInicio}:00`);
-            const endDate = new Date(`${fecha}T${horaFin}:00`);
-            if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+            const baseStart = createDateFromParts(fecha, horaInicio);
+            const baseEnd = createDateFromParts(fecha, horaFin);
+            if (!baseStart || !baseEnd) {
               alert('No se pudo interpretar la fecha y las horas seleccionadas.');
               return;
             }
@@ -1771,12 +1924,19 @@
             const carrera = getCarrerasList().find(c => String(c.id) === String(carreraId));
             const color = (modulo && modulo.color) || (carrera && carrera.color) || '#3788d8';
             const blockCount = Math.max(1, Math.round(durationMinutes / BLOCK_MINUTES));
-            const durationHours = durationMinutes / 60;
+            const snappedRange = snapDateRange(baseStart, blockCount);
+            const finalStart = snappedRange ? snappedRange.start : baseStart;
+            const finalEnd = snappedRange ? snappedRange.end : baseEnd;
+            const durationHours = Math.max(BLOCK_MINUTES, (finalEnd.getTime() - finalStart.getTime()) / 60000) / 60;
+            const blockList = getBlockList();
+            const blockNumber = snappedRange && snappedRange.startBlock ? snappedRange.startBlock.numero : null;
+            const endBlockNumber = snappedRange && snappedRange.endBlock ? snappedRange.endBlock.numero : (blockNumber != null ? blockNumber + blockCount - 1 : null);
             const payloads = [];
             for (let weekOffset = 0; weekOffset <= repetir; weekOffset++) {
-              const startClone = weekOffset === 0 ? new Date(startDate) : shiftDate(startDate, weekOffset * 7);
-              const endClone = weekOffset === 0 ? new Date(endDate) : shiftDate(endDate, weekOffset * 7);
-              const blockNumber = inferBlockNumber(startClone);
+              const startClone = weekOffset === 0 ? new Date(finalStart) : shiftDate(finalStart, weekOffset * 7);
+              const endClone = weekOffset === 0 ? new Date(finalEnd) : shiftDate(finalEnd, weekOffset * 7);
+              const inferredBlockNumber = blockNumber != null ? blockNumber : inferBlockNumber(startClone);
+              const inferredEndBlock = endBlockNumber != null ? endBlockNumber : inferBlockNumber(endClone);
               const meta = {
                 carreraId,
                 moduloId,
@@ -1785,7 +1945,10 @@
                 descripcion,
                 horas: durationHours,
                 bloques: blockCount,
-                numeroBloque: blockNumber
+                numeroBloque: inferredBlockNumber,
+                bloqueInicio: inferredBlockNumber,
+                bloqueFin: inferredEndBlock,
+                bloquesDisponibles: blockList.length
               };
               payloads.push({
                 id: `manual_${Date.now()}_${weekOffset}_${Math.random().toString(36).slice(2, 7)}`,
@@ -1866,11 +2029,9 @@
           });
         }
         if (duracionInput) duracionInput.addEventListener('change', syncEndFromDuration);
-        if (horaInicioInput) horaInicioInput.addEventListener('change', () => {
-          syncEndFromDuration();
-          syncDurationFromTimes();
-        });
-        if (horaFinInput) horaFinInput.addEventListener('change', syncDurationFromTimes);
+        if (horaInicioInput) horaInicioInput.addEventListener('change', handleStartChange);
+        if (horaFinInput) horaFinInput.addEventListener('change', handleEndChange);
+        if (fechaInput) fechaInput.addEventListener('change', handleStartChange);
 
         return { open: openModal, close: closeModal };
       }
@@ -2738,6 +2899,8 @@
             { numero: 22, inicio: '22:25', fin: '23:00', duracion: 35 }
           ];
           try { window.CEDUC_BLOQUES = CEDUC_BLOQUES; } catch (_) { }
+          const CEDUC_BLOCKS = CEDUC_BLOQUES.map(b => ({ number: b.numero, start: b.inicio, end: b.fin, durationMinutes: b.duracion }));
+          try { window.CEDUC_BLOCKS = CEDUC_BLOCKS; } catch (_) { }
           function calcularNumeroBloque(fechaHora) {
             const hora = fechaHora.getHours();
             const minutos = fechaHora.getMinutes();
