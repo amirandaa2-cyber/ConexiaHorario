@@ -7531,12 +7531,20 @@
           <span class="chevron" aria-hidden="true"></span>
         </button>
         <div class="sidebar-group-content" id="sidebar-files">
-          <div class="sidebar-button-stack">
-            <button id="export-excel" class="btn-primary">Exportar en Excel</button>
-            <button id="export-png" class="btn-primary">Exportar horario (PNG)</button>
-            <button id="save-schedule" title="Guardar cambios actuales del calendario">Guardar cambios</button>
-            <button id="migrate-server"
-              title="Envía los datos locales al servidor REST (requiere servidor corriendo)">Migrar datos al servidor</button>
+          <div class="d-flex flex-column gap-2 align-items-stretch">
+            <button id="export-excel" type="button" class="btn btn-primary" title="Descarga los datos en formato XLSX">
+              📊 Exportar en Excel
+            </button>
+            <button id="export-png" type="button" class="btn btn-primary" title="Genera una captura del calendario en PNG">
+              🖼️ Exportar horario (PNG)
+            </button>
+            <button id="save-schedule" type="button" class="btn btn-secondary" title="Guardar cambios actuales del calendario">
+              💾 Guardar cambios
+            </button>
+            <button id="migrate-server" type="button" class="btn btn-outline-warning"
+              title="Envía los datos locales al servidor REST (requiere servidor corriendo)">
+              🔄 Migrar datos al servidor
+            </button>
           </div>
         </div>
       </div>
@@ -7547,26 +7555,30 @@
           <span class="chevron" aria-hidden="true"></span>
         </button>
         <div class="sidebar-group-content" id="sidebar-filters">
-          <div class="sidebar-field">
-            <label for="filter-carrera">Filtrar por Carrera</label>
-            <select id="filter-carrera">
+          <div class="mb-3">
+            <label for="filter-carrera" class="form-label">Filtrar por Carrera</label>
+            <select id="filter-carrera" class="form-select" aria-label="Filtro de carreras">
               <option value="">-- Todas --</option>
             </select>
           </div>
-          <div class="sidebar-inline">
-            <div id="filter-active"></div>
-            <button id="clear-filter" class="btn-ghost" style="display:none;" type="button">Limpiar filtro</button>
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <div id="filter-active" class="flex-grow-1 small text-muted"></div>
+            <button id="clear-filter" class="btn btn-outline-secondary btn-sm" style="display:none;" type="button"
+              title="Limpiar filtros aplicados">
+              ✖️ Limpiar filtro
+            </button>
           </div>
-          <div class="sidebar-field">
-            <label><input type="checkbox" id="show-all-combined"> Mostrar todas combinadas</label>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="show-all-combined">
+            <label class="form-check-label" for="show-all-combined">Mostrar todas combinadas</label>
           </div>
-          <div class="sidebar-field">
-            <label for="filter-week">Semana a mostrar (primer día)</label>
-            <input id="filter-week" type="date">
+          <div class="mb-3">
+            <label for="filter-week" class="form-label">Semana a mostrar (primer día)</label>
+            <input id="filter-week" type="date" class="form-control">
           </div>
-          <div class="sidebar-field">
-            <label for="semester-end">Fin de semestre</label>
-            <input id="semester-end" type="date"
+          <div class="mb-0">
+            <label for="semester-end" class="form-label">Fin de semestre</label>
+            <input id="semester-end" type="date" class="form-control"
               title="Fecha final del semestre (repeticiones semanales hasta esta fecha)">
           </div>
         </div>
@@ -7578,34 +7590,61 @@
           <span class="chevron" aria-hidden="true"></span>
         </button>
         <div class="sidebar-group-content" id="sidebar-catalogs">
-          <section class="sidebar-section">
-            <h3>Carreras</h3>
-            <div class="sidebar-inline">
-              <button id="open-carrera-modal" type="button">Crear Carrera</button>
+          <section class="mb-3">
+            <h3 class="h6 mb-2">Carreras</h3>
+            <div class="d-grid gap-2">
+              <button id="open-carrera-modal" type="button" class="btn btn-success"
+                title="Registrar una nueva carrera">
+                🎓 Crear Carrera
+              </button>
             </div>
-            <ul id="list-carreras"></ul>
+            <ul id="list-carreras" class="mt-3 mb-0 list-unstyled"></ul>
           </section>
-          <section class="sidebar-section">
-            <h3>Módulos</h3>
-            <div class="sidebar-inline">
-              <button id="open-modulo-modal" type="button">Crear Módulo</button>
-              <button id="open-list-modulos-sidebar" type="button">Ver Módulos</button>
+          <section class="mb-3">
+            <h3 class="h6 mb-2">Módulos</h3>
+            <div class="d-grid gap-2">
+              <button id="open-modulo-modal" type="button" class="btn btn-success"
+                title="Crear un módulo y asociarlo a una carrera">
+                📚 Crear Módulo
+              </button>
+              <div class="d-grid gap-1">
+                <button id="open-list-modulos-sidebar" type="button" class="btn btn-outline-primary"
+                  title="Consultar el catálogo completo de módulos">
+                  👁️ Ver Módulos
+                </button>
+              </div>
             </div>
-            <ul id="list-modulos"></ul>
+            <ul id="list-modulos" class="mt-3 mb-0 list-unstyled"></ul>
           </section>
-          <section class="sidebar-section">
-            <h3>Docentes</h3>
-            <div class="sidebar-inline">
-              <button id="open-doc-modal" type="button">Crear Docente</button>
-              <button id="open-list-docentes-sidebar" type="button">Ver Docentes</button>
+          <section class="mb-3">
+            <h3 class="h6 mb-2">Docentes</h3>
+            <div class="d-grid gap-2">
+              <button id="open-doc-modal" type="button" class="btn btn-success"
+                title="Crear o editar un docente">
+                👩‍🏫 Crear Docente
+              </button>
+              <div class="d-grid gap-1">
+                <button id="open-list-docentes-sidebar" type="button" class="btn btn-outline-primary"
+                  title="Ver el listado completo de docentes">
+                  📋 Ver Docentes
+                </button>
+              </div>
             </div>
-            <ul id="list-docentes"></ul>
+            <ul id="list-docentes" class="mt-3 mb-0 list-unstyled"></ul>
           </section>
-          <section class="sidebar-section">
-            <h3>Salas</h3>
-            <div class="sidebar-inline">
-              <button id="open-sala-modal" type="button">Crear Sala</button>
-              <button id="ver-salas" type="button">Ver Salas</button>
+          <section class="mb-0">
+            <h3 class="h6 mb-2">Salas</h3>
+            <div class="d-grid gap-2">
+              <button id="open-sala-modal" type="button" class="btn btn-success"
+                title="Agregar una nueva sala o laboratorio">
+                🏫 Crear Sala
+              </button>
+              <div class="d-grid gap-1">
+                <button id="ver-salas" type="button" class="btn btn-outline-primary"
+                  title="Ver todas las salas registradas">
+                  🗂️ Ver Salas
+                </button>
+              </div>
             </div>
           </section>
         </div>
@@ -7617,16 +7656,26 @@
           <span class="chevron" aria-hidden="true"></span>
         </button>
         <div class="sidebar-group-content" id="sidebar-tools">
-          <div class="sidebar-button-stack">
-            <button id="seed-data" type="button">Semillas (ejemplo)</button>
-            <button id="clear-data" type="button">Borrar datos</button>
-            <button id="run-acople" type="button">Ejecutar Acople (cerrar huecos)</button>
+          <div class="d-flex flex-column gap-2 align-items-stretch mb-3">
+            <button id="seed-data" type="button" class="btn btn-outline-secondary"
+              title="Cargar datos de ejemplo para probar el flujo">
+              🌱 Semillas (ejemplo)
+            </button>
+            <button id="clear-data" type="button" class="btn btn-outline-secondary"
+              title="Eliminar toda la información local">
+              🗑️ Borrar datos
+            </button>
+            <button id="run-acople" type="button" class="btn btn-secondary"
+              title="Reacomoda eventos para cerrar huecos">
+              🔧 Ejecutar Acople
+            </button>
           </div>
-          <div class="sidebar-field">
-            <label><input type="checkbox" id="toggle-acople"> Auto-acoplar bloques (cerrar huecos entre clases)</label>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="toggle-acople">
+            <label class="form-check-label" for="toggle-acople">Auto-acoplar bloques (cerrar huecos entre clases)</label>
           </div>
           <div class="sidebar-section" id="auto-history-container">
-            <h4>Historial auto</h4>
+            <h4 class="h6 mb-2">Historial auto</h4>
             <div id="auto-op-history" class="sidebar-history"></div>
           </div>
         </div>
@@ -7638,20 +7687,26 @@
           <span class="chevron" aria-hidden="true"></span>
         </button>
         <div class="sidebar-group-content" id="sidebar-settings">
-          <div class="sidebar-field">
-            <label for="turno-theme">Tema de Turno</label>
-            <select id="turno-theme">
+          <div class="mb-3">
+            <label for="turno-theme" class="form-label">Tema de Turno</label>
+            <select id="turno-theme" class="form-select">
               <option value="Diurno">Diurno (claro)</option>
               <option value="Vespertino">Vespertino (oscuro)</option>
             </select>
           </div>
-          <div class="sidebar-field">
-            <small id="api-mode">Modo API: <strong style="color:green">OFF</strong></small>
-            <small id="api-base-indicator" style="display:block;margin-top:4px;">Origen API: <code>--</code></small>
+          <div class="mb-3 small text-muted">
+            <div id="api-mode">Modo API: <strong style="color:green">OFF</strong></div>
+            <div id="api-base-indicator" class="mt-1">Origen API: <code>--</code></div>
           </div>
-          <div class="sidebar-button-stack">
-            <button id="toggle-api" type="button">Alternar Modo API (requiere recargar)</button>
-            <button id="toggle-api-source" type="button">Cambiar origen API (Render/Local)</button>
+          <div class="d-flex flex-column gap-2 align-items-stretch">
+            <button id="toggle-api" type="button" class="btn btn-outline-warning"
+              title="Activa o desactiva el uso de la API (requiere recargar)">
+              ⚙️ Alternar Modo API
+            </button>
+            <button id="toggle-api-source" type="button" class="btn btn-outline-secondary"
+              title="Cambiar entre servidores Render y Local">
+              🌐 Cambiar origen API
+            </button>
           </div>
         </div>
       </div>
