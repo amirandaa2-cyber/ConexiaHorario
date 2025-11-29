@@ -3314,7 +3314,6 @@
             const sw = document.createElement('div'); sw.style.width = '18px'; sw.style.height = '12px'; sw.style.background = c.colorDiurno || '#3788d8'; sw.style.border = '1px solid #ccc'; sw.style.borderRadius = '2px';
             const label = document.createElement('div'); label.textContent = c.nombre; label.style.flex = '1'; label.style.fontSize = '13px';
             const btnShow = document.createElement('button'); btnShow.textContent = 'Ver módulos'; btnShow.style.fontSize = '12px'; btnShow.addEventListener('click', () => { openListModulosModal(c.id); });
-            const btnDocs = document.createElement('button'); btnDocs.textContent = 'Ver docentes'; btnDocs.style.fontSize = '12px'; btnDocs.style.marginLeft = '6px'; btnDocs.addEventListener('click', () => { openListDocentesModal(c.id); });
 
             // Botón eliminar carrera en la leyenda
             const btnEliminar = document.createElement('button');
@@ -3392,7 +3391,7 @@
               }
             });
 
-            row.appendChild(sw); row.appendChild(label); row.appendChild(btnShow); row.appendChild(btnDocs); row.appendChild(btnEliminar); legend.appendChild(row);
+            row.appendChild(sw); row.appendChild(label); row.appendChild(btnShow); row.appendChild(btnEliminar); legend.appendChild(row);
           });
         } catch (e) { console.error('populate legend', e); }
         // filter control wiring
