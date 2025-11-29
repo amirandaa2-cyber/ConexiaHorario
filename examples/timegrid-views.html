@@ -7791,6 +7791,10 @@
       box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
       border: 1px solid rgba(148, 163, 184, 0.25);
       margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
     }
 
     [data-turno="Vespertino"] .entity-section {
@@ -8293,7 +8297,7 @@
         <div class="sidebar-group-content" id="sidebar-files">
           <div class="entity-section">
             <div class="entity-title">📁 Gestión de archivos</div>
-            <div class="d-flex flex-column gap-2 align-items-stretch">
+            <div class="d-flex flex-column gap-3 align-items-stretch">
               <button id="export-excel" type="button" class="btn btn-primary btn-hover-lift" title="Descarga los datos en formato XLSX">
                 📊 Exportar en Excel
               </button>
@@ -8358,7 +8362,7 @@
         <div class="sidebar-group-content" id="sidebar-catalogs">
           <div class="entity-section">
             <div class="entity-title">🎓 Carreras</div>
-            <div class="d-grid gap-2">
+            <div class="d-grid gap-3">
               <button id="open-carrera-modal" type="button" class="btn btn-success btn-hover-lift"
                 title="Registrar una nueva carrera">
                 🎓 Crear Carrera
@@ -8368,12 +8372,12 @@
           </div>
           <div class="entity-section">
             <div class="entity-title">📚 Módulos</div>
-            <div class="d-grid gap-2">
+            <div class="d-grid gap-3">
               <button id="open-modulo-modal" type="button" class="btn btn-success btn-hover-lift"
                 title="Crear un módulo y asociarlo a una carrera">
                 📚 Crear Módulo
               </button>
-              <div class="d-grid gap-1">
+              <div class="d-grid gap-2">
                 <button id="open-list-modulos-sidebar" type="button" class="btn btn-outline-primary btn-hover-lift"
                   title="Consultar el catálogo completo de módulos">
                   👁️ Ver Módulos
@@ -8384,12 +8388,12 @@
           </div>
           <div class="entity-section">
             <div class="entity-title">👩‍🏫 Docentes</div>
-            <div class="d-grid gap-2">
+            <div class="d-grid gap-3">
               <button id="open-doc-modal" type="button" class="btn btn-success btn-hover-lift"
                 title="Crear o editar un docente">
                 👩‍🏫 Crear Docente
               </button>
-              <div class="d-grid gap-1">
+              <div class="d-grid gap-2">
                 <button id="open-list-docentes-sidebar" type="button" class="btn btn-outline-primary btn-hover-lift"
                   title="Ver el listado completo de docentes">
                   📋 Ver Docentes
@@ -8400,12 +8404,12 @@
           </div>
           <div class="entity-section mb-0">
             <div class="entity-title">🏫 Salas</div>
-            <div class="d-grid gap-2">
+            <div class="d-grid gap-3">
               <button id="open-sala-modal" type="button" class="btn btn-success btn-hover-lift"
                 title="Agregar una nueva sala o laboratorio">
                 🏫 Crear Sala
               </button>
-              <div class="d-grid gap-1">
+              <div class="d-grid gap-2">
                 <button id="ver-salas" type="button" class="btn btn-outline-primary btn-hover-lift"
                   title="Ver todas las salas registradas">
                   🗂️ Ver Salas
@@ -8424,7 +8428,20 @@
         <div class="sidebar-group-content" id="sidebar-tools">
           <div class="entity-section">
             <div class="entity-title">🧰 Herramientas rápidas</div>
-            <div class="d-flex flex-column gap-2 align-items-stretch mb-3"></div>
+            <div class="d-flex flex-column gap-3 align-items-stretch">
+              <button id="seed-data" type="button" class="btn btn-outline-secondary btn-hover-lift"
+                title="Cargar datos de ejemplo para probar el flujo">
+                🌱 Semillas (ejemplo)
+              </button>
+              <button id="clear-data" type="button" class="btn btn-outline-secondary btn-hover-lift"
+                title="Eliminar toda la información local">
+                🗑️ Borrar datos
+              </button>
+              <button id="run-acople" type="button" class="btn btn-secondary btn-hover-lift"
+                title="Reacomoda eventos para cerrar huecos">
+                🔧 Ejecutar Acople
+              </button>
+            </div>
             <div class="form-check form-switch mb-0">
               <input class="form-check-input" type="checkbox" id="toggle-acople">
               <label class="form-check-label" for="toggle-acople">Auto-acoplar bloques (cerrar huecos entre clases)</label>
@@ -8456,7 +8473,7 @@
               <div id="api-mode">Modo API: <strong style="color:green">OFF</strong></div>
               <div id="api-base-indicator" class="mt-1">Origen API: <code>--</code></div>
             </div>
-            <div class="d-flex flex-column gap-2 align-items-stretch">
+            <div class="d-flex flex-column gap-3 align-items-stretch">
               <button id="toggle-api" type="button" class="btn btn-outline-warning btn-hover-lift"
                 title="Activa o desactiva el uso de la API (requiere recargar)">
                 ⚙️ Alternar Modo API
