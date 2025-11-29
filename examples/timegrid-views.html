@@ -1428,6 +1428,8 @@
       let storedEvents = []; // FullCalendar event objects + metadata
       let templates = []; // recurrence templates: {id, moduloId, docenteId, salaId, startDate, time, duration, until}
       let salas = []; // {id, nombre, capacidad}
+      let openManualBlockModal = () => { console.warn('Modal manual no inicializado aún.'); };
+      let closeManualBlockModal = () => {};
       // If running with API mode, fetch initial data from the server so the app uses PostgreSQL
       if (USE_API) {
         try {
@@ -2399,6 +2401,7 @@
             { numero: 21, inicio: '21:50', fin: '22:25', duracion: 35 },
             { numero: 22, inicio: '22:25', fin: '23:00', duracion: 35 }
           ];
+          try { window.CEDUC_BLOQUES = CEDUC_BLOQUES; } catch (_) { }
           function calcularNumeroBloque(fechaHora) {
             const hora = fechaHora.getHours();
             const minutos = fechaHora.getMinutes();
@@ -6450,6 +6453,66 @@
     });
   </script>
 
+  <!-- Modal de Asignación Manual -->
+  <div id="modal-asignacion-manual" class="modal-asignacion-overlay" aria-hidden="true">
+    <div class="modal-asignacion" role="dialog" aria-modal="true" aria-labelledby="manual-modal-title">
+      <div class="modal-asignacion-header">
+        <h3 id="manual-modal-title" class="modal-asignacion-title">Asignar Evento Manual</h3>
+        <button type="button" id="manual-close" class="modal-asignacion-close" aria-label="Cerrar">×</button>
+      </div>
+      <form id="manual-assign-form" class="asignacion-form">
+        <div class="asignacion-row">
+          <label>Fecha
+            <input id="manual-fecha" type="date" class="form-input" required>
+          </label>
+          <label>Duración (bloques)
+            <input id="manual-duracion" type="number" min="1" value="1" class="form-input" required>
+          </label>
+        </div>
+        <div class="asignacion-row">
+          <label>Hora inicio
+            <input id="manual-hora-inicio" type="time" step="300" class="form-input" required>
+          </label>
+          <label>Hora fin
+            <input id="manual-hora-fin" type="time" step="300" class="form-input" required>
+          </label>
+        </div>
+        <div class="asignacion-row">
+          <label>Carrera
+            <select id="manual-carrera" class="form-select" required></select>
+          </label>
+          <label>Módulo
+            <select id="manual-modulo" class="form-select" required></select>
+          </label>
+        </div>
+        <div class="asignacion-row">
+          <label>Docente
+            <select id="manual-docente" class="form-select" required></select>
+          </label>
+          <label>Sala
+            <select id="manual-sala" class="form-select" required></select>
+          </label>
+        </div>
+        <label>Descripción
+          <textarea id="manual-descripcion" class="form-textarea" placeholder="Descripción opcional"></textarea>
+        </label>
+        <label>Repetir
+          <select id="manual-repetir" class="form-select">
+            <option value="0">No repetir</option>
+            <option value="1">1 semana</option>
+            <option value="2">2 semanas</option>
+            <option value="4">4 semanas</option>
+          </select>
+        </label>
+        <div class="asignacion-actions">
+          <button id="manual-delete" type="button" class="btn btn-danger">Eliminar</button>
+          <button id="manual-cancel" type="button" class="btn btn-secondary">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Asignar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Modal de Edición de Eventos -->
   <div id="modal-edicion" class="modal-overlay" aria-hidden="true">
     <div class="modal-edicion" role="dialog" aria-modal="true" aria-labelledby="modal-edicion-title">
@@ -6606,6 +6669,7 @@
       --sidebar-bg: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
   --sidebar-card-bg: rgba(255, 255, 255, 0.92);
   --sidebar-border: rgba(15, 23, 42, 0.08);
+          --sidebar-width: 360px;
       --text-color: #222;
       --muted: #6b6b6b;
       --input-border: #e6e6e6;
@@ -6675,8 +6739,10 @@
     }
 
     #sidebar {
-      flex: 0 0 360px;
-      width: 360px;
+      position: relative;
+      flex: 0 0 var(--sidebar-width);
+      width: var(--sidebar-width);
+      max-width: var(--sidebar-width);
       max-height: 90vh;
       overflow: auto;
       padding: 16px;
@@ -6685,6 +6751,32 @@
       background: var(--sidebar-bg);
       box-shadow: var(--shadow-1);
       transition: flex-basis 0.25s ease, max-width 0.25s ease, padding 0.25s ease, margin 0.25s ease, opacity 0.2s ease;
+    }
+
+    #sidebar-resize-handle {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 8px;
+      height: 100%;
+      cursor: ew-resize;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.02));
+      border-top-right-radius: var(--radius);
+      border-bottom-right-radius: var(--radius);
+      transition: background 0.2s ease;
+    }
+
+    #sidebar-resize-handle:hover,
+    #sidebar-resize-handle.is-dragging {
+      background: linear-gradient(180deg, rgba(249, 115, 22, 0.3), rgba(249, 115, 22, 0.1));
+    }
+
+    body.sidebar-hidden #sidebar-resize-handle {
+      display: none;
+    }
+
+    body.sidebar-resizing {
+      cursor: ew-resize;
     }
 
     .sidebar-brand {
@@ -7710,7 +7802,8 @@
           </div>
         </div>
       </div>
-    </div>
+      <div id="sidebar-resize-handle" aria-hidden="true"></div>
+      </div>
 
     <div id="calendar-wrap">
       <div id="calendar"></div>
