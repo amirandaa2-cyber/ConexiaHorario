@@ -415,6 +415,7 @@ if(dbReady){
 				       email,
 				       titulo,
 				       "contratoHoras" AS "contratoHoras",
+			       "ContratoHoraSemanal" AS "ContratoHoraSemanal",
 				       "TotalHrsModulos" AS "TotalHrsModulos",
 				       "Hrs Teóricas" AS "Hrs Teóricas",
 				       "Hrs Prácticas" AS "Hrs Prácticas",
@@ -432,19 +433,20 @@ if(dbReady){
 		const id = d.id || uuidv4();
 		try{
 			await db.query(
-				`INSERT INTO docentes (id,rut,nombre,email,titulo,"contratoHoras","TotalHrsModulos","Hrs Teóricas","Hrs Prácticas","Total hrs Semana")
-				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+				`INSERT INTO docentes (id,rut,nombre,email,titulo,"contratoHoras","ContratoHoraSemanal","TotalHrsModulos","Hrs Teóricas","Hrs Prácticas","Total hrs Semana")
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 				 ON CONFLICT (id) DO UPDATE
 				 SET rut=EXCLUDED.rut,
 				     nombre=EXCLUDED.nombre,
 				     email=EXCLUDED.email,
 				     titulo=EXCLUDED.titulo,
 				     "contratoHoras"=EXCLUDED."contratoHoras",
+			     "ContratoHoraSemanal"=EXCLUDED."ContratoHoraSemanal",
 				     "TotalHrsModulos"=EXCLUDED."TotalHrsModulos",
 				     "Hrs Teóricas"=EXCLUDED."Hrs Teóricas",
 				     "Hrs Prácticas"=EXCLUDED."Hrs Prácticas",
 				     "Total hrs Semana"=EXCLUDED."Total hrs Semana"`,
-				[id, d.rut, d.nombre, d.email||null, d.titulo||null, d.contratoHoras||0, d.TotalHrsModulos||0, d['Hrs Teóricas']||0, d['Hrs Prácticas']||0, d['Total hrs Semana']||0]
+				[id, d.rut, d.nombre, d.email||null, d.titulo||null, d.contratoHoras||0, d.ContratoHoraSemanal||0, d.TotalHrsModulos||0, d['Hrs Teóricas']||0, d['Hrs Prácticas']||0, d['Total hrs Semana']||0]
 			);
 			res.json({ok:true,id});
 		}catch(err){ handleDbError(res, err); }
@@ -454,11 +456,20 @@ if(dbReady){
 		const d = req.body;
 		try{
 			await db.query(
-				'UPDATE docentes SET rut=$1, nombre=$2, email=$3, titulo=$4, "contratoHoras"=$5, "TotalHrsModulos"=$6, "Hrs Teóricas"=$7, "Hrs Prácticas"=$8, "Total hrs Semana"=$9 WHERE id=$10',
-				[d.rut, d.nombre, d.email||null, d.titulo||null, d.contratoHoras||0, d.TotalHrsModulos||0, d['Hrs Teóricas']||0, d['Hrs Prácticas']||0, d['Total hrs Semana']||0, req.params.id]
+				'UPDATE docentes SET rut=$1, nombre=$2, email=$3, titulo=$4, "contratoHoras"=$5, "ContratoHoraSemanal"=$6, "TotalHrsModulos"=$7, "Hrs Teóricas"=$8, "Hrs Prácticas"=$9, "Total hrs Semana"=$10 WHERE id=$11',
+				[d.rut, d.nombre, d.email||null, d.titulo||null, d.contratoHoras||0, d.ContratoHoraSemanal||0, d.TotalHrsModulos||0, d['Hrs Teóricas']||0, d['Hrs Prácticas']||0, d['Total hrs Semana']||0, req.params.id]
 			);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }
+	});
+
+	// Nuevo endpoint: detalle completo de un docente por id
+	app.get('/api/docentes/:id', async (req,res)=>{
+		try {
+			const { rows } = await db.query('SELECT * FROM docentes WHERE id=$1 LIMIT 1',[req.params.id]);
+			if(!rows.length){ return res.status(404).json({error:'Docente no encontrado'}); }
+			res.json(rows[0]);
+		} catch(err){ handleDbError(res, err); }
 	});
 
 	app.delete('/api/docentes/:id', async (req,res)=>{
