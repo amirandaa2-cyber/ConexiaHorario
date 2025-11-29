@@ -63,6 +63,7 @@ async function initializeSchema() {
 			RETURN NEW;
 		END;
 		$$ language 'plpgsql'`,
+		`DROP TRIGGER IF EXISTS update_docentes_modtime ON docentes`,
 		`CREATE TRIGGER update_docentes_modtime
 		    BEFORE UPDATE ON docentes
 		    FOR EACH ROW
