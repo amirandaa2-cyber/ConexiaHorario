@@ -178,6 +178,28 @@
     #modal-asignacion-manual .modal-asignacion { max-width: 540px; width: min(92vw, 540px); max-height: 82vh; padding: 20px; }
     #modal-asignacion-manual .asignacion-form { max-height: calc(82vh - 130px); overflow-y: auto; padding-right: 4px; }
     #modal-asignacion-manual .asignacion-actions { position: sticky; bottom: 0; background: #fff; padding-top: 12px; }
+    #modal-asignacion-manual .modal-asignacion-header {
+      border-bottom: none;
+      margin-bottom: 16px;
+      padding: 10px 14px;
+      cursor: move;
+      user-select: none;
+    }
+    #modal-asignacion-manual .modal-asignacion-title {
+      color: #fff;
+      margin: 0;
+      font-weight: 600;
+    }
+    #modal-asignacion-manual .modal-asignacion-close {
+      color: #fff;
+      background: transparent;
+      border: none;
+      padding: 4px 8px;
+    }
+    #modal-asignacion-manual .modal-asignacion-close:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+    }
     [role="dialog"] .modal-drag-handle {
       position: sticky;
       top: 0;
@@ -2997,10 +3019,11 @@
                     const will = currentAssigned + hours;
                     const doc = docentes.find(d => d.id === meta.docenteId);
                     const contrato = parseFloat((doc && doc.contratoHoras) || 24);
+                    const contratoSemanal = parseFloat((doc && (doc.ContratoHoraSemanal != null ? doc.ContratoHoraSemanal : doc.contratoHoras)) || 24);
                     if (will > contrato) {
                       await showCapacityLimitModal(candidate, {
                         docenteName: doc ? doc.nombre : meta.docenteId,
-                        contractHours: contrato,
+                        contractHours: contratoSemanal,
                         currentHours: currentAssigned,
                         eventHours: hours,
                         projectedHours: will,
@@ -4076,10 +4099,30 @@
           const weekRange = getWeekRange();
           const weeklyAssigned = computeAssignedHoursForDocente(d.id, weekRange[0], weekRange[1]);
           const carreraName = (carreras.find(c => c.id === d.carreraId) || {}).nombre || '(sin)';
-          li.innerHTML = `<strong>${d.nombre}</strong> (RUT:${d.rut}) - Carrera:${carreraName} - Edad:${d.edad} - EstadoCivil:${d.estadoCivil} - Contrato semanal:${d.contratoHoras || 0}h - Asignadas (semana):${weeklyAssigned.toFixed(1)}h - Total asignadas:${d.horasAsignadas || 0}h - Trabajadas:${d.horasTrabajadas || 0}h - Turno:${d.turno || 'Diurno'} - Activo:${d.activo ? 'Sí' : 'No'}`;
+          const contratoSemanalMostrar = (d.ContratoHoraSemanal != null ? d.ContratoHoraSemanal : d.contratoHoras) || 0;
+          li.innerHTML = `<strong>${d.nombre}</strong> (RUT:${d.rut}) - Carrera:${carreraName} - Edad:${d.edad} - EstadoCivil:${d.estadoCivil} - Contrato semanal:${contratoSemanalMostrar}h - Asignadas (semana):${weeklyAssigned.toFixed(1)}h - Total asignadas:${d.horasAsignadas || 0}h - Trabajadas:${d.horasTrabajadas || 0}h - Turno:${d.turno || 'Diurno'} - Activo:${d.activo ? 'Sí' : 'No'}`;
           const toggle = document.createElement('button'); toggle.textContent = d.activo ? 'Desvincular' : 'Re-vincular'; toggle.style.marginLeft = '8px';
           toggle.addEventListener('click', () => { d.activo = !d.activo; save(KEY_DOCENTES, docentes); renderDocentes(); refreshCalendarEvents(); });
           li.appendChild(toggle);
+          const viewBtn = document.createElement('button'); viewBtn.textContent = 'Ver datos'; viewBtn.style.marginLeft = '8px';
+          viewBtn.addEventListener('click', async () => {
+            try {
+              let detail = d;
+              if (USE_API) {
+                const r = await authorizedFetch(API_BASE + '/docentes/' + encodeURIComponent(d.id));
+                if (r.ok) detail = await r.json();
+              }
+              const modal = document.createElement('div');
+              modal.style.position = 'fixed'; modal.style.left = '50%'; modal.style.top = '50%'; modal.style.transform = 'translate(-50%, -50%)';
+              modal.style.background = '#fff'; modal.style.color = '#0f172a'; modal.style.padding = '20px'; modal.style.borderRadius = '16px'; modal.style.boxShadow = '0 20px 50px rgba(0,0,0,0.35)'; modal.style.width = 'min(480px,94vw)'; modal.style.maxHeight = '80vh'; modal.style.overflowY = 'auto'; modal.style.zIndex = '13000';
+              const cerrar = document.createElement('button'); cerrar.textContent = 'Cerrar'; cerrar.style.position = 'absolute'; cerrar.style.top = '10px'; cerrar.style.right = '14px'; cerrar.addEventListener('click', ()=>{ document.body.removeChild(modal); });
+              const fields = Object.entries(detail).map(([k,v]) => `<tr><td style='font-weight:600;padding:4px 8px;border-bottom:1px solid #eef;'>${k}</td><td style='padding:4px 8px;border-bottom:1px solid #eef;'>${v==null?'':v}</td></tr>`).join('');
+              modal.innerHTML = `<h3 style='margin:0 0 12px;font-size:20px;'>Datos del Docente</h3><table style='width:100%;border-collapse:collapse;font-size:13px;'>${fields}</table>`;
+              modal.appendChild(cerrar);
+              document.body.appendChild(modal);
+            } catch(err){ console.error('ver datos docente error', err); alert('No se pudo cargar el detalle del docente.'); }
+          });
+          li.appendChild(viewBtn);
           const del = document.createElement('button'); del.textContent = 'Eliminar'; del.style.marginLeft = '8px';
           del.style.backgroundColor = '#dc2626';
           del.style.color = 'white';
@@ -5163,7 +5206,8 @@
       function canAssignHours(docenteId, additionalHours, dateIso = null) {
         const d = docentes.find(x => x.id === docenteId);
         if (!d) return { ok: false, reason: 'Docente no encontrado' };
-        const contrato = parseFloat(d.contratoHoras || 24);
+        // Usar nueva columna ContratoHoraSemanal si existe; fallback a contratoHoras
+        const contrato = parseFloat((d.ContratoHoraSemanal != null ? d.ContratoHoraSemanal : d.contratoHoras) || 24);
         const r = getWeekRange(dateIso);
         const assigned = computeAssignedHoursForDocente(docenteId, r[0], r[1]);
         const will = assigned + (additionalHours || 0);
@@ -7239,10 +7283,10 @@
 
   <!-- Modal de Asignación Manual -->
   <div id="modal-asignacion-manual" class="modal-asignacion-overlay" aria-hidden="true">
-    <div class="modal-asignacion" role="dialog" aria-modal="true" aria-labelledby="manual-modal-title">
-      <div class="modal-asignacion-header">
-        <h3 id="manual-modal-title" class="modal-asignacion-title">Asignar Evento Manual</h3>
-        <button type="button" id="manual-close" class="modal-asignacion-close" aria-label="Cerrar">×</button>
+    <div class="modal-asignacion" role="dialog" aria-modal="true" aria-labelledby="manual-modal-title" data-drag-handle=".modal-asignacion-header">
+      <div class="modal-asignacion-header modal-drag-handle">
+        <h3 id="manual-modal-title" class="modal-asignacion-title modal-drag-title">Asignar Evento Manual</h3>
+        <button type="button" id="manual-close" class="modal-asignacion-close modal-close-btn" aria-label="Cerrar">×</button>
       </div>
       <form id="manual-assign-form" class="asignacion-form">
         <div class="asignacion-row">
