@@ -595,6 +595,50 @@
       color: #0f172a;
     }
 
+    .assign-legend {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: #475569;
+      margin: 2px 0 8px;
+      transition: color 0.2s ease;
+    }
+
+    .assign-legend-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px solid #cbd5f5;
+      background: #cbd5f5;
+      box-shadow: 0 0 0 2px rgba(203, 213, 225, 0.4);
+      flex: none;
+    }
+
+    .assign-legend[data-state="ok"] .assign-legend-dot {
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+    }
+
+    .assign-legend[data-state="idle"] {
+      color: #64748b;
+    }
+
+    .assign-legend[data-state="warn"] {
+      color: #b45309;
+    }
+
+    .assign-legend[data-state="warn"] .assign-legend-dot {
+      box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
+    }
+
+    .assign-legend[data-state="alert"] {
+      color: #b91c1c;
+    }
+
+    .assign-legend[data-state="alert"] .assign-legend-dot {
+      box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.45);
+    }
+
     .assign-row {
       display: flex;
       gap: 12px;
@@ -807,6 +851,10 @@
       const txtDescripcion = document.getElementById('asig-descripcion');
       const btnCerrar = document.getElementById('btn-cerrar-asignacion');
       const btnCancelar = document.getElementById('btn-cancelar-asignacion');
+      const docenteLegend = document.getElementById('assign-docente-legend');
+      const docenteLegendDot = document.getElementById('assign-docente-legend-dot');
+      const docenteLegendText = document.getElementById('assign-docente-legend-text');
+      let horasWarnLogged = false;
 
       function abrirModalAsignacion(context={}) {
         try {
@@ -832,13 +880,23 @@
           (window.modulos||[]).forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=`${m.codigo||m.id} - ${m.nombre}`; selModulo.appendChild(o); });
           // Docentes
           selDocente.innerHTML='';
-          (window.docentes||[]).filter(d=>d.activo!==false).forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=d.nombre; selDocente.appendChild(o); });
+          (window.docentes||[]).filter(d=>d.activo!==false).forEach(d=>{
+            const o=document.createElement('option');
+            o.value = d.id;
+            o.textContent = d.nombre;
+            if(d.carreraId != null) o.dataset.carreraId = d.carreraId;
+            if(d.turno) o.dataset.turno = d.turno;
+            const contratoHoras = d.contratoHoras ?? d.contrato;
+            if(contratoHoras != null) o.dataset.contrato = contratoHoras;
+            selDocente.appendChild(o);
+          });
           // Salas
           selSala.innerHTML='';
           (window.salas||[]).forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=s.nombre; selSala.appendChild(o); });
           // Bloques
           selBloque.innerHTML='';
           (window.CEDUC_BLOQUES||[]).forEach(b=>{ const o=document.createElement('option'); o.value=b.numero; o.textContent=`Bloque ${b.numero} (${b.inicio}-${b.fin})`; selBloque.appendChild(o); });
+          actualizarLeyendaDocente();
         } catch(e){ console.error('cargarOpciones asignación', e); }
       }
       selCarrera && selCarrera.addEventListener('change', ()=>{
@@ -846,7 +904,106 @@
         // Filtrar módulos por carrera
         selModulo.innerHTML='';
         (window.modulos||[]).filter(m=> String(m.carreraId)===String(cid)).forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=`${m.codigo||m.id} - ${m.nombre}`; selModulo.appendChild(o); });
+        actualizarLeyendaDocente();
       });
+
+      selDocente && selDocente.addEventListener('change', ()=>{
+        actualizarLeyendaDocente(selDocente.value);
+      });
+
+      function colorDocente(docente){
+        if(!docente) return '#cbd5f5';
+        try{
+          const carrerasSrc = Array.isArray(window.carreras) ? window.carreras : [];
+          const carrera = carrerasSrc.find(c=>String(c.id)===String(docente.carreraId));
+          if(carrera){
+            const prefer = docente.turno === 'Vespertino' ? (carrera.colorVespertino || carrera.colorDiurno) : (carrera.colorDiurno || carrera.colorVespertino);
+            if(prefer) return prefer;
+          }
+        }catch(err){ console.warn('colorDocente', err); }
+        return docente.turno === 'Vespertino' ? '#6366f1' : '#0ea5e9';
+      }
+
+      function actualizarLeyendaDocente(docenteId = (selDocente ? selDocente.value : '')){
+        if(!docenteLegend || !docenteLegendText) return;
+        const autores = Array.isArray(window.docentes) ? window.docentes : [];
+        const targetId = docenteId || '';
+        if(!targetId){
+          docenteLegend.dataset.state = 'idle';
+          docenteLegendText.textContent = 'Selecciona un docente disponible';
+          if(docenteLegendDot){
+            docenteLegendDot.style.backgroundColor = '#cbd5f5';
+            docenteLegendDot.style.borderColor = '#cbd5f5';
+          }
+          return;
+        }
+        const selectedOption = selDocente && selDocente.selectedOptions && selDocente.selectedOptions[0] ? selDocente.selectedOptions[0] : null;
+        let docente = autores.find(d=>String(d.id)===String(targetId));
+        if(!docente && selectedOption){
+          const contratoFallbackRaw = selectedOption.dataset && selectedOption.dataset.contrato ? parseFloat(selectedOption.dataset.contrato) : null;
+          const contratoFallback = Number.isFinite(contratoFallbackRaw) ? contratoFallbackRaw : null;
+          docente = {
+            id: selectedOption.value,
+            nombre: (selectedOption.textContent || '').trim(),
+            carreraId: selectedOption.dataset ? selectedOption.dataset.carreraId || null : null,
+            contratoHoras: contratoFallback,
+            contrato: contratoFallback,
+            turno: selectedOption.dataset ? selectedOption.dataset.turno || '' : ''
+          };
+        }
+        if(!docente){
+          const hasOptions = !!(selDocente && selDocente.options && selDocente.options.length);
+          docenteLegend.dataset.state = hasOptions ? 'warn' : 'alert';
+          docenteLegendText.textContent = hasOptions ? 'Docente sin ficha cargada' : 'No hay docentes disponibles';
+          if(docenteLegendDot){
+            const tone = hasOptions ? '#f97316' : '#ef4444';
+            docenteLegendDot.style.backgroundColor = tone;
+            docenteLegendDot.style.borderColor = tone;
+          }
+          return;
+        }
+        const contrato = parseFloat(docente.contratoHoras || docente.contrato || 0) || 0;
+        let horasAsignadas = 0;
+        try{
+          if(typeof computeAssignedHoursForDocente === 'function'){
+            horasAsignadas = computeAssignedHoursForDocente(docente.id);
+          }
+        }catch(err){
+          if(!horasWarnLogged){
+            console.warn('computeAssignedHoursForDocente unavailable', err);
+            horasWarnLogged = true;
+          }
+        }
+        const horasLibres = contrato ? Math.max(0, contrato - horasAsignadas) : null;
+        const carrera = (()=>{
+          try{ return (Array.isArray(window.carreras) ? window.carreras : []).find(c=>String(c.id)===String(docente.carreraId)); }catch(_){ return null; }
+        })();
+        const partes = [];
+        if(docente.nombre) partes.push(docente.nombre);
+        if(carrera && carrera.nombre) partes.push(carrera.nombre);
+        const asignadasTexto = horasAsignadas.toFixed(1);
+        const contratoTexto = Number.isFinite(contrato) ? Number(contrato).toFixed(1) : '0.0';
+        if(contrato){
+          partes.push(`${asignadasTexto}h de ${contratoTexto}h`);
+          if(horasLibres !== null) partes.push(`Libre ${horasLibres.toFixed(1)}h`);
+        }else{
+          partes.push(`${asignadasTexto}h asignadas`);
+        }
+        if(docente.turno) partes.push(docente.turno);
+        docenteLegendText.textContent = partes.join(' | ');
+        if(docenteLegendDot){
+          const tone = colorDocente(docente);
+          docenteLegendDot.style.backgroundColor = tone;
+          docenteLegendDot.style.borderColor = tone;
+        }
+        let estado = 'ok';
+        if(contrato){
+          const ratio = contrato ? (horasAsignadas / contrato) : 0;
+          if(ratio >= 0.99) estado = 'alert';
+          else if(ratio >= 0.8) estado = 'warn';
+        }
+        docenteLegend.dataset.state = estado;
+      }
 
       function precargarContexto(ctx){
         const hoy = new Date();
@@ -861,6 +1018,7 @@
         if(ctx.docenteId){ selDocente.value = ctx.docenteId; }
         if(ctx.salaId){ selSala.value = ctx.salaId; }
         if(ctx.bloqueNumero){ selBloque.value = ctx.bloqueNumero; }
+        actualizarLeyendaDocente();
       }
 
       function validar(){
@@ -5843,7 +6001,7 @@
       function buildConflictDetails(candidate, conflicts) {
         const parts = [];
         const candStart = candidate.start || 'Sin inicio';
-        const candEnd = candidate.end || 'Sin fin';
+          docenteLegendText.textContent = partes.join(' | ');
         parts.push(`<div class="conflict-detail candidate"><strong>Intentando guardar:</strong><div>${candidate.title || 'Evento sin título'}</div><div>${candStart} → ${candEnd}</div></div>`);
         conflicts.forEach(c => {
           const ev = c.event;
@@ -7242,6 +7400,10 @@
         <div class="asignacion-row">
           <div class="form-group">
             <label for="asig-docente" class="form-label">Docente</label>
+            <div id="assign-docente-legend" class="assign-legend" aria-live="polite">
+              <span id="assign-docente-legend-dot" class="assign-legend-dot" aria-hidden="true"></span>
+              <span id="assign-docente-legend-text">Selecciona un docente disponible</span>
+            </div>
             <select id="asig-docente" class="form-select"></select>
           </div>
           <div class="form-group">
