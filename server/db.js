@@ -50,6 +50,11 @@ async function initializeSchema() {
 			titulo TEXT,
 			"contratoHoras" NUMERIC(5,2) DEFAULT 0,
 			"ContratoHoraSemanal" NUMERIC(4,1) DEFAULT 0 CHECK ("ContratoHoraSemanal" <= 40),
+			carreraId TEXT REFERENCES carreras(id) ON DELETE SET NULL,
+			edad INTEGER,
+			estadoCivil TEXT,
+			turno TEXT,
+			activo BOOLEAN DEFAULT TRUE,
 			"TotalHrsModulos" NUMERIC(6,1) DEFAULT 0,
 			"Hrs Teóricas" NUMERIC(4,1) DEFAULT 0,
 			"Hrs Prácticas" NUMERIC(4,1) DEFAULT 0,
@@ -57,6 +62,11 @@ async function initializeSchema() {
 			created_at TIMESTAMPTZ DEFAULT NOW(),
 			updated_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
+		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS carreraId TEXT REFERENCES carreras(id) ON DELETE SET NULL`,
+		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS edad INTEGER`,
+		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS estadoCivil TEXT`,
+		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS turno TEXT`,
+		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE`,
 		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS "ContratoHoraSemanal" NUMERIC(4,1) DEFAULT 0 CHECK ("ContratoHoraSemanal" <= 40)`,
 		`CREATE OR REPLACE FUNCTION update_modified_column()
 		RETURNS TRIGGER AS $$
