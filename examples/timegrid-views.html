@@ -1554,6 +1554,327 @@
         } catch (e) { console.log('setupDiagnostics failed', e); }
       })();
       // ---------------------------------------------------------------------------
+      const manualModalApi = initManualAssignmentModal();
+      openManualBlockModal = manualModalApi.open;
+      closeManualBlockModal = manualModalApi.close;
+
+      function initManualAssignmentModal() {
+        const overlay = document.getElementById('modal-asignacion-manual');
+        const form = document.getElementById('manual-assign-form');
+        if (!overlay || !form) {
+          return { open: () => {}, close: () => {} };
+        }
+
+        const fechaInput = document.getElementById('manual-fecha');
+        const duracionInput = document.getElementById('manual-duracion');
+        const horaInicioInput = document.getElementById('manual-hora-inicio');
+        const horaFinInput = document.getElementById('manual-hora-fin');
+        const carreraSelect = document.getElementById('manual-carrera');
+        const moduloSelect = document.getElementById('manual-modulo');
+        const docenteSelect = document.getElementById('manual-docente');
+        const salaSelect = document.getElementById('manual-sala');
+        const descripcionInput = document.getElementById('manual-descripcion');
+        const repetirSelect = document.getElementById('manual-repetir');
+        const closeBtn = document.getElementById('manual-close');
+        const cancelBtn = document.getElementById('manual-cancel');
+        const deleteBtn = document.getElementById('manual-delete');
+        const BLOCK_MINUTES = 35;
+        let selectionSnapshot = null;
+
+        const pad = (value) => String(value).padStart(2, '0');
+        const safeWindowList = (key) => {
+          try {
+            if (typeof window !== 'undefined') {
+              const list = window[key];
+              if (Array.isArray(list) && list.length) return list;
+            }
+          } catch (_) { /* noop */ }
+          return null;
+        };
+        const getCarrerasList = () => safeWindowList('carreras') || carreras || [];
+        const getModulosList = () => safeWindowList('modulos') || modulos || [];
+        const getDocentesList = () => safeWindowList('docentes') || docentes || [];
+        const getSalasList = () => safeWindowList('salas') || salas || [];
+
+        function formatDateValue(date) {
+          if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+          return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+        }
+
+        function formatTimeValue(date) {
+          if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+          return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        }
+
+        function addMinutesToTime(timeStr, minutes) {
+          const [h, m] = String(timeStr || '').split(':').map(Number);
+          if (Number.isNaN(h) || Number.isNaN(m)) return timeStr || '';
+          const base = new Date(`1970-01-01T${pad(h)}:${pad(m)}:00`);
+          base.setMinutes(base.getMinutes() + minutes);
+          return `${pad(base.getHours())}:${pad(base.getMinutes())}`;
+        }
+
+        function diffMinutes(endTime, startTime) {
+          const [eh, em] = String(endTime || '').split(':').map(Number);
+          const [sh, sm] = String(startTime || '').split(':').map(Number);
+          if ([eh, em, sh, sm].some(Number.isNaN)) return 0;
+          return (eh * 60 + em) - (sh * 60 + sm);
+        }
+
+        function formatLocalDateTime(date) {
+          return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+        }
+
+        function shiftDate(baseDate, days) {
+          const clone = new Date(baseDate.getTime());
+          clone.setDate(clone.getDate() + days);
+          return clone;
+        }
+
+        function inferBlockNumber(dateObj) {
+          const bloques = window.CEDUC_BLOQUES || [];
+          if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime()) || !bloques.length) return null;
+          const minutes = dateObj.getHours() * 60 + dateObj.getMinutes();
+          for (const bloque of bloques) {
+            const [hInicio, mInicio] = bloque.inicio.split(':').map(Number);
+            const [hFin, mFin] = bloque.fin.split(':').map(Number);
+            const startMinutes = hInicio * 60 + mInicio;
+            const endMinutes = hFin * 60 + mFin;
+            if (minutes >= startMinutes && minutes < endMinutes) {
+              return bloque.numero;
+            }
+          }
+          return null;
+        }
+
+        function populateCarrerasSelect(selectedId = '') {
+          if (!carreraSelect) return;
+          carreraSelect.innerHTML = '<option value="">Seleccionar...</option>';
+          getCarrerasList().forEach(c => {
+            const option = document.createElement('option');
+            option.value = c.id;
+            option.textContent = c.nombre || c.id;
+            if (selectedId && String(c.id) === String(selectedId)) option.selected = true;
+            carreraSelect.appendChild(option);
+          });
+        }
+
+        function populateModulosSelect(carreraId = '', selectedId = '') {
+          if (!moduloSelect) return;
+          moduloSelect.innerHTML = '<option value="">Seleccionar...</option>';
+          const list = getModulosList().filter(m => {
+            if (!carreraId) return true;
+            return String(m.carreraId) === String(carreraId);
+          });
+          list.forEach(m => {
+            const option = document.createElement('option');
+            option.value = m.id;
+            option.textContent = `${m.codigo || m.id} - ${m.nombre || ''}`.trim();
+            if (selectedId && String(m.id) === String(selectedId)) option.selected = true;
+            moduloSelect.appendChild(option);
+          });
+        }
+
+        function populateDocentesSelect(selectedId = '') {
+          if (!docenteSelect) return;
+          docenteSelect.innerHTML = '<option value="">Seleccionar...</option>';
+          getDocentesList().filter(d => d.activo !== false).forEach(d => {
+            const option = document.createElement('option');
+            option.value = d.id;
+            option.textContent = d.nombre || d.id;
+            if (selectedId && String(d.id) === String(selectedId)) option.selected = true;
+            docenteSelect.appendChild(option);
+          });
+        }
+
+        function populateSalasSelect(selectedId = '') {
+          if (!salaSelect) return;
+          salaSelect.innerHTML = '<option value="">Seleccionar...</option>';
+          getSalasList().forEach(s => {
+            const option = document.createElement('option');
+            option.value = s.id;
+            option.textContent = s.nombre || s.id;
+            if (selectedId && String(s.id) === String(selectedId)) option.selected = true;
+            salaSelect.appendChild(option);
+          });
+        }
+
+        function syncEndFromDuration() {
+          if (!horaInicioInput || !horaFinInput || !duracionInput) return;
+          const startVal = horaInicioInput.value;
+          const blocks = parseInt(duracionInput.value || '1', 10);
+          if (!startVal || Number.isNaN(blocks) || blocks <= 0) return;
+          horaFinInput.value = addMinutesToTime(startVal, blocks * BLOCK_MINUTES);
+        }
+
+        function syncDurationFromTimes() {
+          if (!horaInicioInput || !horaFinInput || !duracionInput) return;
+          const minutes = diffMinutes(horaFinInput.value, horaInicioInput.value);
+          if (minutes > 0) {
+            const blocks = Math.max(1, Math.round(minutes / BLOCK_MINUTES));
+            duracionInput.value = blocks;
+          }
+        }
+
+        function prefillFromSelection(selection = {}) {
+          const start = (selection.start instanceof Date && !Number.isNaN(selection.start.getTime())) ? selection.start : new Date();
+          const endCandidate = (selection.end instanceof Date && selection.end > start)
+            ? selection.end
+            : new Date(start.getTime() + BLOCK_MINUTES * 60000);
+          if (fechaInput) fechaInput.value = formatDateValue(start);
+          if (horaInicioInput) horaInicioInput.value = formatTimeValue(start);
+          if (horaFinInput) horaFinInput.value = formatTimeValue(endCandidate);
+          if (duracionInput) {
+            const minutes = Math.max(BLOCK_MINUTES, (endCandidate - start) / 60000);
+            duracionInput.value = Math.max(1, Math.round(minutes / BLOCK_MINUTES));
+          }
+          if (descripcionInput) descripcionInput.value = '';
+          if (repetirSelect) repetirSelect.value = '0';
+          syncDurationFromTimes();
+        }
+
+        function handleManualSubmit(ev) {
+          ev.preventDefault();
+          if (!calendar) {
+            alert('El calendario no está disponible todavía.');
+            return;
+          }
+          if (!form.reportValidity()) {
+            return;
+          }
+          try {
+            const fecha = fechaInput?.value;
+            const horaInicio = horaInicioInput?.value;
+            const horaFin = horaFinInput?.value;
+            const carreraId = carreraSelect?.value;
+            const moduloId = moduloSelect?.value;
+            const docenteId = docenteSelect?.value;
+            const salaId = salaSelect?.value;
+            const descripcion = (descripcionInput?.value || '').trim();
+            const repetir = parseInt(repetirSelect?.value || '0', 10) || 0;
+            if (!fecha || !horaInicio || !horaFin || !carreraId || !moduloId || !docenteId || !salaId) {
+              alert('Completa todos los campos obligatorios antes de asignar el bloque.');
+              return;
+            }
+            const durationMinutes = diffMinutes(horaFin, horaInicio);
+            if (durationMinutes <= 0) {
+              alert('La hora de fin debe ser mayor al inicio.');
+              return;
+            }
+            const startDate = new Date(`${fecha}T${horaInicio}:00`);
+            const endDate = new Date(`${fecha}T${horaFin}:00`);
+            if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+              alert('No se pudo interpretar la fecha y las horas seleccionadas.');
+              return;
+            }
+            const modulo = getModulosList().find(m => String(m.id) === String(moduloId));
+            const carrera = getCarrerasList().find(c => String(c.id) === String(carreraId));
+            const color = (modulo && modulo.color) || (carrera && carrera.color) || '#3788d8';
+            const blockCount = Math.max(1, Math.round(durationMinutes / BLOCK_MINUTES));
+            const durationHours = durationMinutes / 60;
+            const payloads = [];
+            for (let weekOffset = 0; weekOffset <= repetir; weekOffset++) {
+              const startClone = weekOffset === 0 ? new Date(startDate) : shiftDate(startDate, weekOffset * 7);
+              const endClone = weekOffset === 0 ? new Date(endDate) : shiftDate(endDate, weekOffset * 7);
+              const blockNumber = inferBlockNumber(startClone);
+              const meta = {
+                carreraId,
+                moduloId,
+                docenteId,
+                salaId,
+                descripcion,
+                horas: durationHours,
+                bloques: blockCount,
+                numeroBloque: blockNumber
+              };
+              payloads.push({
+                id: `manual_${Date.now()}_${weekOffset}_${Math.random().toString(36).slice(2, 7)}`,
+                title: (modulo && modulo.nombre) || 'Bloque Manual',
+                start: formatLocalDateTime(startClone),
+                end: formatLocalDateTime(endClone),
+                editable: true,
+                backgroundColor: color,
+                borderColor: color,
+                textColor: '#fff',
+                extendedProps: {
+                  ...meta,
+                  __meta: { ...meta }
+                }
+              });
+            }
+            let created = 0;
+            payloads.forEach(def => {
+              try {
+                const added = calendar.addEvent(def);
+                if (added) created += 1;
+              } catch (err) {
+                console.error('Error agregando bloque manual', err);
+              }
+            });
+            if (!created) {
+              alert('No se pudo crear el bloque manual. Revisa si existen conflictos.');
+              return;
+            }
+            closeModal();
+            if (calendar && typeof calendar.unselect === 'function') {
+              calendar.unselect();
+            }
+          } catch (err) {
+            console.error('handleManualSubmit error', err);
+            alert('Ocurrió un problema al crear el bloque manual. Intenta nuevamente.');
+          }
+        }
+
+        function closeModal(options = {}) {
+          overlay.classList.remove('show');
+          overlay.setAttribute('aria-hidden', 'true');
+          document.body.style.overflow = 'auto';
+          form.reset();
+          selectionSnapshot = null;
+          if (!options.keepSelection && calendar && typeof calendar.unselect === 'function') {
+            calendar.unselect();
+          }
+        }
+
+        function openModal(selection = {}) {
+          selectionSnapshot = selection || null;
+          form.reset();
+          populateCarrerasSelect();
+          populateModulosSelect(carreraSelect?.value || '');
+          populateDocentesSelect();
+          populateSalasSelect();
+          prefillFromSelection(selection);
+          overlay.classList.add('show');
+          overlay.setAttribute('aria-hidden', 'false');
+          document.body.style.overflow = 'hidden';
+          if (carreraSelect) carreraSelect.focus();
+        }
+
+        form.addEventListener('submit', handleManualSubmit);
+        if (closeBtn) closeBtn.addEventListener('click', () => closeModal());
+        if (cancelBtn) cancelBtn.addEventListener('click', () => closeModal());
+        if (deleteBtn) deleteBtn.addEventListener('click', () => closeModal());
+        overlay.addEventListener('click', (ev) => { if (ev.target === overlay) closeModal(); });
+        document.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Escape' && overlay.classList.contains('show')) {
+            closeModal({ keepSelection: true });
+          }
+        });
+        if (carreraSelect) {
+          carreraSelect.addEventListener('change', () => {
+            populateModulosSelect(carreraSelect.value);
+          });
+        }
+        if (duracionInput) duracionInput.addEventListener('change', syncEndFromDuration);
+        if (horaInicioInput) horaInicioInput.addEventListener('change', () => {
+          syncEndFromDuration();
+          syncDurationFromTimes();
+        });
+        if (horaFinInput) horaFinInput.addEventListener('change', syncDurationFromTimes);
+
+        return { open: openModal, close: closeModal };
+      }
+
       // Cache management
       let conflictDecisionCache = null;
       function clearConflictDecisionCache() {
@@ -1866,6 +2187,21 @@
                   window.openManualAssignModal(ctx);
                 }
               } catch (e) { console.error('dateClick -> abrir modal asignación', e); }
+            },
+            select: function(selectionInfo) {
+              try {
+                if (selectionInfo && selectionInfo.allDay) {
+                  if (calendar && typeof calendar.unselect === 'function') {
+                    calendar.unselect();
+                  }
+                  return;
+                }
+                if (typeof openManualBlockModal === 'function') {
+                  openManualBlockModal(selectionInfo || {});
+                }
+              } catch (err) {
+                console.error('Error abriendo el modal manual desde la selección', err);
+              }
             },
             datesSet: function (info) {
               try {
@@ -3007,6 +3343,11 @@
               if (eventosAsociados.length > 0) warningMsg += `\n\nEsto eliminará ${eventosAsociados.length} evento(s) programado(s).`;
 
               if (confirm(warningMsg)) {
+                const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+                if (segundoPaso !== 'ELIMINAR') {
+                  alert('Eliminación cancelada.');
+                  return;
+                }
                 // Eliminar módulos asociados
                 modulos = modulos.filter(m => m.carreraId !== c.id);
 
@@ -3099,6 +3440,11 @@
             }
 
             if (confirm(warningMsg)) {
+              const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+              if (segundoPaso !== 'ELIMINAR') {
+                alert('Eliminación cancelada.');
+                return;
+              }
               // Eliminar eventos asociados
               eventosAsociados.forEach(evento => {
                 const index = storedEvents.findIndex(e => e.id === evento.id);
@@ -3191,6 +3537,11 @@
               }
 
               if (confirm(warningMsg)) {
+                const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+                if (segundoPaso !== 'ELIMINAR') {
+                  alert('Eliminación cancelada.');
+                  return;
+                }
                 // Eliminar eventos asociados
                 eventosAsociados.forEach(evento => {
                   const index = storedEvents.findIndex(e => e.id === evento.id);
@@ -3275,6 +3626,11 @@
               }
 
               if (confirm(warningMsg)) {
+                const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+                if (segundoPaso !== 'ELIMINAR') {
+                  alert('Eliminación cancelada.');
+                  return;
+                }
                 // Desvincular eventos (cambiar docenteId a null)
                 eventosAsociados.forEach(evento => {
                   const index = storedEvents.findIndex(e => e.id === evento.id);
@@ -3353,6 +3709,11 @@
                 }
 
                 if (confirm(warningMsg)) {
+                  const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+                  if (segundoPaso !== 'ELIMINAR') {
+                    alert('Eliminación cancelada.');
+                    return;
+                  }
                   // Desvincular eventos (cambiar salaId a null)
                   eventosAsociados.forEach(evento => {
                     const index = storedEvents.findIndex(e => e.id === evento.id);
@@ -3415,6 +3776,11 @@
             }
 
             if (confirm(warningMsg)) {
+              const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+              if (segundoPaso !== 'ELIMINAR') {
+                alert('Eliminación cancelada.');
+                return;
+              }
               // Desvincular eventos (cambiar docenteId a null)
               eventosAsociados.forEach(evento => {
                 const index = storedEvents.findIndex(e => e.id === evento.id);
@@ -5733,6 +6099,11 @@
       // Delete event handler
       document.getElementById('delete-event').addEventListener('click', function () {
         if (!currentEditingEvent) return; if (!confirm('Eliminar este evento?')) return;
+        const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+        if (segundoPaso !== 'ELIMINAR') {
+          alert('Eliminación cancelada.');
+          return;
+        }
         // remove from storedEvents by matching title and start
         // Remove by id if available, otherwise fall back to title+start match
         if (currentEditingEvent.id) {
@@ -6133,6 +6504,11 @@
       if (clearDataBtn) {
         clearDataBtn.addEventListener('click', async function () {
           if (!confirm('Borrar datos guardados?')) return;
+          const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+          if (segundoPaso !== 'ELIMINAR') {
+            alert('Eliminación cancelada.');
+            return;
+          }
           if (USE_API) {
             const base = API_BASE;
             const pathsInOrder = ['/events', '/templates', '/salas', '/docentes', '/modulos', '/carreras'];
@@ -6205,6 +6581,11 @@
                   const confirmMessage = `Se encontraron ${eventsToRemove.length} módulo(s) programado(s) después del fin de semestre (${semesterEndDate.toLocaleDateString()}).\n\n¿Desea eliminar estos módulos automáticamente?`;
 
                   if (confirm(confirmMessage)) {
+                    const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+                    if (segundoPaso !== 'ELIMINAR') {
+                      alert('Eliminación cancelada.');
+                      return;
+                    }
                     // Remove events that exceed semester end date
                     let removedCount = 0;
                     eventsToRemove.forEach(eventToRemove => {
@@ -6463,6 +6844,11 @@
     async function eliminarEvento() {
       if (!eventoActual) return;
       if (!confirm('¿Estás seguro de que quieres eliminar este evento?')) return;
+      const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
+      if (segundoPaso !== 'ELIMINAR') {
+        alert('Eliminación cancelada.');
+        return;
+      }
       const btnEliminar = document.getElementById('btn-eliminar');
       btnEliminar.disabled = true; btnEliminar.textContent = '🗑️ Eliminando...';
       try {
