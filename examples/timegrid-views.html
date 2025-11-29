@@ -3947,6 +3947,55 @@
             const carrName = (carreras.find(c => c.id === d.carreraId) || {}).nombre || '(sin)';
             infoDiv.innerHTML = `<div style="font-weight:600">${d.nombre}</div><div style="font-size:13px">RUT:${d.rut} • Contrato:${d.contratoHoras || 24}h • Carrera: ${carrName}</div>`;
 
+            // Botón Ver detalles
+            const detailsBtn = document.createElement('button');
+            detailsBtn.textContent = 'Ver detalles';
+            detailsBtn.style.backgroundColor = '#2563eb';
+            detailsBtn.style.color = 'white';
+            detailsBtn.style.padding = '4px 8px';
+            detailsBtn.style.border = 'none';
+            detailsBtn.style.borderRadius = '4px';
+            detailsBtn.style.cursor = 'pointer';
+            detailsBtn.style.fontSize = '12px';
+            detailsBtn.style.marginRight = '8px';
+            detailsBtn.addEventListener('click', async () => {
+              try {
+                let detail = d;
+                if (USE_API) {
+                  const r = await authorizedFetch(API_BASE + '/docentes/' + encodeURIComponent(d.id));
+                  if (r.ok) detail = await r.json();
+                }
+                const modal = document.createElement('div');
+                modal.style.position = 'fixed';
+                modal.style.left = '50%';
+                modal.style.top = '50%';
+                modal.style.transform = 'translate(-50%, -50%)';
+                modal.style.background = '#fff';
+                modal.style.color = '#0f172a';
+                modal.style.padding = '20px';
+                modal.style.borderRadius = '16px';
+                modal.style.boxShadow = '0 20px 50px rgba(0,0,0,0.35)';
+                modal.style.width = 'min(540px,94vw)';
+                modal.style.maxHeight = '80vh';
+                modal.style.overflowY = 'auto';
+                modal.style.zIndex = '13000';
+                modal.setAttribute('role', 'dialog');
+                const closeBtn = document.createElement('button');
+                closeBtn.textContent = 'Cerrar';
+                closeBtn.style.position = 'absolute';
+                closeBtn.style.top = '10px';
+                closeBtn.style.right = '14px';
+                closeBtn.addEventListener('click', () => { try { document.body.removeChild(modal); } catch (_) {} });
+                const fields = Object.entries(detail).map(([k, v]) => `<tr><td style='font-weight:600;padding:6px 10px;border-bottom:1px solid #eef;'>${k}</td><td style='padding:6px 10px;border-bottom:1px solid #eef;'>${v == null ? '' : v}</td></tr>`).join('');
+                modal.innerHTML = `<h3 style='margin:0 0 12px;font-size:20px;'>Datos del Docente</h3><table style='width:100%;border-collapse:collapse;font-size:13px;'>${fields}</table>`;
+                modal.appendChild(closeBtn);
+                document.body.appendChild(modal);
+              } catch (err) {
+                console.error('ver detalles docente (modal list)', err);
+                alert('No se pudo cargar el detalle del docente.');
+              }
+            });
+
             // Botón eliminar docente
             const deleteBtn = document.createElement('button');
             deleteBtn.textContent = 'Eliminar';
@@ -4004,8 +4053,13 @@
               }
             });
 
+            const actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.alignItems = 'center';
+            actions.appendChild(detailsBtn);
+            actions.appendChild(deleteBtn);
             div.appendChild(infoDiv);
-            div.appendChild(deleteBtn);
+            div.appendChild(actions);
             body.appendChild(div);
           });
           const dModal = document.getElementById('list-docentes-modal'); if (dModal) { showModal(dModal); }
