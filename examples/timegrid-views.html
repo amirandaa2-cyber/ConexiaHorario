@@ -1167,9 +1167,9 @@
     const LOCAL_API_BASE = 'http://localhost:3001/api';
     const API_BASE_OVERRIDE_KEY = 'conexia_api_base_override';
 
-    // Sistema de bloques eliminado: volvemos a configuración genérica de intervalos de 30 minutos.
-    // Helpers sencillos para formatear horas.
-    const BLOCK_DURATION_MINUTES = 30;
+    // Sistema de bloques CEDUC: 22 bloques de 35 minutos.
+    const BLOCK_DURATION_MINUTES = 35;
+    const BLOCK_DURATION_HOURS = BLOCK_DURATION_MINUTES / 60;
 
 
     function pad2(num) {
@@ -1201,6 +1201,102 @@
       }
       selectEl.innerHTML = opts.join('');
     }
+
+  function getAvailableBlocks() {
+    if (typeof window === 'undefined') return [];
+    if (Array.isArray(window.CEDUC_BLOCKS) && window.CEDUC_BLOCKS.length) {
+      return window.CEDUC_BLOCKS;
+    }
+    if (Array.isArray(window.CEDUC_BLOQUES) && window.CEDUC_BLOQUES.length) {
+      return window.CEDUC_BLOQUES.map(b => ({ number: b.numero, start: b.inicio, end: b.fin, durationMinutes: b.duracion }));
+    }
+    return [];
+  }
+
+  function normalizeBlockTime(value) {
+    return normalizeTimeStr(value);
+  }
+
+  function getBlockIndexByStart(timeStr) {
+    const normalized = normalizeBlockTime(timeStr);
+    if (!normalized) return -1;
+    const blocks = getAvailableBlocks();
+    return blocks.findIndex((b) => normalizeBlockTime(b.start) === normalized);
+  }
+
+  function getBlockIndexByEnd(timeStr) {
+    const normalized = normalizeBlockTime(timeStr);
+    if (!normalized) return -1;
+    const blocks = getAvailableBlocks();
+    return blocks.findIndex((b) => normalizeBlockTime(b.end) === normalized);
+  }
+
+  function getBlockByStart(timeStr) {
+    const idx = getBlockIndexByStart(timeStr);
+    const blocks = getAvailableBlocks();
+    return idx >= 0 ? blocks[idx] : null;
+  }
+
+  function getBlockForTime(timeStr) {
+    const normalized = normalizeBlockTime(timeStr);
+    if (!normalized) return null;
+    const [hh, mm] = normalized.split(':').map(Number);
+    const minutes = hh * 60 + mm;
+    const blocks = getAvailableBlocks();
+    for (const block of blocks) {
+      const [sh, sm] = block.start.split(':').map(Number);
+      const [eh, em] = block.end.split(':').map(Number);
+      const startMinutes = sh * 60 + sm;
+      const endMinutes = eh * 60 + em;
+      if (minutes >= startMinutes && minutes < endMinutes) {
+        return block;
+      }
+    }
+    return getBlockByStart(normalized);
+  }
+
+  function isValidBlockRange(startTimeStr, blockCount) {
+    const normalized = normalizeBlockTime(startTimeStr);
+    if (!normalized) return false;
+    const startIdx = getBlockIndexByStart(normalized);
+    if (startIdx === -1) return false;
+    const count = Math.max(1, parseInt(blockCount, 10) || 1);
+    const blocks = getAvailableBlocks();
+    const endIdx = startIdx + count - 1;
+    return endIdx < blocks.length;
+  }
+
+  function computeEndDateFromBlocks(dateInput, timeStr, blockCount) {
+    const normalized = normalizeBlockTime(timeStr);
+    if (!normalized) return null;
+    const startIdx = getBlockIndexByStart(normalized);
+    if (startIdx === -1) return null;
+    const count = Math.max(1, parseInt(blockCount, 10) || 1);
+    const blocks = getAvailableBlocks();
+    const endIdx = startIdx + count - 1;
+    if (endIdx >= blocks.length) return null;
+    const baseDate = dateInput instanceof Date ? new Date(dateInput) : new Date(`${dateInput}T00:00:00`);
+    if (Number.isNaN(baseDate.getTime())) return null;
+    const startDate = new Date(baseDate);
+    const [sh, sm] = normalized.split(':').map(Number);
+    startDate.setHours(sh, sm, 0, 0);
+    const endDate = new Date(baseDate);
+    const [eh, em] = blocks[endIdx].end.split(':').map(Number);
+    endDate.setHours(eh, em, 0, 0);
+    return { startDate, endDate, startIdx, endIdx };
+  }
+
+  function computeBlocksBetweenDates(startDate, endDate) {
+    if (!(startDate instanceof Date) || !(endDate instanceof Date)) return 0;
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
+    const startIdx = getBlockIndexByStart(timeStrFromDate(startDate));
+    const endIdx = getBlockIndexByEnd(timeStrFromDate(endDate));
+    if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
+      return (endIdx - startIdx) + 1;
+    }
+    const diff = Math.max(0, (endDate.getTime() - startDate.getTime()) / 60000);
+    return Math.max(1, Math.round(diff / BLOCK_DURATION_MINUTES));
+  }
 
     function normalizeApiBase(url) {
       if (!url) return '';
@@ -3590,10 +3686,6 @@
       const listDocentes = document.getElementById('list-docentes');
       const docentesTools = document.getElementById('docentes-tools');
       const selectCarreraForModulo = document.getElementById('select-carrera');
-      const selectCarreraModalEl = document.getElementById('select-carrera-modal');
-      const selectCarreraList = document.getElementById('select-carrera-list');
-      const selectCarreraCloseBtn = document.getElementById('close-select-carrera-modal');
-      const selectCarreraAllBtn = document.getElementById('select-carrera-view-all');
       const openDocModalBtn = document.getElementById('open-doc-modal');
       const docModal = document.getElementById('doc-modal');
       const closeDocModalBtn = document.getElementById('close-doc-modal');
@@ -3882,38 +3974,13 @@
       }
 
       // Open a modal that lists modules for a career (or all)
-      function openListModulosModal(carreraId, options = {}) {
+      function openListModulosModal(carreraId) {
         try {
-          const { syncFilter = true } = options;
-          const filterSelect = document.getElementById('filter-carrera');
-          const resolvedCarreraId = (carreraId === undefined || carreraId === null)
-            ? (filterSelect?.value || '')
-            : carreraId;
-
-          if (syncFilter && filterSelect) {
-            filterSelect.value = resolvedCarreraId || '';
-            filterSelect.dispatchEvent(new Event('change'));
-          }
-
-          const info = document.getElementById('list-modulos-modal-info');
-          const listContainer = document.getElementById('list-modulos-modal-list');
-          if (!info || !listContainer) return;
-
-          listContainer.innerHTML = '';
-          const carreraSeleccionada = resolvedCarreraId ? carreras.find(c => String(c.id) === String(resolvedCarreraId)) : null;
-          info.textContent = carreraSeleccionada
-            ? `Paso 2: Módulos de ${carreraSeleccionada.nombre}`
-            : 'Paso 2: Mostrando todos los módulos disponibles.';
-
-          const items = modulos.filter(m => {
-            if (!resolvedCarreraId) return true;
-            return String(m.carreraId) === String(resolvedCarreraId);
-          });
-
-          if (items.length === 0) {
-            listContainer.innerHTML = '<div style="padding:8px; color:#475467;">No hay módulos para la carrera seleccionada.</div>';
-          }
-
+          if (carreraId) { const sel = document.getElementById('filter-carrera'); sel.value = carreraId; sel.dispatchEvent(new Event('change')); }
+          const body = document.getElementById('list-modulos-modal-body'); body.innerHTML = '';
+          const selectedCarrId = document.getElementById('filter-carrera')?.value || '';
+          const items = modulos.filter(m => !selectedCarrId || m.carreraId === selectedCarrId);
+          if (items.length === 0) { body.innerHTML = '<div>No hay módulos para la carrera seleccionada.</div>'; }
           items.forEach(m => {
             const div = document.createElement('div');
             div.style.padding = '8px';
@@ -3924,7 +3991,7 @@
 
             const infoDiv = document.createElement('div');
             const carr = carreras.find(c => c.id === m.carreraId);
-            infoDiv.innerHTML = `<div style="font-weight:600">${m.nombre}</div><div style="font-size:13px">ID:${m.id} • Horas:${m.horas} • ${m.tipo} • Carrera: ${carr ? carr.nombre : '(sin)'} </div>`;
+            infoDiv.innerHTML = `<div style="font-weight:600">${m.nombre}</div><div style="font-size:13px">ID:${m.id} • Horas:${m.horas} • ${m.tipo} • Carrera: ${carr ? carr.nombre : '(sin)'}</div>`;
 
             const buttonsDiv = document.createElement('div');
             buttonsDiv.style.display = 'flex';
@@ -3995,7 +4062,7 @@
                 refreshCalendarEvents();
 
                 // Recargar el modal
-                openListModulosModal(resolvedCarreraId, { syncFilter });
+                openListModulosModal(carreraId);
 
                 alert(`Módulo "${m.nombre}" eliminado exitosamente.`);
               }
@@ -4005,74 +4072,10 @@
             buttonsDiv.appendChild(deleteBtn);
             div.appendChild(infoDiv);
             div.appendChild(buttonsDiv);
-            listContainer.appendChild(div);
+            body.appendChild(div);
           });
           const mModal = document.getElementById('list-modulos-modal'); if (mModal) { showModal(mModal); }
         } catch (e) { console.error('openListModulosModal', e); }
-      }
-
-      function renderSelectCarreraList() {
-        if (!selectCarreraList) return;
-        selectCarreraList.innerHTML = '';
-        if (!carreras || carreras.length === 0) {
-          const empty = document.createElement('li');
-          empty.textContent = 'No hay carreras registradas.';
-          empty.style.padding = '8px';
-          selectCarreraList.appendChild(empty);
-          return;
-        }
-
-        carreras.forEach(c => {
-          const li = document.createElement('li');
-          li.style.padding = '12px';
-          li.style.border = '1px solid #eee';
-          li.style.borderRadius = '10px';
-          li.style.marginBottom = '10px';
-          li.style.display = 'flex';
-          li.style.alignItems = 'center';
-          li.style.gap = '12px';
-
-          const info = document.createElement('div');
-          info.style.flex = '1';
-          info.innerHTML = `<div style="font-weight:600;">${c.nombre}</div><div style="font-size:12px;color:#475467;">ID: ${c.id}</div>`;
-
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.textContent = 'Ver módulos';
-          btn.className = 'btn btn-outline-primary btn-sm';
-          btn.style.minWidth = '120px';
-          btn.style.textAlign = 'center';
-          btn.style.fontWeight = '600';
-          btn.addEventListener('click', () => {
-            if (selectCarreraModalEl) hideModal(selectCarreraModalEl);
-            setTimeout(() => openListModulosModal(c.id, { syncFilter: false }), 80);
-          });
-
-          li.appendChild(info);
-          li.appendChild(btn);
-          selectCarreraList.appendChild(li);
-        });
-      }
-
-      function openSelectCarreraModal() {
-        if (!selectCarreraModalEl) {
-          openListModulosModal();
-          return;
-        }
-        renderSelectCarreraList();
-        showModal(selectCarreraModalEl);
-      }
-
-      window.openSelectCarreraModal = openSelectCarreraModal;
-
-      if (selectCarreraCloseBtn) {
-        selectCarreraCloseBtn.addEventListener('click', () => hideModal(selectCarreraModalEl));
-      }
-      if (selectCarreraAllBtn) {
-        selectCarreraAllBtn.addEventListener('click', () => {
-          if (selectCarreraModalEl) hideModal(selectCarreraModalEl);
-          setTimeout(() => openListModulosModal('', { syncFilter: false }), 80);
-        });
       }
 
       // Open a modal that lists docentes for a career (or all)
@@ -4679,7 +4682,7 @@
 
       // Make dialog-like elements draggable by a unified handle.
       (function enableDraggableModals() {
-        const TARGET_SELECTORS = ['#assign-modal', '#doc-modal', '#carrera-modal', '#modulo-modal', '#sala-modal', '#list-modulos-modal', '#list-docentes-modal', '#list-salas-modal', '#select-carrera-modal', '#seed-summary-modal', '#auto-preview-modal', '#acople-preview-modal'];
+        const TARGET_SELECTORS = ['#assign-modal', '#doc-modal', '#carrera-modal', '#modulo-modal', '#sala-modal', '#list-modulos-modal', '#list-docentes-modal', '#list-salas-modal', '#seed-summary-modal', '#auto-preview-modal', '#acople-preview-modal'];
 
         function makeDraggable(modal) {
           if (!modal || modal.__draggable) return;
@@ -4874,7 +4877,7 @@
         try {
           if (!modal) return;
           // hide other modals
-          const selectors = ['#assign-modal', '#doc-modal', '#carrera-modal', '#modulo-modal', '#sala-modal', '#list-modulos-modal', '#list-docentes-modal', '#list-salas-modal', '#select-carrera-modal', '#seed-summary-modal', '#auto-preview-modal', '#acople-preview-modal'];
+          const selectors = ['#assign-modal', '#doc-modal', '#carrera-modal', '#modulo-modal', '#sala-modal', '#list-modulos-modal', '#list-docentes-modal', '#list-salas-modal', '#seed-summary-modal', '#auto-preview-modal', '#acople-preview-modal'];
           selectors.forEach(sel => { const el = document.querySelector(sel); if (el && el !== modal) { hideModal(el); } });
           // ensure backdrop exists
           let backdrop = document.getElementById('modal-backdrop');
@@ -6811,7 +6814,7 @@
         const lm = document.getElementById('list-modulos'); if (lm) lm.style.display = 'none';
         const ld = document.getElementById('list-docentes'); if (ld) ld.style.display = 'none';
         // wire sidebar quick-open buttons
-        const openModsBtn = document.getElementById('open-list-modulos-sidebar'); if (openModsBtn) openModsBtn.addEventListener('click', () => { openSelectCarreraModal(); });
+        const openModsBtn = document.getElementById('open-list-modulos-sidebar'); if (openModsBtn) openModsBtn.addEventListener('click', () => { openListModulosModal(document.getElementById('filter-carrera')?.value || ''); });
         const openDocsBtn = document.getElementById('open-list-docentes-sidebar'); if (openDocsBtn) openDocsBtn.addEventListener('click', () => { openListDocentesModal(document.getElementById('filter-carrera')?.value || ''); });
       } catch (e) { console.error('hide sidebar lists', e); }
 
@@ -8878,26 +8881,10 @@
   <div id="list-modulos-modal" class="app-modal app-modal--narrow" role="dialog" aria-modal="true" style="display:none">
     <h4>Módulos</h4>
     <div class="modal-body">
-      <div id="list-modulos-modal-body" style="padding:8px;">
-        <p id="list-modulos-modal-info" style="margin:0 0 12px 0; color:#475467; font-size:13px;">Selecciona una carrera para ver sus módulos.</p>
-        <div id="list-modulos-modal-list"></div>
-      </div>
+      <div id="list-modulos-modal-body" style="padding:8px;"></div>
     </div>
     <div class="modal-actions">
       <button id="close-list-modulos-modal" type="button">Cerrar</button>
-    </div>
-  </div>
-
-  <!-- Modal: seleccionar carrera antes de ver módulos -->
-  <div id="select-carrera-modal" class="app-modal app-modal--narrow" role="dialog" aria-modal="true" style="display:none">
-    <h4>Selecciona una carrera</h4>
-    <div class="modal-body">
-      <p style="margin:0 0 10px 0; color:#475467; font-size:13px;">Paso 1: Elige una carrera para consultar sus módulos.</p>
-      <ul id="select-carrera-list" style="list-style:none; padding:0; margin:0; max-height:55vh; overflow:auto;"></ul>
-    </div>
-    <div class="modal-actions" style="justify-content:space-between;">
-      <button id="select-carrera-view-all" type="button" class="btn btn-outline-primary">Ver todos los módulos</button>
-      <button id="close-select-carrera-modal" type="button">Cerrar</button>
     </div>
   </div>
 
