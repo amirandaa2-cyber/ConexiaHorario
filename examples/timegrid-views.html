@@ -1401,6 +1401,49 @@
     }
   }
 
+  function canSnapEventToBlocks(ev) {
+    try {
+      if (!ev) return false;
+      const startDate = coerceDate(ev.start);
+      if (!startDate) return false;
+      const blocks = getAvailableBlocks();
+      if (!blocks.length) return true;
+
+      const startBlock = getBlockForTime(timeStrFromDate(startDate));
+      if (!startBlock) return false;
+      const blockStartStr = normalizeBlockTime(startBlock.start);
+      if (!blockStartStr) return false;
+      const startIdx = getBlockIndexByStart(blockStartStr);
+      if (startIdx === -1) return false;
+
+      const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+      let desiredBlocks = 0;
+      if (meta && meta.bloques != null) {
+        const parsed = parseInt(meta.bloques, 10);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          desiredBlocks = parsed;
+        }
+      }
+
+      if (!desiredBlocks) {
+        const endDate = coerceDate(ev.end);
+        if (endDate) {
+          desiredBlocks = computeBlocksBetweenDates(startDate, endDate);
+        }
+      }
+
+      if (!Number.isFinite(desiredBlocks) || desiredBlocks <= 0) {
+        desiredBlocks = 1;
+      }
+
+      const endIdx = startIdx + desiredBlocks - 1;
+      return endIdx < blocks.length;
+    } catch (err) {
+      console.warn('canSnapEventToBlocks', err);
+      return false;
+    }
+  }
+
     function normalizeApiBase(url) {
       if (!url) return '';
       return String(url).trim().replace(/\/+$/, '');
@@ -4104,12 +4147,72 @@
         });
       }
 
-      // Open a modal that lists modules for a career (or all)
+      // Open a modal that lists modules for a career (or all), with a carrera picker UI
       function openListModulosModal(carreraId) {
         try {
-          if (carreraId) { const sel = document.getElementById('filter-carrera'); sel.value = carreraId; sel.dispatchEvent(new Event('change')); }
           const body = document.getElementById('list-modulos-modal-body'); body.innerHTML = '';
-          const selectedCarrId = document.getElementById('filter-carrera')?.value || '';
+
+          // If no carreraId provided, show carrera selector UI similar to the screenshot
+          if (!carreraId) {
+            const header = document.createElement('div');
+            header.style.marginBottom = '8px';
+            header.innerHTML = '<div style="font-weight:600">Paso 1: Elige una carrera para consultar sus módulos.</div>';
+            body.appendChild(header);
+            (carreras || []).forEach(c => {
+              const row = document.createElement('div');
+              row.style.padding = '10px';
+              row.style.marginBottom = '8px';
+              row.style.border = '1px solid #f5d0a6';
+              row.style.borderRadius = '10px';
+              row.style.background = 'var(--sidebar-card-bg)';
+              row.style.display = 'flex';
+              row.style.alignItems = 'center';
+              row.style.justifyContent = 'space-between';
+
+              const info = document.createElement('div');
+              info.innerHTML = `<div style="font-weight:600">${c.nombre}</div><div style="font-size:13px;color:#6b6b6b">ID: ${c.codigo || c.id}</div>`;
+
+              const btn = document.createElement('button');
+              btn.textContent = 'Ver módulos';
+              btn.style.padding = '6px 10px';
+              btn.style.border = '1px solid #f97316';
+              btn.style.color = '#f97316';
+              btn.style.background = 'white';
+              btn.style.borderRadius = '8px';
+              btn.style.cursor = 'pointer';
+              btn.addEventListener('click', () => {
+                openListModulosModal(c.id);
+              });
+
+              row.appendChild(info);
+              row.appendChild(btn);
+              body.appendChild(row);
+            });
+
+            const actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.justifyContent = 'space-between';
+            actions.style.marginTop = '12px';
+            const viewAll = document.createElement('button');
+            viewAll.textContent = 'Ver todos los módulos';
+            viewAll.className = 'assign-secondary';
+            viewAll.addEventListener('click', () => openListModulosModal('__ALL__'));
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = 'Cerrar';
+            closeBtn.addEventListener('click', () => { const mm = document.getElementById('list-modulos-modal'); if (mm) hideModal(mm); });
+            actions.appendChild(viewAll);
+            actions.appendChild(closeBtn);
+            body.appendChild(actions);
+
+            const mModal = document.getElementById('list-modulos-modal'); if (mModal) { mModal.querySelector('h4').textContent = 'Selecciona una carrera'; showModal(mModal); }
+            return;
+          }
+
+          // Filter and list modules for provided carrera or all
+          if (carreraId && carreraId !== '__ALL__') {
+            const sel = document.getElementById('filter-carrera'); if (sel) { sel.value = carreraId; sel.dispatchEvent(new Event('change')); }
+          }
+          const selectedCarrId = (carreraId && carreraId !== '__ALL__') ? carreraId : '';
           const items = modulos.filter(m => !selectedCarrId || m.carreraId === selectedCarrId);
           if (items.length === 0) { body.innerHTML = '<div>No hay módulos para la carrera seleccionada.</div>'; }
           items.forEach(m => {
@@ -4205,7 +4308,7 @@
             div.appendChild(buttonsDiv);
             body.appendChild(div);
           });
-          const mModal = document.getElementById('list-modulos-modal'); if (mModal) { showModal(mModal); }
+          const mModal = document.getElementById('list-modulos-modal'); if (mModal) { mModal.querySelector('h4').textContent = 'Módulos'; showModal(mModal); }
         } catch (e) { console.error('openListModulosModal', e); }
       }
 
