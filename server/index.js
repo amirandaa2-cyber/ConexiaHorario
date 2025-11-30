@@ -23,6 +23,7 @@ const ALLOWED_ROLE_CODES = (process.env.ALLOWED_ROLE_CODES || 'admin,docente')
 	.split(',')
 	.map((code) => code.trim().toLowerCase())
 	.filter(Boolean);
+const BLOCK_MINUTES = 35;
 
 function handleDbError(res, err){
   console.error('Database error', err);
@@ -160,6 +161,79 @@ function mapEventRow(row) {
 		salaId: linking.salaId,
 		extendedProps
 	};
+}
+
+function normalizeDateInput(value) {
+	if (!value) return null;
+	const date = value instanceof Date ? value : new Date(value);
+	return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getIsoWeekYear(value) {
+	const date = normalizeDateInput(value);
+	if (!date) return null;
+	const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+	const day = utcDate.getUTCDay() || 7;
+	utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+	const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+	const week = Math.ceil(((utcDate - yearStart) / 86400000 + 1) / 7);
+	return { week, year: utcDate.getUTCFullYear() };
+}
+
+function buildDocenteWeekKey(docenteId, startValue) {
+	if (!docenteId) return null;
+	const iso = getIsoWeekYear(startValue);
+	if (!iso) return null;
+	return {
+		docenteId: String(docenteId).trim(),
+		week: iso.week,
+		year: iso.year
+	};
+}
+
+function extractDocenteWeekKeyFromEventRow(row) {
+	if (!row) return null;
+	return buildDocenteWeekKey(row.docente_id ?? row.docenteId, row.start);
+}
+
+async function recalcDocenteSemanaHoras(key) {
+	if (!key || !dbReady) return;
+	const { docenteId, week, year } = key;
+	if (!docenteId || !Number.isInteger(week) || !Number.isInteger(year)) {
+		return;
+	}
+	const { rows } = await db.query(
+		`SELECT COALESCE(SUM(ROUND(EXTRACT(EPOCH FROM ("end" - start)) / (60.0 * $4))), 0)::int AS bloques
+		   FROM events
+		  WHERE docente_id = $1
+		    AND date_part('isoyear', start AT TIME ZONE 'UTC') = $2
+		    AND date_part('week', start AT TIME ZONE 'UTC') = $3`,
+		[docenteId, year, week, BLOCK_MINUTES]
+	);
+	const bloques = Number(rows[0]?.bloques) || 0;
+	if (bloques > 0) {
+		await db.query(
+			`INSERT INTO docente_semana_horas (docente_id, semana, "año", bloques_usados)
+			 VALUES ($1, $2, $3, $4)
+			 ON CONFLICT (docente_id, semana, "año") DO UPDATE
+			 SET bloques_usados = EXCLUDED.bloques_usados`,
+			[docenteId, week, year, bloques]
+		);
+	} else {
+		await db.query('DELETE FROM docente_semana_horas WHERE docente_id=$1 AND semana=$2 AND "año"=$3', [docenteId, week, year]);
+	}
+}
+
+async function refreshDocenteSemanaHoras(keys = []) {
+	if (!Array.isArray(keys) || !keys.length) return;
+	const seen = new Set();
+	for (const key of keys) {
+		if (!key || !key.docenteId || !Number.isInteger(key.week) || !Number.isInteger(key.year)) continue;
+		const signature = `${key.docenteId}__${key.week}__${key.year}`;
+		if (seen.has(signature)) continue;
+		seen.add(signature);
+		await recalcDocenteSemanaHoras(key);
+	}
 }
 
 async function fetchUserByEmail(email) {
@@ -776,7 +850,12 @@ if(dbReady){
 		const linking = extractEventLinking(payload);
 		const extendedProps = mergeMetaIntoExtendedProps(payload.extendedProps || {}, linking);
 		try{
-			await db.query(
+			let previousEvent = null;
+			if (payload.id) {
+				const prevResult = await db.query('SELECT docente_id, start FROM events WHERE id=$1 LIMIT 1', [id]);
+				previousEvent = prevResult.rows[0] || null;
+			}
+			const upsertResult = await db.query(
 				`INSERT INTO events (id,title,start,"end",modulo_id,docente_id,sala_id,extendedProps)
 				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 				 ON CONFLICT (id) DO UPDATE
@@ -786,10 +865,16 @@ if(dbReady){
 			     modulo_id=EXCLUDED.modulo_id,
 			     docente_id=EXCLUDED.docente_id,
 			     sala_id=EXCLUDED.sala_id,
-			     extendedProps=EXCLUDED.extendedProps,
-			     updated_at=NOW()`,
+		     extendedProps=EXCLUDED.extendedProps,
+		     updated_at=NOW()
+		     RETURNING id, docente_id, start`,
 				[id, payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedProps]
 			);
+			const savedEvent = upsertResult.rows[0] || null;
+			await refreshDocenteSemanaHoras([
+				extractDocenteWeekKeyFromEventRow(previousEvent),
+				extractDocenteWeekKeyFromEventRow(savedEvent)
+			]);
 			res.json({ok:true,id});
 		}catch(err){ handleDbError(res, err); }
 	});
@@ -799,17 +884,33 @@ if(dbReady){
 		const linking = extractEventLinking(payload);
 		const extendedProps = mergeMetaIntoExtendedProps(payload.extendedProps || {}, linking);
 		try{
-			await db.query(
-				'UPDATE events SET title=$1, start=$2, "end"=$3, modulo_id=$4, docente_id=$5, sala_id=$6, extendedProps=$7, updated_at=NOW() WHERE id=$8',
+			const existingResult = await db.query('SELECT docente_id, start FROM events WHERE id=$1 LIMIT 1', [req.params.id]);
+			if (!existingResult.rowCount) {
+				return res.status(404).json({ error: 'Evento no encontrado.' });
+			}
+			const previousEvent = existingResult.rows[0];
+			const updatedResult = await db.query(
+				'UPDATE events SET title=$1, start=$2, "end"=$3, modulo_id=$4, docente_id=$5, sala_id=$6, extendedProps=$7, updated_at=NOW() WHERE id=$8 RETURNING id, docente_id, start',
 				[payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedProps, req.params.id]
 			);
+			const updatedEvent = updatedResult.rows[0] || null;
+			await refreshDocenteSemanaHoras([
+				extractDocenteWeekKeyFromEventRow(previousEvent),
+				extractDocenteWeekKeyFromEventRow(updatedEvent)
+			]);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }
 	});
 
 	app.delete('/api/events/:id', async (req,res)=>{
 		try{
+			const existingResult = await db.query('SELECT docente_id, start FROM events WHERE id=$1 LIMIT 1', [req.params.id]);
+			if (!existingResult.rowCount) {
+				return res.status(404).json({ error: 'Evento no encontrado.' });
+			}
+			const previousEvent = existingResult.rows[0];
 			await db.query('DELETE FROM events WHERE id=$1', [req.params.id]);
+			await refreshDocenteSemanaHoras([extractDocenteWeekKeyFromEventRow(previousEvent)]);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }
 	});
