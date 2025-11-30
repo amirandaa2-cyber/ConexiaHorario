@@ -3104,9 +3104,16 @@
                 const ev = info.event;
                 console.debug('eventDrop invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
 
+                const canSnap = canSnapEventToBlocks(ev);
+                if (!canSnap) {
+                  alert('Debes ajustar el evento a un bloque válido.');
+                  if (typeof info.revert === 'function') info.revert();
+                  return;
+                }
+
                 const snapResult = realignToBlockRange(ev);
                 if (!snapResult) {
-                  alert('Debes ajustar el evento a un bloque válido.');
+                  console.warn('No se pudo alinear el evento tras validar los bloques permitidos.', ev && ev.id);
                   if (typeof info.revert === 'function') info.revert();
                   return;
                 }
@@ -3245,9 +3252,16 @@
                 const ev = info.event;
                 console.debug('eventResize invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
 
+                const canSnap = canSnapEventToBlocks(ev);
+                if (!canSnap) {
+                  alert('Debes ajustar el evento a un bloque válido.');
+                  if (typeof info.revert === 'function') info.revert();
+                  return;
+                }
+
                 const snapResult = realignToBlockRange(ev);
                 if (!snapResult) {
-                  alert('Debes ajustar el evento a un bloque válido.');
+                  console.warn('No se pudo ajustar el evento a los bloques válidos durante el redimensionado.', ev && ev.id);
                   if (typeof info.revert === 'function') info.revert();
                   return;
                 }
@@ -4212,6 +4226,25 @@
           if (carreraId && carreraId !== '__ALL__') {
             const sel = document.getElementById('filter-carrera'); if (sel) { sel.value = carreraId; sel.dispatchEvent(new Event('change')); }
           }
+          // Header with back button to return to carrera filter view
+          const header = document.createElement('div');
+          header.style.display = 'flex';
+          header.style.justifyContent = 'space-between';
+          header.style.alignItems = 'center';
+          header.style.margin = '0 0 10px 0';
+          const titleEl = document.createElement('div');
+          const selectedCarr = carreras.find(c => c.id === carreraId);
+          titleEl.textContent = selectedCarr ? selectedCarr.nombre : (carreraId === '__ALL__' ? 'Todos los módulos' : 'Módulos');
+          titleEl.style.fontWeight = '600';
+          const backBtn = document.createElement('button');
+          backBtn.textContent = '← Volver a carreras';
+          backBtn.className = 'assign-secondary';
+          backBtn.style.padding = '6px 10px';
+          backBtn.addEventListener('click', () => openListModulosModal(null));
+          header.appendChild(titleEl);
+          header.appendChild(backBtn);
+          body.appendChild(header);
+
           const selectedCarrId = (carreraId && carreraId !== '__ALL__') ? carreraId : '';
           const items = modulos.filter(m => !selectedCarrId || m.carreraId === selectedCarrId);
           if (items.length === 0) { body.innerHTML = '<div>No hay módulos para la carrera seleccionada.</div>'; }
