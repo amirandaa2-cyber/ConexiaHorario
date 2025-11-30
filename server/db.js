@@ -34,6 +34,11 @@ async function initializeSchema() {
 			colorVespertino TEXT
 		)`,
 		`ALTER TABLE carreras ADD COLUMN IF NOT EXISTS "jefeCarrera" VARCHAR(255)`,
+		`ALTER TABLE carreras ADD COLUMN IF NOT EXISTS totalHoras INTEGER`,
+		`ALTER TABLE carreras ADD COLUMN IF NOT EXISTS practicaHoras INTEGER`,
+		`ALTER TABLE carreras ADD COLUMN IF NOT EXISTS teoricaHoras INTEGER`,
+		`ALTER TABLE carreras ADD COLUMN IF NOT EXISTS colorDiurno TEXT`,
+		`ALTER TABLE carreras ADD COLUMN IF NOT EXISTS colorVespertino TEXT`,
 		`CREATE TABLE IF NOT EXISTS modulos (
 			id SERIAL PRIMARY KEY,
 			nombre VARCHAR(255) NOT NULL,
