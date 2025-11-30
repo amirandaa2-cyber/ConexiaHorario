@@ -3285,8 +3285,77 @@
               }
             };
           }
-          // Stub para evitar errores por llamadas residuales si existen
-          function realignToBlockRange(ev) { return ev; }
+          function realignToBlockRange(ev) {
+            try {
+              if (!ev || !ev.start) return null;
+              const blocks = getAvailableBlocks();
+              const originalStart = new Date(ev.start);
+              const originalEnd = ev.end ? new Date(ev.end) : null;
+              if (Number.isNaN(originalStart.getTime())) return null;
+
+              // Si no hay bloques definidos, no interferimos pero retornamos datos básicos
+              if (!blocks.length) {
+                return { startDate: originalStart, endDate: originalEnd, startIdx: -1, endIdx: -1, blocksUsed: 0 };
+              }
+
+              const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+              let blockCount = Math.max(1, parseInt(meta.bloques, 10) || 0);
+              if (!blockCount) {
+                const resolvedEnd = originalEnd && !Number.isNaN(originalEnd.getTime())
+                  ? originalEnd
+                  : new Date(originalStart.getTime() + BLOCK_DURATION_MINUTES * 60000);
+                blockCount = computeBlocksBetweenDates(originalStart, resolvedEnd) || 1;
+              }
+
+              const startTimeStr = normalizeTimeStr(timeStrFromDate(originalStart));
+              const maybeBlock = getBlockForTime(startTimeStr) || getBlockByStart(startTimeStr);
+              let startIdx = maybeBlock ? getBlockIndexByStart(maybeBlock.start) : -1;
+
+              if (startIdx === -1) {
+                const targetMinutes = originalStart.getHours() * 60 + originalStart.getMinutes();
+                let bestIdx = -1; let bestDelta = Infinity;
+                for (let i = 0; i < blocks.length; i++) {
+                  const normalizedStart = normalizeBlockTime(blocks[i].start);
+                  if (!normalizedStart) continue;
+                  const [h, m] = normalizedStart.split(':').map(Number);
+                  const minutes = h * 60 + m;
+                  const delta = Math.abs(minutes - targetMinutes);
+                  if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
+                }
+                startIdx = bestIdx;
+              }
+
+              if (startIdx === -1) return null;
+              const usableBlocks = Math.max(1, Math.min(blockCount, blocks.length - startIdx));
+              const baseDate = new Date(originalStart);
+              const startBlockStartStr = normalizeBlockTime(blocks[startIdx].start);
+              if (!startBlockStartStr) return null;
+              const range = computeEndDateFromBlocks(baseDate, startBlockStartStr, usableBlocks);
+              if (!range) return null;
+
+              ev.start = range.startDate.toISOString();
+              if (range.endDate) {
+                ev.end = range.endDate.toISOString();
+              }
+              ev.extendedProps = ev.extendedProps || {};
+              ev.extendedProps.__meta = ev.extendedProps.__meta || {};
+              ev.extendedProps.__meta.horas = usableBlocks * BLOCK_DURATION_HOURS;
+              ev.extendedProps.__meta.bloques = usableBlocks;
+              ev.extendedProps.__meta.bloqueInicio = range.startIdx + 1;
+              ev.extendedProps.__meta.bloqueFin = range.endIdx + 1;
+
+              return {
+                startDate: range.startDate,
+                endDate: range.endDate,
+                startIdx: range.startIdx,
+                endIdx: range.endIdx,
+                blocksUsed: usableBlocks
+              };
+            } catch (err) {
+              console.warn('realignToBlockRange error', err);
+              return null;
+            }
+          }
 
           // ===== Tooltips y consistencia en títulos =====
           function formatearHora(fecha) {
@@ -4622,7 +4691,8 @@
       // Usar select genérico de intervalos de 30 minutos
       populateTimeSelect(assignTimeInput);
       if (assignTimeInput && !assignTimeInput.value) {
-        assignTimeInput.value = CEDUC_BLOCKS[0]?.start || '';
+        const blockList = getAvailableBlocks();
+        assignTimeInput.value = blockList.length ? normalizeBlockTime(blockList[0].start) : '';
       }
 
       function getSemesterEndValue() {
@@ -4927,7 +4997,10 @@
         const defaultBlocks = Number(modulo.horasSemanales ?? modulo.horas ?? 1) || 1;
         assignDurationInput.value = Math.max(1, Math.round(defaultBlocks));
         assignDateInput.value = new Date().toISOString().slice(0, 10);
-        assignTimeInput.value = CEDUC_BLOCKS[0]?.start || '';
+        {
+          const blockList = getAvailableBlocks();
+          assignTimeInput.value = blockList.length ? normalizeBlockTime(blockList[0].start) : '';
+        }
         if (assignRepeatInput) assignRepeatInput.checked = false;
         if (assignRepeatSemesterInput) assignRepeatSemesterInput.checked = false;
         if (assignUntilInput) { assignUntilInput.value = ''; assignUntilInput.removeAttribute('disabled'); }
@@ -5512,14 +5585,20 @@
           const hours = typeof meta.horas === 'number'
             ? meta.horas
             : Math.max(0, (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60));
-
-          const startBlock = getBlockForTime(timeStrFromDate(startTime)) || getBlockByStart(timeStrFromDate(startTime));
-          const endBlockMatch = CEDUC_BLOCKS.find(b => b.end === normalizeTimeStr(timeStrFromDate(endTime)));
-          if (!startBlock) {
-            msgs.push('El inicio debe coincidir con uno de los bloques oficiales (1-22).');
-          }
-          if (!endBlockMatch) {
-            msgs.push('El término debe coincidir con el fin de un bloque oficial.');
+          const blockList = getAvailableBlocks();
+          if (blockList.length) {
+            const startTimeStr = normalizeTimeStr(timeStrFromDate(startTime));
+            const endTimeStr = normalizeTimeStr(timeStrFromDate(endTime));
+            const startBlock = getBlockForTime(startTimeStr) || getBlockByStart(startTimeStr);
+            const endBlockMatch = blockList.find(b => normalizeTimeStr(b.end) === endTimeStr) || null;
+            if (!startBlock) {
+              msgs.push('El inicio debe coincidir con uno de los bloques oficiales (1-22).');
+            }
+            if (!endBlockMatch) {
+              msgs.push('El término debe coincidir con el fin de un bloque oficial.');
+            }
+          } else {
+            console.warn('validateCandidateEvent: no hay bloques configurados, se omite validación por bloque.');
           }
 
           // docente hours
@@ -5532,7 +5611,11 @@
           if (conflicts.length) {
             conflicts.forEach(c => { msgs.push(`Conflicto de ${c.type} con evento: ${c.event.title} (${c.event.start} - ${c.event.end})`); });
           }
-        } catch (err) { console.error('validateCandidateEvent', err); msgs.push('Error validando evento'); }
+        } catch (err) {
+          console.error('validateCandidateEvent', err);
+          const errMsg = err && err.message ? err.message : 'Error desconocido';
+          msgs.push('Error validando evento: ' + errMsg);
+        }
         return msgs;
       }
 
@@ -6593,7 +6676,12 @@
         const startTimeStr = normalizeTimeStr(timeStrFromDate(s));
         if (editStartTimeSel) {
           const block = getBlockForTime(startTimeStr) || getBlockByStart(startTimeStr);
-          editStartTimeSel.value = block ? block.start : (CEDUC_BLOCKS[0]?.start || '');
+          if (block) {
+            editStartTimeSel.value = block.start;
+          } else {
+            const blockList = getAvailableBlocks();
+            editStartTimeSel.value = blockList.length ? normalizeBlockTime(blockList[0].start) : '';
+          }
         }
         const blockCount = computeBlocksBetweenDates(new Date(eventApi.start), new Date(eventApi.end));
         document.getElementById('edit-duration').value = blockCount;
