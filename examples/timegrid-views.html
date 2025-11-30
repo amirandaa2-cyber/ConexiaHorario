@@ -1427,6 +1427,22 @@
       }
     }
 
+    function normalizeDocenteRecord(d) {
+      try {
+        const out = Object.assign({}, d);
+        const semanal = out.ContratoHoraSemanal;
+        const legacy = out.contratoHoras;
+        // Prefer weekly contract; fallback to legacy; default to 24 if falsy or zero
+        const val = parseFloat(semanal != null ? semanal : legacy);
+        const sane = Number.isFinite(val) && val > 0 ? val : 24;
+        out.ContratoHoraSemanal = sane;
+        out.contratoHoras = sane;
+        return out;
+      } catch (_) {
+        return Object.assign({ contratoHoras: 24, ContratoHoraSemanal: 24 }, d || {});
+      }
+    }
+
     function detectDefaultApiBase() {
       if (typeof window === 'undefined') return REMOTE_API_BASE;
 
@@ -1845,6 +1861,7 @@
 
           carreras = (carreras || []).map(normalizeCarreraRecord);
           modulos = (modulos || []).map(m => normalizeModuloRecord(m, carreras));
+          docentes = (docentes || []).map(normalizeDocenteRecord);
           templates = (templates || []).map(normalizeTemplateRecord);
 
       storedEvents = (storedEvents || []).map(ev => {
@@ -2850,6 +2867,15 @@
                 const startIso = ev.start.toISOString();
                 const endIso = ev.end ? ev.end.toISOString() : null;
 
+                // Early dedupe guard: if an event with same id and same start/end is already stored, skip
+                const preExistingSame = storedEvents.find(se => {
+                  try { return se.id === ev.id && se.start === startIso && se.end === endIso; } catch (_) { return false; }
+                });
+                if (preExistingSame) {
+                  console.warn('eventAdd deduped: same id/start/end already persisted');
+                  return;
+                }
+
                 // VALIDACIÓN CRÍTICA: Verificar fin de semestre
                 const semesterEndInput = document.getElementById('semester-end')?.value;
                 if (semesterEndInput) {
@@ -2952,7 +2978,7 @@
                   }
                 }
 
-                // persist using event id
+                // persist using event id (dedupe safeguard)
                 const existingIdx = storedEvents.findIndex(se => se.id === ev.id);
                 if (existingIdx === -1) {
                   const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
@@ -2964,7 +2990,11 @@
                     editable: true,
                     extendedProps: { __meta: meta }
                   };
-                  storedEvents.push(toStore);
+                  // Prevent duplicates: ensure same title+start+end not already present
+                  const dupIdx = storedEvents.findIndex(se => se.title === toStore.title && se.start === toStore.start && se.end === toStore.end);
+                  if (dupIdx === -1) {
+                    storedEvents.push(toStore);
+                  }
                   console.log('Evento agregado exitosamente:', toStore.title);
                   debouncedPersistEvents();
                 } else {
@@ -5580,8 +5610,9 @@
       function canAssignHours(docenteId, additionalHours, dateIso = null) {
         const d = docentes.find(x => x.id === docenteId);
         if (!d) return { ok: false, reason: 'Docente no encontrado' };
-        // Usar nueva columna ContratoHoraSemanal si existe; fallback a contratoHoras
-        const contrato = parseFloat((d.ContratoHoraSemanal != null ? d.ContratoHoraSemanal : d.contratoHoras) || 24);
+        // Usar ContratoHoraSemanal preferentemente, con fallback y default seguro
+        const contratoRaw = (d.ContratoHoraSemanal != null ? d.ContratoHoraSemanal : d.contratoHoras);
+        const contrato = Number.isFinite(parseFloat(contratoRaw)) && parseFloat(contratoRaw) > 0 ? parseFloat(contratoRaw) : 24;
         const r = getWeekRange(dateIso);
         const assigned = computeAssignedHoursForDocente(docenteId, r[0], r[1]);
         const will = assigned + (additionalHours || 0);
@@ -5673,7 +5704,8 @@
 
           for (const d of docentes) {
             const assigned = computeAssignedHoursForDocente(d.id);
-            const contrato = parseFloat(d.contratoHoras || 24);
+            const contratoRaw = (d.ContratoHoraSemanal != null ? d.ContratoHoraSemanal : d.contratoHoras);
+            const contrato = Number.isFinite(parseFloat(contratoRaw)) && parseFloat(contratoRaw) > 0 ? parseFloat(contratoRaw) : 24;
             if (assigned > contrato) {
               showValidationMessage(`Docente ${d.nombre} supera contrato: asignadas ${assigned.toFixed(2)}h / contrato ${contrato}h`, 'error');
                       // Open richer conflict modal with options to inspect and reschedule
