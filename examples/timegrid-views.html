@@ -6863,82 +6863,6 @@
       const migrateBtn = document.getElementById('migrate-server');
       if (migrateBtn) { migrateBtn.addEventListener('click', () => { migrateToServer(); }); }
 
-      // Buttons for quick seed data and clear
-      const seedDataBtn = document.getElementById('seed-data');
-      if (seedDataBtn) {
-        seedDataBtn.addEventListener('click', function () {
-        try {
-          console.log('seed-data clicked');
-          // ask user
-          if (!confirm('Generar datos de ejemplo (múltiples carreras, módulos, docentes y salas)?')) return;
-          // seed: create 2 careers with 8 modules each and 5 docentes per career
-          const careerNames = ['Informática', 'Matemáticas'];
-          carreras = careerNames.map((name, i) => ({ id: 'C-' + String(i + 1).padStart(3, '0'), nombre: name, totalHoras: 4000, practicaHoras: 800, teoricaHoras: 3200, colorDiurno: ['#3b82f6', '#10b981'][i % 2], colorVespertino: ['#60a5fa', '#34d399'][i % 2] }));
-          // modules: 8 per career
-          modulos = [];
-          let modCounter = 1;
-          carreras.forEach(c => {
-            for (let j = 0; j < 8; j++) {
-              const id = 'M-' + String(modCounter++).padStart(3, '0');
-              const tipo = (j % 3 === 0) ? 'Práctico' : 'Teórico';
-              modulos.push({ id, nombre: `${c.nombre} Módulo ${j + 1}`, carreraId: c.id, horas: (tipo === 'Práctico' ? 4 : 3), tipo });
-            }
-          });
-          // docentes: 5 per career, contrato semanal ~24h -> store contratoHoras=24 and contratoMensual (~24*4.33)
-          docentes = [];
-          let docCounter = 1;
-          carreras.forEach((c, ci) => {
-            for (let k = 0; k < 5; k++) {
-              const turno = (k % 2 === 0) ? 'Diurno' : 'Vespertino';
-              const contratoSem = 24; // weekly hours
-              const contratoMensual = Math.round(contratoSem * 4.3333 * 100) / 100; // approx monthly
-              docentes.push({ id: 'doc_' + docCounter, rut: (10000000 + docCounter) + '-X', nombre: `Profesor ${docCounter}`, edad: 30 + (docCounter % 10), estadoCivil: 'Soltero', contratoHoras: contratoSem, contratoMensual: contratoMensual, horasAsignadas: 0, horasTrabajadas: 0, turno, activo: true, carreraId: c.id });
-              docCounter++;
-            }
-          });
-          // salas: minimal rooms to function: 2 salas per career (can host parallel classes)
-          salas = [];
-          let salaCounter = 1;
-          carreras.forEach(c => {
-            salas.push({ id: 'S-' + String(salaCounter).padStart(2, '0'), nombre: `${c.nombre} Sala 1`, capacidad: 30, carreraId: c.id }); salaCounter++;
-            salas.push({ id: 'S-' + String(salaCounter).padStart(2, '0'), nombre: `${c.nombre} Sala 2`, capacidad: 20, carreraId: c.id }); salaCounter++;
-          });
-          // clear events
-          // Do NOT generate scheduled events when seeding — only create raw data (carreras, modulos, docentes, salas)
-          // This leaves storedEvents empty so the seed button only populates the raw entities.
-          storedEvents = [];
-          const weekStart = document.getElementById('filter-week')?.value || getWeekRange()[0];
-          let createdEvents = 0;
-          // persist all
-          save(KEY_CARRERAS, carreras); save(KEY_MODULOS, modulos); save(KEY_DOCENTES, docentes); save(KEY_SALAS, salas);
-          persistEventsAndValidate();
-          renderCarreras(); renderModulos(); renderDocentes(); renderRooms();
-          // navigate calendar to the seeded week so user sees results
-          try { if (calendar && calendar.gotoDate) calendar.gotoDate(weekStart); } catch (e) { }
-          refreshCalendarEvents();
-
-          // show a visible modal summary with counts and sample events so user sees the result
-          (function showSeedSummary() {
-            const summaryId = 'seed-summary-modal';
-            let existing = document.getElementById(summaryId);
-            if (existing) existing.parentNode.removeChild(existing);
-            const modal = document.createElement('div');
-            modal.id = summaryId;
-            modal.setAttribute('role', 'dialog');
-            modal.setAttribute('aria-modal', 'true');
-            modal.classList.add('app-modal', 'app-modal--wide');
-            const createdList = storedEvents.slice(0, 10).map(e => `<li>${e.title} — ${e.start.replace('T', ' ')} to ${e.end.replace('T', ' ')}</li>`).join('');
-            modal.innerHTML = `<h4>Semilla creada</h4><div class="modal-body">Se han creado: <strong>${carreras.length}</strong> carreras, <strong>${modulos.length}</strong> módulos, <strong>${docentes.length}</strong> docentes, <strong>${salas.length}</strong> salas, <strong>${createdEvents}</strong> eventos.<div style="margin-top:8px;"><strong>Eventos (muestras):</strong><ul>${createdList || '<li>(ninguno)</li>'}</ul></div></div><div class="modal-actions"><button id="seed-summary-close" type="button">Cerrar</button><button id="seed-summary-focus" type="button">Ir a calendario</button></div>`;
-            document.body.appendChild(modal);
-            showModal(modal);
-            const closeBtn = document.getElementById('seed-summary-close');
-            const focusBtn = document.getElementById('seed-summary-focus');
-            if (closeBtn) closeBtn.addEventListener('click', () => { hideModal(modal); modal.remove(); });
-            if (focusBtn) focusBtn.addEventListener('click', () => { try { if (calendar && calendar.gotoDate) calendar.gotoDate(weekStart); } catch (e) { } hideModal(modal); modal.remove(); });
-          })();
-        } catch (err) { console.error('Error in seed-data handler', err); alert('Error creando semilla: ' + (err && err.message ? err.message : String(err))); }
-        });
-      }
 
       // Ensure SheetJS is available, then export selected in-memory arrays to a multi-sheet .xlsx
       function ensureSheetJS(cb) {
@@ -6989,63 +6913,6 @@
         });
       }
 
-      const clearDataBtn = document.getElementById('clear-data');
-      if (clearDataBtn) {
-        clearDataBtn.addEventListener('click', async function () {
-          if (!confirm('Borrar datos guardados?')) return;
-          const segundoPaso = prompt('Para confirmar la eliminación, escriba ELIMINAR');
-          if (segundoPaso !== 'ELIMINAR') {
-            alert('Eliminación cancelada.');
-            return;
-          }
-          if (USE_API) {
-            const base = API_BASE;
-            const pathsInOrder = ['/events', '/templates', '/salas', '/docentes', '/modulos', '/carreras'];
-            for (const path of pathsInOrder) {
-              try {
-                const response = await authorizedFetch(base + path);
-                const items = response.ok ? await response.json() : [];
-                for (const item of items || []) {
-                  const id = item && item.id;
-                  if (!id) continue;
-                  try {
-                    await authorizedFetch(base + path + '/' + encodeURIComponent(id), { method: 'DELETE' });
-                  } catch (err) {
-                    console.warn('No se pudo eliminar', path, id, err);
-                  }
-                }
-              } catch (err) {
-                console.warn('No se pudieron limpiar recursos en', path, err);
-              }
-            }
-          } else {
-            localStorage.removeItem(KEY_CARRERAS);
-            localStorage.removeItem(KEY_MODULOS);
-            localStorage.removeItem(KEY_DOCENTES);
-            localStorage.removeItem(KEY_EVENTS);
-            localStorage.removeItem(KEY_TEMPLATES);
-            localStorage.removeItem(KEY_SALAS);
-          }
-          carreras = [];
-          modulos = [];
-          docentes = [];
-          storedEvents = [];
-          templates = [];
-          salas = [];
-          save(KEY_CARRERAS, carreras);
-          save(KEY_MODULOS, modulos);
-          save(KEY_DOCENTES, docentes);
-          save(KEY_TEMPLATES, templates);
-          save(KEY_SALAS, salas);
-          persistEventsAndValidate();
-          renderCarreras();
-          renderModulos();
-          renderDocentes();
-          renderRooms();
-          refreshCalendarEvents();
-          try { showResultModal('Datos limpiados correctamente.', 'success'); } catch (_) { alert('Datos limpiados correctamente.'); }
-        });
-      }
 
       const runAcopleBtn = document.getElementById('run-acople');
       if (runAcopleBtn) {
@@ -8779,14 +8646,6 @@
           <div class="entity-section">
             <div class="entity-title">🧰 Herramientas rápidas</div>
             <div class="d-flex flex-column gap-3 align-items-stretch">
-              <button id="seed-data" type="button" class="btn btn-outline-secondary btn-hover-lift"
-                title="Cargar datos de ejemplo para probar el flujo">
-                🌱 Semillas (ejemplo)
-              </button>
-              <button id="clear-data" type="button" class="btn btn-outline-secondary btn-hover-lift"
-                title="Eliminar toda la información local">
-                🗑️ Borrar datos
-              </button>
               <button id="run-acople" type="button" class="btn btn-secondary btn-hover-lift"
                 title="Reacomoda eventos para cerrar huecos">
                 🔧 Ejecutar Acople
