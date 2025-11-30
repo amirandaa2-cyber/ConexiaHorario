@@ -133,6 +133,14 @@ async function initializeSchema() {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_start ON events (start)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_modulo ON events (modulo_id)`,
+		`CREATE TABLE IF NOT EXISTS docente_semana_horas (
+			docente_id VARCHAR(20) REFERENCES docentes(id) ON DELETE CASCADE,
+			semana INTEGER NOT NULL,
+			"año" INTEGER NOT NULL,
+			bloques_usados INTEGER DEFAULT 0,
+			horas_usadas NUMERIC(5,2) GENERATED ALWAYS AS (bloques_usados * 35.0 / 60.0) STORED,
+			PRIMARY KEY (docente_id, semana, "año")
+		)`,
 		`CREATE TABLE IF NOT EXISTS auth_role (
 			id SERIAL PRIMARY KEY,
 			code TEXT UNIQUE NOT NULL,
