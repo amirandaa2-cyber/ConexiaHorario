@@ -204,7 +204,9 @@
       position: sticky;
       top: 0;
       z-index: 10002;
-      background: inherit;
+      background: linear-gradient(90deg, var(--brand-orange), #ff9f43);
+      color: #fff;
+      box-shadow: 0 6px 18px rgba(249, 115, 22, 0.24);
     }
 
     /* Ensure modal children use border-box sizing so padding doesn't break measurements */
@@ -7813,6 +7815,16 @@
       background: rgba(255, 255, 255, 0.02);
     }
 
+    #sidebar .entity-section .btn {
+      margin-bottom: 8px;
+    }
+
+    #sidebar .entity-section .btn:last-child,
+    #sidebar .entity-section .d-grid > :last-child .btn,
+    #sidebar .entity-section .d-flex > :last-child .btn {
+      margin-bottom: 0;
+    }
+
     .sidebar-group.collapsed .sidebar-group-content {
       display: none;
     }
@@ -8038,18 +8050,30 @@
     }
 
     .modal-close-btn {
-      background: transparent;
+      position: relative;
+      background: #fff;
       border: none;
-      color: white;
-      font-size: 18px;
+      color: var(--brand-orange);
+      font-size: 0;
       line-height: 1;
       cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 6px;
+      padding: 6px 12px;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+    }
+
+    .modal-close-btn::before {
+      content: "×";
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--brand-orange);
+      display: inline-block;
+      line-height: 1;
     }
 
     .modal-close-btn:hover {
-      background: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.24);
+      transform: translateY(-1px);
     }
 
     /* Modal buttons */
@@ -8722,7 +8746,7 @@
               <div class="d-grid gap-2">
                 <button id="open-list-docentes-sidebar" type="button" class="btn btn-outline-primary btn-hover-lift"
                   title="Ver el listado completo de docentes">
-                  📋 Ver Docentes
+                  👁️ Ver Docentes
                 </button>
               </div>
             </div>
@@ -8738,7 +8762,7 @@
               <div class="d-grid gap-2">
                 <button id="ver-salas" type="button" class="btn btn-outline-primary btn-hover-lift"
                   title="Ver todas las salas registradas">
-                  🗂️ Ver Salas
+                  👁️ Ver Salas
                 </button>
               </div>
             </div>
