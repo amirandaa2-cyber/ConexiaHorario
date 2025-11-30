@@ -1298,6 +1298,109 @@
     return Math.max(1, Math.round(diff / BLOCK_DURATION_MINUTES));
   }
 
+  function coerceDate(value) {
+    if (!value) return null;
+    try {
+      if (value instanceof Date) {
+        const clone = new Date(value.getTime());
+        return Number.isNaN(clone.getTime()) ? null : clone;
+      }
+      if (typeof value === 'string') {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+      if (typeof value === 'number') {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function realignToBlockRange(ev) {
+    try {
+      if (!ev) return null;
+      const startDate = coerceDate(ev.start);
+      if (!startDate) return null;
+      const declaredEnd = coerceDate(ev.end);
+      const blocks = getAvailableBlocks();
+      const fallbackEnd = declaredEnd || new Date(startDate.getTime() + BLOCK_DURATION_MINUTES * 60000);
+
+      if (!blocks.length) {
+        return {
+          startDate,
+          endDate: fallbackEnd,
+          startIdx: -1,
+          endIdx: -1,
+          blocksUsed: computeBlocksBetweenDates(startDate, fallbackEnd) || 1
+        };
+      }
+
+      const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+      let desiredBlocks = parseInt(meta.bloques, 10);
+      if (!Number.isFinite(desiredBlocks) || desiredBlocks <= 0) {
+        desiredBlocks = computeBlocksBetweenDates(startDate, fallbackEnd) || 1;
+      }
+
+      const startTimeStr = normalizeTimeStr(timeStrFromDate(startDate));
+      let startIdx = getBlockIndexByStart(startTimeStr);
+      if (startIdx === -1) {
+        const targetMinutes = startDate.getHours() * 60 + startDate.getMinutes();
+        let bestIdx = -1;
+        let bestDelta = Infinity;
+        for (let i = 0; i < blocks.length; i++) {
+          const normalizedStart = normalizeBlockTime(blocks[i].start);
+          if (!normalizedStart) continue;
+          const [h, m] = normalizedStart.split(':').map(Number);
+          const minutes = h * 60 + m;
+          const delta = Math.abs(minutes - targetMinutes);
+          if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
+        }
+        startIdx = bestIdx;
+      }
+      if (startIdx === -1) return null;
+
+      const maxBlocks = blocks.length - startIdx;
+      const usableBlocks = Math.max(1, Math.min(desiredBlocks, maxBlocks));
+      const blockStartStr = normalizeBlockTime(blocks[startIdx].start);
+      if (!blockStartStr) return null;
+      const range = computeEndDateFromBlocks(startDate, blockStartStr, usableBlocks);
+      if (!range) return null;
+
+      const blocksUsed = (range.endIdx >= range.startIdx)
+        ? ((range.endIdx - range.startIdx) + 1)
+        : usableBlocks;
+
+      if (typeof ev.setStart === 'function') {
+        ev.setStart(range.startDate);
+        if (range.endDate) ev.setEnd(range.endDate); else ev.setEnd(null);
+      } else {
+        ev.start = range.startDate.toISOString();
+        ev.end = range.endDate ? range.endDate.toISOString() : null;
+      }
+
+      ev.extendedProps = ev.extendedProps || {};
+      ev.extendedProps.__meta = ev.extendedProps.__meta || {};
+      ev.extendedProps.__meta.horas = blocksUsed * BLOCK_DURATION_HOURS;
+      ev.extendedProps.__meta.bloques = blocksUsed;
+      ev.extendedProps.__meta.bloqueInicio = range.startIdx + 1;
+      ev.extendedProps.__meta.bloqueFin = range.endIdx + 1;
+
+      return {
+        startDate: range.startDate,
+        endDate: range.endDate,
+        startIdx: range.startIdx,
+        endIdx: range.endIdx,
+        blocksUsed
+      };
+    } catch (err) {
+      console.warn('realignToBlockRange', err);
+      return null;
+    }
+  }
+
     function normalizeApiBase(url) {
       if (!url) return '';
       return String(url).trim().replace(/\/+$/, '');
@@ -3284,77 +3387,6 @@
                 __meta: (eventoOriginal.extendedProps && eventoOriginal.extendedProps.__meta) || {}
               }
             };
-          }
-          function realignToBlockRange(ev) {
-            try {
-              if (!ev || !ev.start) return null;
-              const blocks = getAvailableBlocks();
-              const originalStart = new Date(ev.start);
-              const originalEnd = ev.end ? new Date(ev.end) : null;
-              if (Number.isNaN(originalStart.getTime())) return null;
-
-              // Si no hay bloques definidos, no interferimos pero retornamos datos básicos
-              if (!blocks.length) {
-                return { startDate: originalStart, endDate: originalEnd, startIdx: -1, endIdx: -1, blocksUsed: 0 };
-              }
-
-              const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
-              let blockCount = Math.max(1, parseInt(meta.bloques, 10) || 0);
-              if (!blockCount) {
-                const resolvedEnd = originalEnd && !Number.isNaN(originalEnd.getTime())
-                  ? originalEnd
-                  : new Date(originalStart.getTime() + BLOCK_DURATION_MINUTES * 60000);
-                blockCount = computeBlocksBetweenDates(originalStart, resolvedEnd) || 1;
-              }
-
-              const startTimeStr = normalizeTimeStr(timeStrFromDate(originalStart));
-              const maybeBlock = getBlockForTime(startTimeStr) || getBlockByStart(startTimeStr);
-              let startIdx = maybeBlock ? getBlockIndexByStart(maybeBlock.start) : -1;
-
-              if (startIdx === -1) {
-                const targetMinutes = originalStart.getHours() * 60 + originalStart.getMinutes();
-                let bestIdx = -1; let bestDelta = Infinity;
-                for (let i = 0; i < blocks.length; i++) {
-                  const normalizedStart = normalizeBlockTime(blocks[i].start);
-                  if (!normalizedStart) continue;
-                  const [h, m] = normalizedStart.split(':').map(Number);
-                  const minutes = h * 60 + m;
-                  const delta = Math.abs(minutes - targetMinutes);
-                  if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
-                }
-                startIdx = bestIdx;
-              }
-
-              if (startIdx === -1) return null;
-              const usableBlocks = Math.max(1, Math.min(blockCount, blocks.length - startIdx));
-              const baseDate = new Date(originalStart);
-              const startBlockStartStr = normalizeBlockTime(blocks[startIdx].start);
-              if (!startBlockStartStr) return null;
-              const range = computeEndDateFromBlocks(baseDate, startBlockStartStr, usableBlocks);
-              if (!range) return null;
-
-              ev.start = range.startDate.toISOString();
-              if (range.endDate) {
-                ev.end = range.endDate.toISOString();
-              }
-              ev.extendedProps = ev.extendedProps || {};
-              ev.extendedProps.__meta = ev.extendedProps.__meta || {};
-              ev.extendedProps.__meta.horas = usableBlocks * BLOCK_DURATION_HOURS;
-              ev.extendedProps.__meta.bloques = usableBlocks;
-              ev.extendedProps.__meta.bloqueInicio = range.startIdx + 1;
-              ev.extendedProps.__meta.bloqueFin = range.endIdx + 1;
-
-              return {
-                startDate: range.startDate,
-                endDate: range.endDate,
-                startIdx: range.startIdx,
-                endIdx: range.endIdx,
-                blocksUsed: usableBlocks
-              };
-            } catch (err) {
-              console.warn('realignToBlockRange error', err);
-              return null;
-            }
           }
 
           // ===== Tooltips y consistencia en títulos =====
