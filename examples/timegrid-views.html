@@ -901,7 +901,13 @@
           (window.carreras||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.nombre; selCarrera.appendChild(o); });
           // Modulos
           selModulo.innerHTML='';
-          (window.modulos||[]).forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=`${m.codigo||m.id} - ${m.nombre}`; selModulo.appendChild(o); });
+          (window.modulos||[]).forEach(m=>{
+          const codigo = m.codigoAsignatura || m.codigo || m.id;
+          const o=document.createElement('option');
+          o.value=m.id;
+          o.textContent=`${codigo} - ${m.nombre}`;
+          selModulo.appendChild(o);
+          });
           // Docentes
           selDocente.innerHTML='';
           (window.docentes||[]).filter(d=>d.activo!==false).forEach(d=>{
@@ -927,7 +933,13 @@
         const cid = selCarrera.value;
         // Filtrar módulos por carrera
         selModulo.innerHTML='';
-        (window.modulos||[]).filter(m=> String(m.carreraId)===String(cid)).forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=`${m.codigo||m.id} - ${m.nombre}`; selModulo.appendChild(o); });
+        (window.modulos||[]).filter(m=> String(m.carreraId)===String(cid)).forEach(m=>{
+          const codigo = m.codigoAsignatura || m.codigo || m.id;
+          const o=document.createElement('option');
+          o.value=m.id;
+          o.textContent=`${codigo} - ${m.nombre}`;
+          selModulo.appendChild(o);
+        });
         actualizarLeyendaDocente();
       });
 
@@ -1621,28 +1633,6 @@
           try { carreras = await fetchCarreras(); } catch (e) { carreras = []; console.error('fetchCarreras error', e); }
           try {
             modulos = await fetchModulos();
-            // === NORMALIZAR MÓDULOS QUE VIENEN DE LA API CON CARRERA VÁLIDA ===
-            const carreraIdsValidos = new Set((carreras || []).map(c => String(c.id)));
-            modulos = (modulos || []).map(m => {
-              if (!m) return m;
-
-              // id del módulo
-              let id = m.id ?? m.moduloId ?? m.codigo;
-              if (id != null) id = String(id);
-
-              // distintos posibles nombres del campo carrera
-              let carreraId = m.carreraId ?? m.carrera_id ?? m.id_carrera;
-              if (!carreraId && m.carrera && m.carrera.id != null) carreraId = m.carrera.id;
-              if (carreraId != null) carreraId = String(carreraId);
-
-              // si la carrera no existe en la lista de carreras, la dejamos sin asignar
-              if (carreraId && !carreraIdsValidos.has(carreraId)) {
-                console.warn('Modulo con carreraId no encontrado en carreras:', m.nombre, 'carreraId=', carreraId);
-                carreraId = null;
-              }
-
-              return { ...m, id, carreraId };
-            });
           } catch (e) { modulos = []; console.error('fetchModulos error', e); }
           try { docentes = await fetchDocentes(); } catch (e) { docentes = []; console.error('fetchDocentes error', e); }
           try { templates = await fetchTemplates(); } catch (e) { templates = []; console.error('fetchTemplates error', e); }
@@ -1653,6 +1643,10 @@
         // fall back to loading from localStorage when not using API
         try { docentes = load(KEY_DOCENTES, []); carreras = load(KEY_CARRERAS, []); modulos = load(KEY_MODULOS, []); storedEvents = load(KEY_EVENTS, []); templates = load(KEY_TEMPLATES, []); salas = load(KEY_SALAS, []); } catch (e) { console.warn('local load failed', e); }
       }
+
+          carreras = (carreras || []).map(normalizeCarreraRecord);
+          modulos = (modulos || []).map(m => normalizeModuloRecord(m, carreras));
+          templates = (templates || []).map(normalizeTemplateRecord);
 
       storedEvents = (storedEvents || []).map(ev => {
         try {
@@ -1904,8 +1898,9 @@
           });
           list.forEach(m => {
             const option = document.createElement('option');
+            const codigo = m.codigoAsignatura || m.codigo || m.id;
             option.value = m.id;
-            option.textContent = `${m.codigo || m.id} - ${m.nombre || ''}`.trim();
+            option.textContent = `${codigo} - ${m.nombre || ''}`.trim();
             if (selectedId && String(m.id) === String(selectedId)) option.selected = true;
             moduloSelect.appendChild(option);
           });
@@ -2035,8 +2030,9 @@
           });
           list.forEach(m => {
             const option = document.createElement('option');
+            const codigo = m.codigoAsignatura || m.codigo || m.id;
             option.value = m.id;
-            option.textContent = `${m.codigo || m.id} - ${m.nombre || ''}`.trim();
+            option.textContent = `${codigo} - ${m.nombre || ''}`.trim();
             if (selectedId && String(m.id) === String(selectedId)) option.selected = true;
             moduloSelect.appendChild(option);
           });
@@ -2336,12 +2332,78 @@
         }, 1000);
       }
 
+      // Normalizadores de registros para los catálogos provenientes del API/localStorage
+      function normalizeCarreraRecord(raw) {
+        if (!raw) return raw;
+        const color = raw.color || raw.colorDiurno || raw.colorVespertino || '#3788d8';
+        return { ...raw, color };
+      }
+
+      function normalizeModuloRecord(raw, carrerasList = []) {
+        if (!raw) return raw;
+        let id = raw.id ?? raw.moduloId ?? raw.codigo;
+        if (id !== null && id !== undefined) id = String(id);
+        let carreraId = raw.carreraId ?? raw.carrera_id ?? raw.id_carrera;
+        if (!carreraId && raw.carrera && raw.carrera.id != null) carreraId = raw.carrera.id;
+        if (carreraId !== null && carreraId !== undefined) carreraId = String(carreraId);
+        if (carreraId && carrerasList.length) {
+          const exists = carrerasList.some(c => String(c.id) === carreraId);
+          if (!exists) {
+            console.warn('Módulo con carreraId no listado, se deja sin asignar:', raw.nombre, 'carreraId=', carreraId);
+            carreraId = null;
+          }
+        }
+        const carreraRef = carreraId ? carrerasList.find(c => String(c.id) === carreraId) : null;
+        const codigoAsignatura = raw.codigoAsignatura ?? raw.codigo_asignatura ?? raw.codigo ?? null;
+        const horasSemana = Number(raw.horasSemana ?? raw.horas_semana ?? raw.horasSemanales ?? raw.horasSemanaPlanificadas ?? 0) || 0;
+        const horasTeoricas = Number(raw.horasTeoricas ?? raw.horas_teoricas ?? 0) || 0;
+        const horasPracticas = Number(raw.horasPracticas ?? raw.horas_practicas ?? 0) || 0;
+        const totalHoras = Number(raw.totalHoras ?? raw.horasTotales ?? horasSemana) || 0;
+        const nivelVal = raw.nivel ?? raw.level;
+        const nivelParsed = nivelVal === null || nivelVal === undefined || nivelVal === '' ? null : Number(nivelVal);
+        const normalized = {
+          ...raw,
+          id,
+          carreraId,
+          codigoAsignatura,
+          codigo: codigoAsignatura || raw.codigo || (id || ''),
+          horasSemana,
+          horasSemanales: horasSemana,
+          totalHoras,
+          horasTeoricas,
+          horasPracticas,
+          nivel: Number.isFinite(nivelParsed) ? nivelParsed : null
+        };
+        if (!normalized.color) {
+          const carreraColor = carreraRef ? (carreraRef.colorDiurno || carreraRef.colorVespertino || carreraRef.color) : null;
+          if (carreraColor) normalized.color = carreraColor;
+        }
+        if (!normalized.carreraNombre && carreraRef) normalized.carreraNombre = carreraRef.nombre;
+        return normalized;
+      }
+
+      function normalizeTemplateRecord(raw) {
+        if (!raw) return raw;
+        const durationVal = raw.duration === '' || raw.duration === null || raw.duration === undefined ? null : Number(raw.duration);
+        return {
+          ...raw,
+          moduloId: raw.moduloId != null ? String(raw.moduloId) : null,
+          docenteId: raw.docenteId || null,
+          salaId: raw.salaId || null,
+          duration: durationVal !== null && Number.isFinite(durationVal) ? durationVal : raw.duration
+        };
+      }
+
       // Minimal API helpers (used when USE_API=true)
       async function fetchCarreras() {
-        if (!USE_API) return load(KEY_CARRERAS, []);
+        if (!USE_API) {
+          const data = load(KEY_CARRERAS, []);
+          return (data || []).map(normalizeCarreraRecord);
+        }
         try {
           const r = await authorizedFetch(API_BASE + '/carreras');
-          return r.ok ? await r.json() : [];
+          const data = r.ok ? await r.json() : [];
+          return (data || []).map(normalizeCarreraRecord);
         } catch (err) {
           console.error('fetchCarreras falló', err);
           return [];
@@ -2349,31 +2411,14 @@
       }
 
       async function fetchModulos() {
-        if (!USE_API) return load(KEY_MODULOS, []);
+        if (!USE_API) {
+          const data = load(KEY_MODULOS, []);
+          return (data || []).map(m => normalizeModuloRecord(m, carreras));
+        }
         try {
           const r = await authorizedFetch(API_BASE + '/modulos');
           const data = r.ok ? await r.json() : [];
-          return (data || []).map(m => {
-            if (!m) return m;
-            let id = m.id ?? m.moduloId ?? m.codigo;
-            if (id != null) id = String(id);
-            let carreraId = m.carreraId ?? m.carrera_id ?? m.id_carrera;
-            if (!carreraId && m.carrera && m.carrera.id != null) carreraId = m.carrera.id;
-            if (carreraId != null) carreraId = String(carreraId);
-            const totalHoras = Number(m.totalHoras ?? 0) || 0;
-            const horasTeoricas = Number(m.horasTeoricas ?? 0) || 0;
-            const horasPracticas = Number(m.horasPracticas ?? 0) || 0;
-            const horasSemanales = Number(m.horasSemanales ?? 0) || 0; // bloques de 35 minutos por semana
-            return {
-              ...m,
-              id,
-              carreraId,
-              totalHoras,
-              horasTeoricas,
-              horasPracticas,
-              horasSemanales
-            };
-          });
+          return (data || []).map(m => normalizeModuloRecord(m, carreras));
         } catch (err) {
           console.error('fetchModulos falló', err);
           return [];
@@ -2403,10 +2448,14 @@
       }
 
       async function fetchTemplates() {
-        if (!USE_API) return load(KEY_TEMPLATES, []);
+        if (!USE_API) {
+          const data = load(KEY_TEMPLATES, []);
+          return (data || []).map(normalizeTemplateRecord);
+        }
         try {
           const r = await authorizedFetch(API_BASE + '/templates');
-          return r.ok ? await r.json() : [];
+          const data = r.ok ? await r.json() : [];
+          return (data || []).map(normalizeTemplateRecord);
         } catch (err) {
           console.error('fetchTemplates falló', err);
           return [];
@@ -3153,7 +3202,8 @@
             if (meta.moduloId) {
               const modulo = modulos.find(m => m.id === meta.moduloId);
               if (modulo) {
-                info.push(`Código: ${modulo.codigo || 'N/A'}`);
+                const codigo = modulo.codigoAsignatura || modulo.codigo || 'N/A';
+                info.push(`Código: ${codigo}`);
                 info.push(`Carrera: ${modulo.carreraId || 'N/A'}`);
               }
             }
@@ -3250,7 +3300,8 @@
             let infoAdicional = '';
             if (meta.moduloId) {
               const modulo = modulos.find(m => m.id === meta.moduloId);
-              if (modulo && modulo.codigo) infoAdicional = ` - ${modulo.codigo}`;
+              const codigo = modulo ? (modulo.codigoAsignatura || modulo.codigo) : '';
+              if (codigo) infoAdicional = ` - ${codigo}`;
             }
             return tituloFormateado + infoAdicional;
           }
@@ -3270,7 +3321,7 @@
             const meta = (evento.extendedProps && evento.extendedProps.__meta) || {};
             const modulo = meta.moduloId ? modulos.find(m => m.id === meta.moduloId) : null;
             const nombre = formatearTituloEvento(evento);
-            const codigo = (modulo && modulo.codigo) ? modulo.codigo : '';
+            const codigo = modulo ? (modulo.codigoAsignatura || modulo.codigo || '') : '';
             return { nombre, codigo };
           }
 
