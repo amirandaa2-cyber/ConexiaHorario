@@ -74,6 +74,94 @@ function userHasAllowedRole(user) {
 	return userRoles.some((code) => ALLOWED_ROLE_CODES.includes(code));
 }
 
+function toSafeInteger(value) {
+	const num = Number(value);
+	return Number.isFinite(num) ? Math.trunc(num) : null;
+}
+
+function normalizeModuloPayload(raw = {}) {
+	const nombre = (raw.nombre || '').trim();
+	const carreraId = raw.carreraId || raw.carrera_id || raw.id_carrera || raw.carrera || null;
+	const horasSemanaSource = raw.horasSemana ?? raw.horas ?? raw.totalHoras ?? raw.horasSemanales;
+	const horasSemana = Number(horasSemanaSource || 0) || 0;
+	const nivel = raw.nivel !== undefined && raw.nivel !== null && raw.nivel !== '' ? toSafeInteger(raw.nivel) : null;
+	const codigoAsignatura = raw.codigoAsignatura || raw.codigo_asignatura || raw.codigo || null;
+	const providedId = raw.id !== undefined && raw.id !== null && raw.id !== '' ? toSafeInteger(raw.id) : null;
+	return {
+		id: providedId,
+		nombre,
+		carreraId: carreraId ? String(carreraId).trim() : null,
+		horasSemana,
+		nivel,
+		codigoAsignatura: codigoAsignatura ? String(codigoAsignatura).trim() : null
+	};
+}
+
+function extractEventLinking(payload = {}) {
+	const meta = (payload.extendedProps && payload.extendedProps.__meta) || {};
+	const moduloCandidate = payload.modulo_id ?? payload.moduloId ?? meta.moduloId ?? meta.modulo_id ?? meta.modulo;
+	const docenteCandidate = payload.docente_id ?? payload.docenteId ?? meta.docenteId ?? meta.docente_id;
+	const salaCandidate = payload.sala_id ?? payload.salaId ?? meta.salaId ?? meta.sala_id;
+	return {
+		moduloId: toSafeInteger(moduloCandidate),
+		docenteId: docenteCandidate ? String(docenteCandidate).trim() : null,
+		salaId: salaCandidate ? String(salaCandidate).trim() : null
+	};
+}
+
+function normalizeTemplatePayload(raw = {}) {
+	const moduloCandidate = raw.moduloId ?? raw.modulo_id ?? raw.modulo;
+	const docenteCandidate = raw.docenteId ?? raw.docente_id ?? raw.docente;
+	const salaCandidate = raw.salaId ?? raw.sala_id ?? raw.sala;
+	const durationCandidate = raw.duration ?? raw.duracion ?? raw.blocks ?? raw.blockCount;
+	return {
+		moduloId: toSafeInteger(moduloCandidate),
+		docenteId: docenteCandidate ? String(docenteCandidate).trim() : null,
+		salaId: salaCandidate ? String(salaCandidate).trim() : null,
+		startDate: raw.startDate || raw.start_date || null,
+		time: raw.time || raw.hora || null,
+		duration: (() => {
+			if (durationCandidate === undefined || durationCandidate === null || durationCandidate === '') return null;
+			const normalized = Number(durationCandidate);
+			return Number.isFinite(normalized) ? normalized : null;
+		})(),
+		until: raw.until || raw.hasta || null
+	};
+}
+
+function mergeMetaIntoExtendedProps(baseProps = {}, linking = {}) {
+	const safeProps = baseProps && typeof baseProps === 'object' ? { ...baseProps } : {};
+	const existingMeta = safeProps.__meta && typeof safeProps.__meta === 'object' ? safeProps.__meta : {};
+	const mergedMeta = {
+		...existingMeta,
+		...(linking.moduloId !== null && linking.moduloId !== undefined ? { moduloId: String(linking.moduloId) } : {}),
+		...(linking.docenteId ? { docenteId: String(linking.docenteId) } : {}),
+		...(linking.salaId ? { salaId: String(linking.salaId) } : {})
+	};
+	safeProps.__meta = mergedMeta;
+	return safeProps;
+}
+
+function mapEventRow(row) {
+	const linking = {
+		moduloId: row.modulo_id !== null && row.modulo_id !== undefined ? String(row.modulo_id) : null,
+		docenteId: row.docente_id || null,
+		salaId: row.sala_id || null
+	};
+	const baseProps = row.extendedProps && typeof row.extendedProps === 'object' ? row.extendedProps : {};
+	const extendedProps = mergeMetaIntoExtendedProps(baseProps, linking);
+	return {
+		id: row.id,
+		title: row.title,
+		start: row.start,
+		end: row.end,
+		moduloId: linking.moduloId,
+		docenteId: linking.docenteId,
+		salaId: linking.salaId,
+		extendedProps
+	};
+}
+
 async function fetchUserByEmail(email) {
 	const normalized = normalizeEmail(email);
 	if (!normalized) return null;
@@ -287,6 +375,7 @@ if(dbReady){
 			const { rows } = await db.query(`
 				SELECT id,
 				       nombre,
+				       "jefeCarrera" AS "jefeCarrera",
 				       totalHoras AS "totalHoras",
 				       practicaHoras AS "practicaHoras",
 				       teoricaHoras AS "teoricaHoras",
@@ -303,16 +392,17 @@ if(dbReady){
 		const id = c.id || uuidv4();
 		try{
 			await db.query(
-				`INSERT INTO carreras (id,nombre,totalHoras,practicaHoras,teoricaHoras,colorDiurno,colorVespertino)
-				 VALUES ($1,$2,$3,$4,$5,$6,$7)
+				`INSERT INTO carreras (id,nombre,"jefeCarrera",totalHoras,practicaHoras,teoricaHoras,colorDiurno,colorVespertino)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 				 ON CONFLICT (id) DO UPDATE
 				 SET nombre=EXCLUDED.nombre,
+				     "jefeCarrera"=EXCLUDED."jefeCarrera",
 				     totalHoras=EXCLUDED.totalHoras,
 				     practicaHoras=EXCLUDED.practicaHoras,
 				     teoricaHoras=EXCLUDED.teoricaHoras,
 				     colorDiurno=EXCLUDED.colorDiurno,
 				     colorVespertino=EXCLUDED.colorVespertino`,
-				[id, c.nombre, c.totalHoras||0, c.practicaHoras||0, c.teoricaHoras||0, c.colorDiurno||null, c.colorVespertino||null]
+				[id, c.nombre, c.jefeCarrera || null, c.totalHoras||0, c.practicaHoras||0, c.teoricaHoras||0, c.colorDiurno||null, c.colorVespertino||null]
 			);
 			res.json({ok:true,id});
 		}catch(err){ handleDbError(res, err); }
@@ -322,8 +412,8 @@ if(dbReady){
 		const c = req.body;
 		try{
 			await db.query(
-				'UPDATE carreras SET nombre=$1, totalHoras=$2, practicaHoras=$3, teoricaHoras=$4, colorDiurno=$5, colorVespertino=$6 WHERE id=$7',
-				[c.nombre, c.totalHoras||0, c.practicaHoras||0, c.teoricaHoras||0, c.colorDiurno||null, c.colorVespertino||null, req.params.id]
+				'UPDATE carreras SET nombre=$1, "jefeCarrera"=$2, totalHoras=$3, practicaHoras=$4, teoricaHoras=$5, colorDiurno=$6, colorVespertino=$7 WHERE id=$8',
+				[c.nombre, c.jefeCarrera || null, c.totalHoras||0, c.practicaHoras||0, c.teoricaHoras||0, c.colorDiurno||null, c.colorVespertino||null, req.params.id]
 			);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }
@@ -341,59 +431,88 @@ if(dbReady){
 			const { rows } = await db.query(`
 				SELECT id,
 				       nombre,
-				       carreraId AS "carreraId",
-				       totalHoras,
-				       horasTeoricas,
-				       horasPracticas,
-				       horasSemanales
-				  FROM modulos
-				 ORDER BY nombre ASC`);
-			res.json(rows);
+				       "horasSemana" AS "horasSemana",
+				       nivel,
+				       carrera_id AS "carreraId",
+				       codigo_asignatura AS "codigoAsignatura",
+				       created_at,
+				       updated_at
+			  FROM modulos
+			 ORDER BY nombre ASC`);
+			const normalized = rows.map((row) => {
+				const horasSemana = Number(row.horasSemana ?? 0) || 0;
+				return {
+					id: row.id !== null && row.id !== undefined ? String(row.id) : null,
+					nombre: row.nombre,
+					carreraId: row.carreraId ? String(row.carreraId) : null,
+					horasSemana,
+					nivel: row.nivel ?? null,
+					codigoAsignatura: row.codigoAsignatura || null,
+					totalHoras: horasSemana,
+					horasTeoricas: 0,
+					horasPracticas: 0,
+					horasSemanales: horasSemana,
+					created_at: row.created_at,
+					updated_at: row.updated_at
+				};
+			});
+			res.json(normalized);
 		}catch(err){ handleDbError(res, err); }
 	});
 
 	app.post('/api/modulos', async (req,res)=>{
-		const m = req.body;
-		const id = m.id || uuidv4();
+		const payload = normalizeModuloPayload(req.body || {});
+		if (!payload.nombre) {
+			return res.status(400).json({ error: 'El nombre del módulo es obligatorio.' });
+		}
+		if (!payload.carreraId) {
+			return res.status(400).json({ error: 'carreraId es obligatorio.' });
+		}
 		try{
-			await db.query(
-				`INSERT INTO modulos (id,nombre,carreraId,totalHoras,horasTeoricas,horasPracticas,horasSemanales)
-				 VALUES ($1,$2,$3,$4,$5,$6,$7)
-				 ON CONFLICT (id) DO UPDATE
-				 SET nombre=EXCLUDED.nombre,
-				     carreraId=EXCLUDED.carreraId,
-				     totalHoras=EXCLUDED.totalHoras,
-				     horasTeoricas=EXCLUDED.horasTeoricas,
-				     horasPracticas=EXCLUDED.horasPracticas,
-				     horasSemanales=EXCLUDED.horasSemanales`,
-				[
-					id,
-					m.nombre,
-					m.carreraId || null,
-					m.totalHoras ?? 0,
-					m.horasTeoricas ?? 0,
-					m.horasPracticas ?? 0,
-					m.horasSemanales ?? 0
-				]
-			);
-			res.json({ok:true,id});
+			let insertedId;
+			if (Number.isInteger(payload.id)) {
+				await db.query(
+					`INSERT INTO modulos (id,nombre,"horasSemana",nivel,carrera_id,codigo_asignatura)
+					 VALUES ($1,$2,$3,$4,$5,$6)
+					 ON CONFLICT (id) DO UPDATE
+					 SET nombre=EXCLUDED.nombre,
+					     "horasSemana"=EXCLUDED."horasSemana",
+					     nivel=EXCLUDED.nivel,
+					     carrera_id=EXCLUDED.carrera_id,
+					     codigo_asignatura=EXCLUDED.codigo_asignatura,
+					     updated_at=NOW()`,
+					[payload.id, payload.nombre, payload.horasSemana, payload.nivel, payload.carreraId, payload.codigoAsignatura]
+				);
+				insertedId = payload.id;
+			} else {
+				const { rows } = await db.query(
+					`INSERT INTO modulos (nombre,"horasSemana",nivel,carrera_id,codigo_asignatura)
+					 VALUES ($1,$2,$3,$4,$5)
+					 RETURNING id`,
+					[payload.nombre, payload.horasSemana, payload.nivel, payload.carreraId, payload.codigoAsignatura]
+				);
+				insertedId = rows[0]?.id;
+			}
+			res.json({ok:true,id: insertedId});
 		}catch(err){ handleDbError(res, err); }
 	});
 
 	app.put('/api/modulos/:id', async (req,res)=>{
-		const m = req.body;
+		const moduloId = toSafeInteger(req.params.id);
+		const payload = normalizeModuloPayload({ ...(req.body || {}), id: moduloId });
+		if (!Number.isInteger(moduloId)) {
+			return res.status(400).json({ error: 'ID de módulo inválido.' });
+		}
+		if (!payload.nombre) {
+			return res.status(400).json({ error: 'El nombre del módulo es obligatorio.' });
+		}
+		if (!payload.carreraId) {
+			return res.status(400).json({ error: 'carreraId es obligatorio.' });
+		}
 		try{
 			await db.query(
-				'UPDATE modulos SET nombre=$1, carreraId=$2, totalHoras=$3, horasTeoricas=$4, horasPracticas=$5, horasSemanales=$6, updated_at=NOW() WHERE id=$7',
-				[
-					m.nombre,
-					m.carreraId || null,
-					m.totalHoras ?? 0,
-					m.horasTeoricas ?? 0,
-					m.horasPracticas ?? 0,
-					m.horasSemanales ?? 0,
-					req.params.id
-				]
+				'UPDATE modulos SET nombre=$1, "horasSemana"=$2, nivel=$3, carrera_id=$4, codigo_asignatura=$5, updated_at=NOW() WHERE id=$6',
+				[payload.nombre, payload.horasSemana, payload.nivel, payload.carreraId, payload.codigoAsignatura, moduloId]
 			);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }
@@ -416,7 +535,7 @@ if(dbReady){
 				       titulo,
 				       "contratoHoras" AS "contratoHoras",
 			       "ContratoHoraSemanal" AS "ContratoHoraSemanal",
-			       carreraId AS "carreraId",
+	       carrera_id AS "carreraId",
 			       edad AS edad,
 			       estadoCivil AS "estadoCivil",
 			       turno AS turno,
@@ -438,7 +557,7 @@ if(dbReady){
 		const id = d.id || uuidv4();
 		try{
 			await db.query(
-				`INSERT INTO docentes (id,rut,nombre,email,titulo,"contratoHoras","ContratoHoraSemanal",carreraId,edad,estadoCivil,turno,activo,"TotalHrsModulos","Hrs Teóricas","Hrs Prácticas","Total hrs Semana")
+				`INSERT INTO docentes (id,rut,nombre,email,titulo,"contratoHoras","ContratoHoraSemanal",carrera_id,edad,estadoCivil,turno,activo,"TotalHrsModulos","Hrs Teóricas","Hrs Prácticas","Total hrs Semana")
 				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
 				 ON CONFLICT (id) DO UPDATE
 				 SET rut=EXCLUDED.rut,
@@ -446,8 +565,8 @@ if(dbReady){
 				     email=EXCLUDED.email,
 				     titulo=EXCLUDED.titulo,
 				     "contratoHoras"=EXCLUDED."contratoHoras",
-			     "ContratoHoraSemanal"=EXCLUDED."ContratoHoraSemanal",
-			     carreraId=EXCLUDED.carreraId,
+		     "ContratoHoraSemanal"=EXCLUDED."ContratoHoraSemanal",
+		     carrera_id=EXCLUDED.carrera_id,
 			     edad=EXCLUDED.edad,
 			     estadoCivil=EXCLUDED.estadoCivil,
 			     turno=EXCLUDED.turno,
@@ -483,7 +602,7 @@ if(dbReady){
 		const d = req.body;
 		try{
 			await db.query(
-				'UPDATE docentes SET rut=$1, nombre=$2, email=$3, titulo=$4, "contratoHoras"=$5, "ContratoHoraSemanal"=$6, carreraId=$7, edad=$8, estadoCivil=$9, turno=$10, activo=$11, "TotalHrsModulos"=$12, "Hrs Teóricas"=$13, "Hrs Prácticas"=$14, "Total hrs Semana"=$15 WHERE id=$16',
+				'UPDATE docentes SET rut=$1, nombre=$2, email=$3, titulo=$4, "contratoHoras"=$5, "ContratoHoraSemanal"=$6, carrera_id=$7, edad=$8, estadoCivil=$9, turno=$10, activo=$11, "TotalHrsModulos"=$12, "Hrs Teóricas"=$13, "Hrs Prácticas"=$14, "Total hrs Semana"=$15 WHERE id=$16',
 				[d.rut, d.nombre, d.email||null, d.titulo||null, d.contratoHoras||0, d.ContratoHoraSemanal||0, d.carreraId||null, Number.isFinite(d.edad)?d.edad:null, d.estadoCivil||null, d.turno||null, (d.activo===false?false:true), d.TotalHrsModulos||0, d['Hrs Teóricas']||0, d['Hrs Prácticas']||0, d['Total hrs Semana']||0, req.params.id]
 			);
 			res.json({ok:true});
@@ -559,39 +678,69 @@ if(dbReady){
 				       startDate AS "startDate",
 				       time,
 				       duration,
-				       until
-				  FROM templates`);
-			res.json(rows);
+				       until,
+				       created_at,
+				       updated_at
+			  FROM templates
+			 ORDER BY startDate ASC NULLS LAST, time ASC NULLS LAST`);
+			const normalized = rows.map((row) => ({
+				...row,
+				moduloId: row.moduloId !== null && row.moduloId !== undefined ? String(row.moduloId) : null,
+				docenteId: row.docenteId || null,
+				salaId: row.salaId || null,
+				duration: row.duration === null || row.duration === undefined ? null : Number(row.duration)
+			}));
+			res.json(normalized);
 		}catch(err){ handleDbError(res, err); }
 	});
 
 	app.post('/api/templates', async (req,res)=>{
-		const t = req.body;
-		const id = t.id || uuidv4();
+		const raw = req.body || {};
+		const id = raw.id || uuidv4();
+		const payload = normalizeTemplatePayload(raw);
+		if (!Number.isInteger(payload.moduloId)) {
+			return res.status(400).json({ error: 'moduloId es obligatorio y debe ser numérico.' });
+		}
 		try{
 			await db.query(
 				`INSERT INTO templates (id,moduloId,docenteId,salaId,startDate,time,duration,until)
 				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 				 ON CONFLICT (id) DO UPDATE
 				 SET moduloId=EXCLUDED.moduloId,
-				     docenteId=EXCLUDED.docenteId,
-				     salaId=EXCLUDED.salaId,
-				     startDate=EXCLUDED.startDate,
-				     time=EXCLUDED.time,
-				     duration=EXCLUDED.duration,
-				     until=EXCLUDED.until`,
-				[id, t.moduloId, t.docenteId, t.salaId, t.startDate, t.time, t.duration, t.until]
+			     docenteId=EXCLUDED.docenteId,
+			     salaId=EXCLUDED.salaId,
+			     startDate=EXCLUDED.startDate,
+			     time=EXCLUDED.time,
+			     duration=EXCLUDED.duration,
+			     until=EXCLUDED.until,
+			     updated_at=NOW()`,
+				[id, payload.moduloId, payload.docenteId, payload.salaId, payload.startDate, payload.time, payload.duration, payload.until]
 			);
 			res.json({ok:true,id});
 		}catch(err){ handleDbError(res, err); }
 	});
 
 	app.put('/api/templates/:id', async (req,res)=>{
-		const t = req.body;
+		const payload = normalizeTemplatePayload(req.body || {});
+		if (!Number.isInteger(payload.moduloId)) {
+			try {
+				const existing = await db.query('SELECT moduloId FROM templates WHERE id=$1 LIMIT 1', [req.params.id]);
+				if (!existing.rowCount) {
+					return res.status(404).json({ error: 'Template no encontrado.' });
+				}
+				const existingModulo = existing.rows[0]?.moduloid ?? existing.rows[0]?.moduloId;
+				payload.moduloId = toSafeInteger(existingModulo);
+				if (!Number.isInteger(payload.moduloId)) {
+					return res.status(400).json({ error: 'moduloId es obligatorio y debe ser numérico.' });
+				}
+			} catch (lookupErr) {
+				return handleDbError(res, lookupErr);
+			}
+		}
 		try{
 			await db.query(
-				'UPDATE templates SET moduloId=$1, docenteId=$2, salaId=$3, startDate=$4, time=$5, duration=$6, until=$7 WHERE id=$8',
-				[t.moduloId, t.docenteId, t.salaId, t.startDate, t.time, t.duration, t.until, req.params.id]
+				'UPDATE templates SET moduloId=$1, docenteId=$2, salaId=$3, startDate=$4, time=$5, duration=$6, until=$7, updated_at=NOW() WHERE id=$8',
+				[payload.moduloId, payload.docenteId, payload.salaId, payload.startDate, payload.time, payload.duration, payload.until, req.params.id]
 			);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }
@@ -606,41 +755,53 @@ if(dbReady){
 
 	app.get('/api/events', async (req,res)=>{
 		try{
-			const { rows } = await db.query("SELECT id, title, start, \"end\", COALESCE(extendedProps, '{}'::jsonb) AS \"extendedProps\" FROM events");
-			res.json(rows.map((row)=>({
-				id: row.id,
-				title: row.title,
-				start: row.start,
-				end: row.end,
-				extendedProps: row.extendedProps || {}
-			})));
+			const { rows } = await db.query(`
+				SELECT id,
+				       title,
+				       start,
+				       "end",
+				       modulo_id,
+				       docente_id,
+				       sala_id,
+				       COALESCE(extendedProps, '{}'::jsonb) AS "extendedProps"
+			  FROM events
+			 ORDER BY start ASC`);
+			res.json(rows.map(mapEventRow));
 		}catch(err){ handleDbError(res, err); }
 	});
 
 	app.post('/api/events', async (req,res)=>{
-		const e = req.body;
-		const id = e.id || uuidv4();
+		const payload = req.body || {};
+		const id = payload.id || uuidv4();
+		const linking = extractEventLinking(payload);
+		const extendedProps = mergeMetaIntoExtendedProps(payload.extendedProps || {}, linking);
 		try{
 			await db.query(
-				`INSERT INTO events (id,title,start,"end",extendedProps)
-				 VALUES ($1,$2,$3,$4,$5)
+				`INSERT INTO events (id,title,start,"end",modulo_id,docente_id,sala_id,extendedProps)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 				 ON CONFLICT (id) DO UPDATE
-				 SET title=$2,
-				     start=$3,
-				     "end"=$4,
-				     extendedProps=$5`,
-				[id, e.title, e.start, e.end, e.extendedProps || {}]
+				 SET title=EXCLUDED.title,
+			     start=EXCLUDED.start,
+			     "end"=EXCLUDED."end",
+			     modulo_id=EXCLUDED.modulo_id,
+			     docente_id=EXCLUDED.docente_id,
+			     sala_id=EXCLUDED.sala_id,
+			     extendedProps=EXCLUDED.extendedProps,
+			     updated_at=NOW()`,
+				[id, payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedProps]
 			);
 			res.json({ok:true,id});
 		}catch(err){ handleDbError(res, err); }
 	});
 
 	app.put('/api/events/:id', async (req,res)=>{
-		const e = req.body;
+		const payload = req.body || {};
+		const linking = extractEventLinking(payload);
+		const extendedProps = mergeMetaIntoExtendedProps(payload.extendedProps || {}, linking);
 		try{
 			await db.query(
-				'UPDATE events SET title=$1, start=$2, "end"=$3, extendedProps=$4 WHERE id=$5',
-				[e.title, e.start, e.end, e.extendedProps || {}, req.params.id]
+				'UPDATE events SET title=$1, start=$2, "end"=$3, modulo_id=$4, docente_id=$5, sala_id=$6, extendedProps=$7, updated_at=NOW() WHERE id=$8',
+				[payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedProps, req.params.id]
 			);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }

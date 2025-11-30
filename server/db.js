@@ -19,29 +19,41 @@ async function initializeSchema() {
 		return;
 	}
 
+
 	const statements = [
 		'CREATE EXTENSION IF NOT EXISTS pgcrypto',
 		'CREATE EXTENSION IF NOT EXISTS citext',
 		`CREATE TABLE IF NOT EXISTS carreras (
-			id TEXT PRIMARY KEY,
-			nombre TEXT,
+			id VARCHAR(50) PRIMARY KEY,
+			nombre VARCHAR(255) NOT NULL,
+			"jefeCarrera" VARCHAR(255),
 			totalHoras INTEGER,
 			practicaHoras INTEGER,
 			teoricaHoras INTEGER,
 			colorDiurno TEXT,
 			colorVespertino TEXT
 		)`,
+		`ALTER TABLE carreras ADD COLUMN IF NOT EXISTS "jefeCarrera" VARCHAR(255)`,
 		`CREATE TABLE IF NOT EXISTS modulos (
-			id TEXT PRIMARY KEY,
-			nombre TEXT NOT NULL,
-			carreraId TEXT REFERENCES carreras(id) ON DELETE SET NULL,
-			totalHoras INTEGER DEFAULT 0,
-			horasTeoricas NUMERIC(4,1) DEFAULT 0,
-			horasPracticas NUMERIC(4,1) DEFAULT 0,
-			horasSemanales NUMERIC(4,1) DEFAULT 0,
+			id SERIAL PRIMARY KEY,
+			nombre VARCHAR(255) NOT NULL,
+			"horasSemana" INTEGER DEFAULT 0,
+			nivel INTEGER,
+			carrera_id VARCHAR(50) NOT NULL REFERENCES carreras(id) ON DELETE CASCADE,
+			codigo_asignatura VARCHAR(50),
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
+		`ALTER TABLE modulos ADD COLUMN IF NOT EXISTS codigo_asignatura VARCHAR(50)`,
+		`ALTER TABLE modulos ADD COLUMN IF NOT EXISTS carrera_id VARCHAR(50)`,
+		`ALTER TABLE modulos ADD COLUMN IF NOT EXISTS "horasSemana" INTEGER DEFAULT 0`,
+		`ALTER TABLE modulos ADD COLUMN IF NOT EXISTS nivel INTEGER`,
+		`ALTER TABLE modulos ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+		`ALTER TABLE modulos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+		`ALTER TABLE modulos DROP CONSTRAINT IF EXISTS fk_modulos_carrera`,
+		`ALTER TABLE modulos ADD CONSTRAINT fk_modulos_carrera FOREIGN KEY (carrera_id) REFERENCES carreras(id) ON DELETE CASCADE`,
+		`CREATE INDEX IF NOT EXISTS idx_modulos_codigo ON modulos (codigo_asignatura)`,
+		`CREATE INDEX IF NOT EXISTS idx_modulos_carrera ON modulos (carrera_id)`,
 		`CREATE TABLE IF NOT EXISTS docentes (
 			id VARCHAR(20) PRIMARY KEY,
 			rut VARCHAR(20) UNIQUE NOT NULL,
@@ -50,7 +62,7 @@ async function initializeSchema() {
 			titulo TEXT,
 			"contratoHoras" NUMERIC(5,2) DEFAULT 0,
 			"ContratoHoraSemanal" NUMERIC(4,1) DEFAULT 0 CHECK ("ContratoHoraSemanal" <= 40),
-			carreraId TEXT REFERENCES carreras(id) ON DELETE SET NULL,
+			carrera_id VARCHAR(50) REFERENCES carreras(id) ON DELETE SET NULL,
 			edad INTEGER,
 			estadoCivil TEXT,
 			turno TEXT,
@@ -62,12 +74,14 @@ async function initializeSchema() {
 			created_at TIMESTAMPTZ DEFAULT NOW(),
 			updated_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
-		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS carreraId TEXT REFERENCES carreras(id) ON DELETE SET NULL`,
+		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS carrera_id VARCHAR(50)`,
 		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS edad INTEGER`,
 		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS estadoCivil TEXT`,
 		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS turno TEXT`,
 		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE`,
 		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS "ContratoHoraSemanal" NUMERIC(4,1) DEFAULT 0 CHECK ("ContratoHoraSemanal" <= 40)`,
+		`ALTER TABLE docentes DROP CONSTRAINT IF EXISTS fk_docente_carrera`,
+		`ALTER TABLE docentes ADD CONSTRAINT fk_docente_carrera FOREIGN KEY (carrera_id) REFERENCES carreras(id) ON DELETE SET NULL`,
 		`CREATE OR REPLACE FUNCTION update_modified_column()
 		RETURNS TRIGGER AS $$
 		BEGIN
@@ -87,21 +101,33 @@ async function initializeSchema() {
 		)`,
 		`CREATE TABLE IF NOT EXISTS templates (
 			id TEXT PRIMARY KEY,
-			moduloId TEXT,
-			docenteId TEXT,
-			salaId TEXT,
-			startDate TEXT,
-			time TEXT,
+			moduloId INTEGER REFERENCES modulos(id) ON DELETE CASCADE,
+			docenteId VARCHAR(20) REFERENCES docentes(id) ON DELETE SET NULL,
+			salaId VARCHAR(50) REFERENCES salas(id) ON DELETE SET NULL,
+			startDate DATE,
+			time TIME,
 			duration REAL,
-			until TEXT
+			until DATE,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_templates_modulo ON templates (moduloId)`,
+		`CREATE INDEX IF NOT EXISTS idx_templates_docente ON templates (docenteId)`,
+		`CREATE INDEX IF NOT EXISTS idx_templates_sala ON templates (salaId)`,
 		`CREATE TABLE IF NOT EXISTS events (
 			id TEXT PRIMARY KEY,
-			title TEXT,
-			start TEXT,
-			"end" TEXT,
-			extendedProps JSONB
+			title TEXT NOT NULL,
+			start TIMESTAMPTZ NOT NULL,
+			"end" TIMESTAMPTZ NOT NULL,
+			modulo_id INTEGER REFERENCES modulos(id) ON DELETE CASCADE,
+			docente_id VARCHAR(20) REFERENCES docentes(id) ON DELETE SET NULL,
+			sala_id VARCHAR(50) REFERENCES salas(id) ON DELETE SET NULL,
+			extendedProps JSONB NOT NULL DEFAULT '{}'::jsonb,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_events_start ON events (start)`,
+		`CREATE INDEX IF NOT EXISTS idx_events_modulo ON events (modulo_id)`,
 		`CREATE TABLE IF NOT EXISTS auth_role (
 			id SERIAL PRIMARY KEY,
 			code TEXT UNIQUE NOT NULL,
