@@ -569,6 +569,28 @@
       box-shadow: 0 8px 20px rgba(249, 115, 22, 0.35);
     }
 
+    .stats-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+      color: #fff;
+      padding: 8px 18px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-decoration: none;
+      box-shadow: 0 8px 20px rgba(16, 185, 129, 0.35);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .stats-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(20, 184, 166, 0.4);
+    }
+
     @media (max-width: 720px) {
       .auth-wrapper {
         padding: 28px;
@@ -1144,6 +1166,14 @@
       const panel = document.getElementById('session-panel');
       if (panel) {
         panel.classList.add('user-info-area');
+      }
+
+      const statsButton = document.getElementById('open-stats-panel');
+      if (statsButton) {
+        statsButton.addEventListener('click', function () {
+          const statsUrl = new URL('PanelEstadisticasDocentes.html', window.location.href);
+          window.location.href = statsUrl.toString();
+        });
       }
     });
 
@@ -8903,6 +8933,10 @@
       <span><strong>Sesión:</strong> <span id="session-user-label">admin</span></span>
       <span id="session-privileges">Privilegios: administración total de horarios, catálogos y exportaciones.</span>
     </div>
+    <button id="open-stats-panel" type="button" class="stats-button">
+      <span aria-hidden="true">📊</span>
+      <span>Panel estadísticas</span>
+    </button>
     <button id="admin-logout" type="button" class="logout-button">Cerrar sesión</button>
   </div>
 
