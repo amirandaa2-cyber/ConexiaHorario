@@ -1221,6 +1221,17 @@
     // Generador simple de opciones cada 30 minutos para selects de hora.
     function populateTimeSelect(selectEl) {
       if (!selectEl) return;
+      const blocks = getAvailableBlocks();
+      if (blocks.length) {
+        const options = blocks.map((block) => {
+          const startVal = normalizeBlockTime(block.start);
+          const labelPrefix = block.number ? `Bloque ${block.number}` : 'Bloque';
+          const label = `${labelPrefix} · ${block.start} - ${block.end}`;
+          return `<option value="${startVal}" data-block-number="${block.number || ''}">${label}</option>`;
+        });
+        selectEl.innerHTML = options.join('');
+        return;
+      }
       const opts = [];
       for (let h = 8; h <= 22; h++) {
         for (let m of [0,30]) {
@@ -2894,41 +2905,56 @@
                 try { persistEventsAndValidate(); } catch (_) { }
               } catch (err) { console.error('datesSet handler error', err); }
             },
-            events: function (fetchInfo, successCallback) {
-              const filterCarrera = document.getElementById('filter-carrera')?.value || '';
-              // Ajustar cada evento al bloque CEDUC más cercano preservando colores
-              let bloquesEvents = storedEvents.map(event => {
-                try {
-                  const bloqueAjustado = ajustarEventoABloque(event);
-                  if (bloqueAjustado) {
-                    const eventoConBloque = {
-                      id: event.id,
-                      title: event.title,
-                      start: bloqueAjustado.start,
-                      end: bloqueAjustado.end,
-                      allDay: false,
-                      extendedProps: {
-                        numeroBloque: bloqueAjustado.bloqueNumero,
-                        __meta: (event.extendedProps && event.extendedProps.__meta) || {}
-                      }
-                    };
-                    return preservarColoresEvento(event, eventoConBloque);
-                  }
-                } catch (adjErr) {
-                  console.warn('Error ajustando evento a bloque, se usa original', adjErr, event);
+            events: async function (fetchInfo, successCallback, failureCallback) {
+              try {
+                let freshEvents = [];
+                if (USE_API) {
+                  freshEvents = await fetchEvents();
+                } else {
+                  freshEvents = load(KEY_EVENTS, []);
                 }
-                return event;
-              });
+                storedEvents = freshEvents; // Sincronizar el estado global
 
-              let filteredEvents = bloquesEvents.filter(e => {
-                if (!filterCarrera) return true;
-                const meta = (e.extendedProps && e.extendedProps.__meta) || {};
-                if (!meta.moduloId) return false;
-                const mod = modulos.find(m => m.id === meta.moduloId);
-                if (!mod) return false;
-                return mod.carreraId === filterCarrera;
-              });
-              successCallback(filteredEvents);
+                const filterCarrera = document.getElementById('filter-carrera')?.value || '';
+                
+                let bloquesEvents = storedEvents.map(event => {
+                  try {
+                    const bloqueAjustado = ajustarEventoABloque(event);
+                    if (bloqueAjustado) {
+                      const eventoConBloque = {
+                        id: event.id,
+                        title: event.title,
+                        start: bloqueAjustado.start,
+                        end: bloqueAjustado.end,
+                        allDay: false,
+                        extendedProps: {
+                          numeroBloque: bloqueAjustado.bloqueNumero,
+                          __meta: (event.extendedProps && event.extendedProps.__meta) || {}
+                        }
+                      };
+                      return preservarColoresEvento(event, eventoConBloque);
+                    }
+                  } catch (adjErr) {
+                    console.warn('Error ajustando evento a bloque, se usa original', adjErr, event);
+                  }
+                  return event;
+                });
+
+                let filteredEvents = bloquesEvents.filter(e => {
+                  if (!filterCarrera) return true;
+                  const meta = (e.extendedProps && e.extendedProps.__meta) || {};
+                  if (!meta.moduloId) return false;
+                  const mod = modulos.find(m => m.id === meta.moduloId);
+                  if (!mod) return false;
+                  return mod.carreraId === filterCarrera;
+                });
+                successCallback(filteredEvents);
+              } catch (err) {
+                console.error('Error cargando eventos para el calendario', err);
+                if (failureCallback) {
+                  failureCallback(err);
+                }
+              }
             },
             eventClick: function (info) { abrirModal(info.event); },
             eventAdd: async function (info) {
