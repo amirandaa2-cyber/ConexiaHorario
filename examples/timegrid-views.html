@@ -31,6 +31,48 @@
       color: #1e293b !important;
       margin: 0 !important;
     }
+    .fc-header-toolbar .fc-toolbar-center {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 16px !important;
+      flex-wrap: wrap !important;
+    }
+    .toolbar-filter-carrera {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .toolbar-filter-carrera .toolbar-filter-select {
+      min-width: 200px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background-color: #ffffff;
+      color: #1e293b;
+      font-weight: 500;
+      box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
+    }
+    .toolbar-filter-carrera .toolbar-filter-clear {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
+    .toolbar-filter-carrera .toolbar-filter-active {
+      flex-basis: 100%;
+      font-size: 12px;
+      color: #64748b;
+    }
+    @media (max-width: 768px) {
+      .toolbar-filter-carrera {
+        justify-content: center;
+      }
+      .toolbar-filter-carrera .toolbar-filter-select {
+        width: 100%;
+        max-width: 260px;
+      }
+    }
     /* BOTONES DE NAVEGACIÓN MEJORADOS */
     .fc-button {
       background: #ffffff !important;
@@ -2838,7 +2880,13 @@
                 // Also support direct click on element
                 info.el.addEventListener('click', function(ev) {
                   ev.preventDefault(); ev.stopPropagation();
-                  if (typeof abrirModal === 'function') abrirModal(info.event);
+                  if (typeof openEventManagementModal === 'function') {
+                    openEventManagementModal(info.event);
+                  } else if (typeof openEventEditModal === 'function') {
+                    openEventEditModal(info.event);
+                  } else if (typeof abrirModal === 'function') {
+                    abrirModal(info.event);
+                  }
                 });
               } catch (e) { /* noop */ }
             },
@@ -2956,7 +3004,15 @@
                 }
               }
             },
-            eventClick: function (info) { abrirModal(info.event); },
+            eventClick: function (info) {
+              if (typeof openEventManagementModal === 'function') {
+                openEventManagementModal(info.event);
+              } else if (typeof openEventEditModal === 'function') {
+                openEventEditModal(info.event);
+              } else if (typeof abrirModal === 'function') {
+                abrirModal(info.event);
+              }
+            },
             eventAdd: async function (info) {
               try {
                 const ev = info.event;
@@ -3446,7 +3502,16 @@
               }
             }
           });
-          try { if (calendar) calendar.render(); } catch (err) { console.error('Calendar render error', err); runtimeErrorEl.textContent = 'Error renderizando el calendario: ' + err.message; runtimeErrorEl.style.display = 'block'; }
+          try {
+            if (calendar) {
+              calendar.render();
+              relocateCarreraFilterToToolbar();
+            }
+          } catch (err) {
+            console.error('Calendar render error', err);
+            runtimeErrorEl.textContent = 'Error renderizando el calendario: ' + err.message;
+            runtimeErrorEl.style.display = 'block';
+          }
           // SISTEMA DE BLOQUES CEDUC - NO VALORES DECIMALES
           const CEDUC_BLOQUES = [
             { numero: 1,  inicio: '08:30', fin: '09:05', duracion: 35 },
@@ -3976,6 +4041,57 @@
         return palette;
       }
 
+      function relocateCarreraFilterToToolbar() {
+        try {
+          const calendarNode = document.getElementById('calendar');
+          const toolbar = calendarNode?.querySelector('.fc-header-toolbar');
+          const filterSelect = document.getElementById('filter-carrera');
+          if (!calendarNode || !toolbar || !filterSelect) return;
+
+          const clearBtn = document.getElementById('clear-filter');
+          const filterActive = document.getElementById('filter-active');
+          const filterLabel = document.querySelector('label[for="filter-carrera"]');
+          if (filterLabel && filterLabel.parentElement) {
+            filterLabel.parentElement.style.display = 'none';
+          }
+
+          const activeRow = filterActive ? filterActive.closest('.d-flex') : null;
+          if (activeRow && !activeRow.classList.contains('toolbar-filter-carrera')) {
+            activeRow.style.display = 'none';
+          }
+
+          const centerChunk = toolbar.querySelector('.fc-toolbar-center') || toolbar;
+          let wrapper = toolbar.querySelector('.toolbar-filter-carrera');
+          if (!wrapper) {
+            wrapper = document.createElement('div');
+            wrapper.className = 'toolbar-filter-carrera';
+            centerChunk.insertBefore(wrapper, centerChunk.firstChild);
+          }
+
+          if (!wrapper.contains(filterSelect)) {
+            wrapper.appendChild(filterSelect);
+          }
+          filterSelect.classList.add('toolbar-filter-select');
+
+          if (clearBtn) {
+            clearBtn.classList.add('toolbar-filter-clear');
+            if (!wrapper.contains(clearBtn)) {
+              wrapper.appendChild(clearBtn);
+            }
+          }
+
+          if (filterActive) {
+            filterActive.classList.add('toolbar-filter-active');
+            filterActive.classList.remove('flex-grow-1');
+            if (!wrapper.contains(filterActive)) {
+              wrapper.appendChild(filterActive);
+            }
+          }
+        } catch (err) {
+          console.error('No se pudo ubicar el filtro de carreras en el encabezado', err);
+        }
+      }
+
       // Renderers
       function renderCarreras() {
         // refresh select
@@ -4142,6 +4258,7 @@
           clearBtn.addEventListener('click', () => { sel.value = ''; sel.dispatchEvent(new Event('change')); });
           updateFilterUI();
         } catch (e) { console.error('filter wiring', e); }
+        relocateCarreraFilterToToolbar();
       }
 
       function renderModulos() {
@@ -6964,6 +7081,25 @@
         showModal(eventEditModal);
       }
 
+      // Expose a professional, safe, independent event management entrypoint
+      function openEventManagementModal(eventApi) {
+        try {
+          if (!eventApi) { console.warn('openEventManagementModal: no event provided'); return; }
+          // Prefer the new edit modal flow
+          if (typeof openEventEditModal === 'function') {
+            openEventEditModal(eventApi);
+            return;
+          }
+          // Fallback to any legacy handler if present
+          if (typeof abrirModal === 'function') {
+            abrirModal(eventApi);
+            return;
+          }
+          alert('No hay manejador de edición disponible.');
+        } catch (e) { console.error('openEventManagementModal error', e); }
+      }
+      try { window.openEventManagementModal = openEventManagementModal; } catch (_) {}
+
       editForm.addEventListener('submit', async function (ev) {
         ev.preventDefault();
         if (!currentEditingEvent) return;
@@ -9028,6 +9164,10 @@
               <button id="export-png" type="button" class="btn btn-primary btn-hover-lift" title="Genera una captura del calendario en PNG">
                 🖼️ Exportar horario (PNG)
               </button>
+
+                <button id="export-pdf" type="button" class="btn btn-primary btn-hover-lift" title="Genera un PDF del calendario">
+                  📄 Exportar horario (PDF)
+                </button>
               <button id="save-schedule" type="button" class="btn btn-secondary btn-hover-lift" title="Guardar cambios actuales del calendario">
                 💾 Guardar cambios
               </button>
