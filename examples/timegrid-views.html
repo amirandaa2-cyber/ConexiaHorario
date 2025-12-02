@@ -8190,15 +8190,14 @@
   <style>
     :root {
       --brand-orange: #f97316;
+      /* naranja */
       --brand-green: #10b981;
+      /* verde */
       --bg-page: #ffffff;
       --sidebar-bg: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
-      --sidebar-card-bg: rgba(255, 255, 255, 0.92);
-      --sidebar-border: rgba(15, 23, 42, 0.08);
-      --sidebar-min-width: 260px;
-      --sidebar-max-width: 420px;
-      --sidebar-fluid-width: clamp(var(--sidebar-min-width), 30vw, var(--sidebar-max-width));
-      --sidebar-width: var(--sidebar-fluid-width);
+  --sidebar-card-bg: rgba(255, 255, 255, 0.92);
+  --sidebar-border: rgba(15, 23, 42, 0.08);
+          --sidebar-width: 360px;
       --text-color: #222;
       --muted: #6b6b6b;
       --input-border: #e6e6e6;
@@ -8265,8 +8264,6 @@
       gap: 18px;
       align-items: flex-start;
       transition: gap 0.25s ease;
-      width: 100%;
-      min-height: 0;
     }
 
     #sidebar {
@@ -8764,7 +8761,7 @@
 
     /* allow calendar area to shrink/grow inside the flex row */
     #calendar-wrap {
-      flex: 1 1 calc(100% - var(--sidebar-width) - 24px);
+      flex: 1 1 auto;
       min-width: 0;
     }
 
@@ -8791,22 +8788,18 @@
     @media (max-width: 980px) {
       #app {
         gap: 12px;
-        flex-direction: column;
       }
 
       #sidebar {
         width: 100%;
-        max-width: 100%;
         max-height: none;
         position: relative;
         order: 1;
-        flex: 1 1 auto;
       }
 
       #calendar-wrap {
         order: 2;
         width: 100%;
-        flex: 1 1 auto;
       }
 
       #calendar {
