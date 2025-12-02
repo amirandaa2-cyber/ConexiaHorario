@@ -5261,6 +5261,8 @@
         refreshAssignRepeatState();
         toggleAssignModal(true);
       }
+      // Exponer el modal moderno para que los botones antiguos sigan funcionando
+      try { window.openAssignModalForModule = openAssignModalForModule; } catch (_) { }
 
       assignForm.addEventListener('submit', async function (ev) {
         ev.preventDefault();
@@ -5385,7 +5387,7 @@
         const skippedDates = [];
         if (doRepeat && until) {
           const templateId = 'tpl_' + Date.now();
-          templates.push({ id: templateId, moduloId, docenteId, salaId, startDate: date, time, duration, until });
+          templates.push({ id: templateId, moduloId, docenteId, salaId, startDate: date, time, duration: durationHours, until });
           // generate weekly occurrences linked to templateId, count only successful pushes
           let cur = new Date(date);
           const endUntil = new Date(until);
@@ -5396,11 +5398,21 @@
             else skippedDates.push(dstr);
             cur.setDate(cur.getDate() + 7);
           }
+          if (createdCount === 0) {
+            alert('No se pudo crear ninguna ocurrencia. Revisa conflictos o disponibilidad del docente.');
+            return;
+          }
         } else {
           // single event
           const can = canAssignHours(docente.id, durationHours, date);
           if (!can.ok) { alert(`No se puede asignar: docente ${docente.nombre} excedería su contrato semanal (${can.contrato}h). Asignadas: ${can.assigned.toFixed(2)}h`); return; }
-          if (await pushEventForDate(date, null)) createdCount = 1;
+          const created = await pushEventForDate(date, null);
+          if (created) {
+            createdCount = 1;
+          } else {
+            alert('No se pudo crear el evento. Verifica si existe un conflicto de horario en la franja seleccionada.');
+            return;
+          }
         }
 
         // update docente horasAsignadas based on actually created occurrences
