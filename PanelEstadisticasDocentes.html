@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Estadísticas Docentes · Conexia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bowlby+One&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-page: #f8fafc;
+      --card-bg: #ffffff;
+      --text-color: #0f172a;
+      --muted-text: #64748b;
+      --brand-orange: #f97316;
+      --brand-green: #10b981;
+      --brand-blue: #2563eb;
+      --border-color: rgba(15, 23, 42, 0.08);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(180deg, #fdf7f0 0%, #f8fbff 100%);
+      color: var(--text-color);
+      min-height: 100vh;
+    }
+
+    .page-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    header.hero {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 32px;
+      box-shadow: 0 20px 55px rgba(15, 23, 42, 0.08);
+      border: 1px solid var(--border-color);
+    }
+
+    .hero-eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      font-size: 0.72rem;
+      color: var(--muted-text);
+      margin-bottom: 6px;
+    }
+
+    .hero h1 {
+      margin: 0 0 12px;
+      font-family: 'Bowlby One', cursive;
+      letter-spacing: 0.01em;
+    }
+
+    .hero-lead {
+      margin: 0;
+      color: var(--muted-text);
+      max-width: 560px;
+      line-height: 1.5;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .primary-btn,
+    .ghost-btn {
+      border-radius: 999px;
+      padding: 10px 20px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, var(--brand-orange), #fb923c);
+      color: #fff;
+      box-shadow: 0 15px 30px rgba(249, 115, 22, 0.35);
+    }
+
+    .ghost-btn {
+      background: rgba(15, 23, 42, 0.05);
+      color: var(--text-color);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .primary-btn:hover,
+    .ghost-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 28px rgba(15, 23, 42, 0.15);
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 20px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .metric-label {
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      color: var(--muted-text);
+    }
+
+    .metric-value {
+      font-size: 2.25rem;
+      font-weight: 700;
+    }
+
+    .metric-trend {
+      font-size: 0.9rem;
+      color: var(--brand-green);
+      font-weight: 600;
+    }
+
+    .section-title {
+      margin: 12px 0 8px;
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+
+    .section-description {
+      margin: 0 0 18px;
+      color: var(--muted-text);
+      font-size: 0.95rem;
+    }
+
+    .panel-section {
+      background: var(--card-bg);
+      border-radius: 22px;
+      padding: 28px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+    }
+
+    .progress-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.2);
+      overflow: hidden;
+    }
+
+    .progress-value {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--brand-blue), var(--brand-green));
+    }
+
+    .list-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+
+    .list-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .list-card li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px dashed rgba(15, 23, 42, 0.08);
+      padding-bottom: 10px;
+    }
+
+    .list-card li:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--brand-green);
+    }
+
+    footer.page-footer {
+      text-align: center;
+      color: var(--muted-text);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 640px) {
+      header.hero {
+        padding: 24px;
+      }
+      .metric-value {
+        font-size: 1.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div>
+        <p class="hero-eyebrow">Conexia · Insights</p>
+        <h1>Panel de estadísticas docentes</h1>
+        <p class="hero-lead">Monitorea la ocupación de docentes, identifica brechas de cobertura y toma decisiones rápidas antes de publicar nuevos bloques en el calendario.</p>
+      </div>
+      <div class="hero-actions">
+        <a class="ghost-btn" href="timegrid-views.html">⟵ Volver al calendario</a>
+        <button type="button" class="primary-btn" onclick="window.print()">🖨️ Exportar como PDF</button>
+      </div>
+    </header>
+
+    <section class="cards-grid" aria-label="Indicadores destacados">
+      <article class="metric-card">
+        <span class="metric-label">Docentes activos</span>
+        <span class="metric-value">46</span>
+        <span class="metric-trend">+3 incorporados este mes</span>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Cobertura semanal</span>
+        <span class="metric-value">92%</span>
+        <span class="metric-trend">↑ 5 pts vs semana anterior</span>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Horas por docente</span>
+        <span class="metric-value">18.4</span>
+        <span class="metric-trend">Objetivo: 20 h promedio</span>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Bloques críticos</span>
+        <span class="metric-value">7</span>
+        <span class="metric-trend" style="color:#ef4444;">Prioridad alta</span>
+      </article>
+    </section>
+
+    <section class="panel-section" aria-labelledby="distribucion-title">
+      <h2 id="distribucion-title" class="section-title">Distribución de carga</h2>
+      <p class="section-description">Resumen semanal por escuela. Los porcentajes indican la utilización de las horas asignables para cada equipo docente.</p>
+      <div class="progress-row">
+        <span>Ingeniería &amp; Minería</span>
+        <span>87%</span>
+      </div>
+      <div class="progress-bar" aria-hidden="true">
+        <div class="progress-value" style="width:87%"></div>
+      </div>
+      <div class="progress-row">
+        <span>Negocios &amp; Logística</span>
+        <span>94%</span>
+      </div>
+      <div class="progress-bar" aria-hidden="true">
+        <div class="progress-value" style="width:94%"></div>
+      </div>
+      <div class="progress-row">
+        <span>Salud</span>
+        <span>78%</span>
+      </div>
+      <div class="progress-bar" aria-hidden="true">
+        <div class="progress-value" style="width:78%"></div>
+      </div>
+      <div class="progress-row">
+        <span>Tecnologías de la Información</span>
+        <span>101%</span>
+      </div>
+      <div class="progress-bar" aria-hidden="true">
+        <div class="progress-value" style="width:100%"></div>
+      </div>
+    </section>
+
+    <section class="list-grid" aria-label="Detalle de focos prioritarios">
+      <article class="panel-section list-card">
+        <h2 class="section-title">Docentes con mayor carga</h2>
+        <ul>
+          <li><span>Camila Rivas</span><span class="chip">24 h</span></li>
+          <li><span>Javier Lazo</span><span class="chip">22 h</span></li>
+          <li><span>Pamela Olivares</span><span class="chip">21 h</span></li>
+          <li><span>Ignacio Romero</span><span class="chip">21 h</span></li>
+        </ul>
+      </article>
+      <article class="panel-section list-card">
+        <h2 class="section-title">Alertas de reemplazo</h2>
+        <ul>
+          <li><span>Programación I · Vespertino</span><span class="chip" style="background:rgba(239,68,68,0.15);color:#ef4444;">3 faltas</span></li>
+          <li><span>Metalurgia · Taller M2</span><span class="chip" style="background:rgba(251,191,36,0.2);color:#b45309;">Seguimiento</span></li>
+          <li><span>Higiene y Seguridad</span><span class="chip">Cubierto</span></li>
+          <li><span>Logística Aplicada</span><span class="chip">Cubierto</span></li>
+        </ul>
+      </article>
+      <article class="panel-section list-card">
+        <h2 class="section-title">Bloques en riesgo</h2>
+        <ul>
+          <li><span>Lunes · 08:00-09:40</span><span class="chip" style="background:rgba(59,130,246,0.15);color:#2563eb;">Sobrecarga</span></li>
+          <li><span>Martes · 19:00-21:00</span><span class="chip" style="background:rgba(239,68,68,0.15);color:#ef4444;">Sin docente</span></li>
+          <li><span>Jueves · 15:00-18:00</span><span class="chip">Estable</span></li>
+          <li><span>Viernes · 09:40-11:20</span><span class="chip">Estable</span></li>
+        </ul>
+      </article>
+    </section>
+
+    <footer class="page-footer">
+      Datos referenciales para exploración visual. Integra tus API o reportes reales conectando este panel al backend de Conexia.
+    </footer>
+  </div>
+</body>
+</html>
