@@ -1330,119 +1330,15 @@
       selectEl.innerHTML = opts.join('');
     }
 
-    function timeStrToMinutes(str) {
-      if (typeof str !== 'string') return 0;
-      const parts = str.trim().split(':');
-      const hours = parseInt(parts[0], 10) || 0;
-      const minutes = parseInt(parts[1], 10) || 0;
-      return (hours * 60) + minutes;
-    }
-
-    function minutesToTimeStr(totalMinutes) {
-      const normalized = ((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60);
-      const hours = Math.floor(normalized / 60);
-      const minutes = normalized % 60;
-      return `${pad2(hours)}:${pad2(minutes)}`;
-    }
-
-    function addMinutesToTimeStr(timeStr, minutesToAdd) {
-      return minutesToTimeStr(timeStrToMinutes(timeStr) + minutesToAdd);
-    }
-
-    function ensureSecondsPart(timeStr) {
-      const normalized = normalizeTimeStr(timeStr);
-      return normalized ? `${normalized}:00` : '00:00:00';
-    }
-
-    const CEDUC_BLOQUES = [
-      { numero: 1,  inicio: '08:30', fin: '09:05', duracion: 35 },
-      { numero: 2,  inicio: '09:05', fin: '09:40', duracion: 35 },
-      { numero: 3,  inicio: '09:50', fin: '10:25', duracion: 35 },
-      { numero: 4,  inicio: '10:25', fin: '11:00', duracion: 35 },
-      { numero: 5,  inicio: '11:10', fin: '11:45', duracion: 35 },
-      { numero: 6,  inicio: '11:45', fin: '12:20', duracion: 35 },
-      { numero: 7,  inicio: '12:30', fin: '13:05', duracion: 35 },
-      { numero: 8,  inicio: '13:05', fin: '13:40', duracion: 35 },
-      { numero: 9,  inicio: '13:50', fin: '14:25', duracion: 35 },
-      { numero: 10, inicio: '14:25', fin: '15:00', duracion: 35 },
-      { numero: 11, inicio: '15:10', fin: '15:45', duracion: 35 },
-      { numero: 12, inicio: '15:45', fin: '16:20', duracion: 35 },
-      { numero: 13, inicio: '16:30', fin: '17:05', duracion: 35 },
-      { numero: 14, inicio: '17:05', fin: '17:40', duracion: 35 },
-      { numero: 15, inicio: '17:50', fin: '18:25', duracion: 35 },
-      { numero: 16, inicio: '18:35', fin: '19:10', duracion: 35 },
-      { numero: 17, inicio: '19:10', fin: '19:45', duracion: 35 },
-      { numero: 18, inicio: '19:55', fin: '20:30', duracion: 35 },
-      { numero: 19, inicio: '20:30', fin: '21:05', duracion: 35 },
-      { numero: 20, inicio: '21:15', fin: '21:50', duracion: 35 },
-      { numero: 21, inicio: '21:50', fin: '22:25', duracion: 35 },
-      { numero: 22, inicio: '22:25', fin: '23:00', duracion: 35 }
-    ];
-
-    const CEDUC_BLOCKS = CEDUC_BLOQUES.map(b => ({ number: b.numero, start: b.inicio, end: b.fin, durationMinutes: b.duracion }));
-    const BLOCK_TIMEGRID_MIN = ensureSecondsPart(CEDUC_BLOQUES[0]?.inicio || '08:30');
-    const BLOCK_TIMEGRID_MAX = ensureSecondsPart(addMinutesToTimeStr(CEDUC_BLOQUES[CEDUC_BLOQUES.length - 1]?.fin || '23:00', 5));
-    const BLOCK_SNAP_MINUTES = 5;
-    const BLOCK_SNAP_DURATION = `00:${pad2(BLOCK_SNAP_MINUTES)}:00`;
-    const BLOCK_START_LOOKUP = new Map(CEDUC_BLOQUES.map(b => [normalizeTimeStr(b.inicio), b]));
-    const BLOCK_RANGES = CEDUC_BLOQUES.map(b => ({
-      number: b.numero,
-      start: timeStrToMinutes(b.inicio),
-      end: timeStrToMinutes(b.fin)
-    }));
-    const BLOCK_BREAKS = buildBlockBreaks(CEDUC_BLOQUES);
-    const BLOCK_BREAK_RANGES = BLOCK_BREAKS.map(br => ({
-      start: timeStrToMinutes(br.start),
-      end: timeStrToMinutes(br.end)
-    }));
-
-    if (typeof window !== 'undefined') {
-      window.CEDUC_BLOQUES = CEDUC_BLOQUES;
-      window.CEDUC_BLOCKS = CEDUC_BLOCKS;
-    }
-
-    function buildBlockBreaks(blocks) {
-      const result = [];
-      for (let i = 0; i < blocks.length - 1; i++) {
-        const currentEnd = normalizeTimeStr(blocks[i].fin);
-        const nextStart = normalizeTimeStr(blocks[i + 1].inicio);
-        if (currentEnd && nextStart && currentEnd !== nextStart) {
-          result.push({
-            start: currentEnd,
-            end: nextStart,
-            afterBlock: blocks[i].numero
-          });
-        }
-      }
-      return result;
-    }
-
-    function timeIsWithinBreak(timeStr) {
-      if (!timeStr) return false;
-      const minutes = timeStrToMinutes(timeStr);
-      return BLOCK_BREAK_RANGES.some(range => minutes >= range.start && minutes < range.end);
-    }
-
-    function findBlockByMinutes(minutes) {
-      return BLOCK_RANGES.find(range => minutes >= range.start && minutes < range.end) || null;
-    }
-
-    function getBreakByStart(timeStr) {
-      const normalized = normalizeTimeStr(timeStr);
-      if (!normalized) return null;
-      return BLOCK_BREAKS.find(br => normalizeTimeStr(br.start) === normalized) || null;
-    }
-
   function getAvailableBlocks() {
-    if (typeof window !== 'undefined') {
-      if (Array.isArray(window.CEDUC_BLOCKS) && window.CEDUC_BLOCKS.length) {
-        return window.CEDUC_BLOCKS;
-      }
-      if (Array.isArray(window.CEDUC_BLOQUES) && window.CEDUC_BLOQUES.length) {
-        return window.CEDUC_BLOQUES.map(b => ({ number: b.numero, start: b.inicio, end: b.fin, durationMinutes: b.duracion }));
-      }
+    if (typeof window === 'undefined') return [];
+    if (Array.isArray(window.CEDUC_BLOCKS) && window.CEDUC_BLOCKS.length) {
+      return window.CEDUC_BLOCKS;
     }
-    return CEDUC_BLOCKS;
+    if (Array.isArray(window.CEDUC_BLOQUES) && window.CEDUC_BLOQUES.length) {
+      return window.CEDUC_BLOQUES.map(b => ({ number: b.numero, start: b.inicio, end: b.fin, durationMinutes: b.duracion }));
+    }
+    return [];
   }
 
   function normalizeBlockTime(value) {
@@ -3061,13 +2957,12 @@
             selectMirror: true,
             hiddenDays: [0],
             // Ajustes de espaciado CEDUC
-            slotMinTime: BLOCK_TIMEGRID_MIN,
-            slotMaxTime: BLOCK_TIMEGRID_MAX,
-            slotDuration: BLOCK_SNAP_DURATION,
-            snapDuration: BLOCK_SNAP_DURATION,
-            slotLabelInterval: BLOCK_SNAP_DURATION,
+            slotMinTime: '08:00:00',
+            slotMaxTime: '23:30:00',
+            slotDuration: '00:35:00',
+            slotLabelInterval: '01:10:00',
             slotLabelFormat: { hour: '2-digit', minute: '2-digit' },
-            slotLabelContent: renderBlockSlotLabel,
+            slotHeight: 60,
             dayMaxEvents: false,
             eventTimeFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
             dateClick: function(info) {
@@ -3104,7 +2999,6 @@
                 };
                 localStorage.setItem(KEY_CALENDAR_STATE, JSON.stringify(state));
                 try { persistEventsAndValidate(); } catch (_) { }
-                refreshBlockGridStyling(calendarEl);
               } catch (err) { console.error('datesSet handler error', err); }
             },
             events: async function (fetchInfo, successCallback, failureCallback) {
@@ -3660,13 +3554,40 @@
             if (calendar) {
               calendar.render();
               relocateCarreraFilterToToolbar();
-              refreshBlockGridStyling(calendarEl);
             }
           } catch (err) {
             console.error('Calendar render error', err);
             runtimeErrorEl.textContent = 'Error renderizando el calendario: ' + err.message;
             runtimeErrorEl.style.display = 'block';
           }
+          // SISTEMA DE BLOQUES CEDUC - NO VALORES DECIMALES
+          const CEDUC_BLOQUES = [
+            { numero: 1,  inicio: '08:30', fin: '09:05', duracion: 35 },
+            { numero: 2,  inicio: '09:05', fin: '09:40', duracion: 35 },
+            { numero: 3,  inicio: '09:50', fin: '10:25', duracion: 35 },
+            { numero: 4,  inicio: '10:25', fin: '11:00', duracion: 35 },
+            { numero: 5,  inicio: '11:10', fin: '11:45', duracion: 35 },
+            { numero: 6,  inicio: '11:45', fin: '12:20', duracion: 35 },
+            { numero: 7,  inicio: '12:30', fin: '13:05', duracion: 35 },
+            { numero: 8,  inicio: '13:05', fin: '13:40', duracion: 35 },
+            { numero: 9,  inicio: '13:50', fin: '14:25', duracion: 35 },
+            { numero: 10, inicio: '14:25', fin: '15:00', duracion: 35 },
+            { numero: 11, inicio: '15:10', fin: '15:45', duracion: 35 },
+            { numero: 12, inicio: '15:45', fin: '16:20', duracion: 35 },
+            { numero: 13, inicio: '16:30', fin: '17:05', duracion: 35 },
+            { numero: 14, inicio: '17:05', fin: '17:40', duracion: 35 },
+            { numero: 15, inicio: '17:50', fin: '18:25', duracion: 35 },
+            { numero: 16, inicio: '18:35', fin: '19:10', duracion: 35 },
+            { numero: 17, inicio: '19:10', fin: '19:45', duracion: 35 },
+            { numero: 18, inicio: '19:55', fin: '20:30', duracion: 35 },
+            { numero: 19, inicio: '20:30', fin: '21:05', duracion: 35 },
+            { numero: 20, inicio: '21:15', fin: '21:50', duracion: 35 },
+            { numero: 21, inicio: '21:50', fin: '22:25', duracion: 35 },
+            { numero: 22, inicio: '22:25', fin: '23:00', duracion: 35 }
+          ];
+          try { window.CEDUC_BLOQUES = CEDUC_BLOQUES; } catch (_) { }
+          const CEDUC_BLOCKS = CEDUC_BLOQUES.map(b => ({ number: b.numero, start: b.inicio, end: b.fin, durationMinutes: b.duracion }));
+          try { window.CEDUC_BLOCKS = CEDUC_BLOCKS; } catch (_) { }
           function calcularNumeroBloque(fechaHora) {
             const hora = fechaHora.getHours();
             const minutos = fechaHora.getMinutes();
@@ -3874,55 +3795,6 @@
             const nombre = formatearTituloEvento(evento);
             const codigo = modulo ? (modulo.codigoAsignatura || modulo.codigo || '') : '';
             return { nombre, codigo };
-          }
-
-          function renderBlockSlotLabel(arg) {
-            try {
-              const normalized = normalizeTimeStr(timeStrFromDate(arg.date));
-              if (!normalized) return { html: '' };
-              const block = BLOCK_START_LOOKUP.get(normalized);
-              const breakInfo = getBreakByStart(normalized);
-              if (!block && !breakInfo) {
-                return { html: '' };
-              }
-              const wrapper = document.createElement('div');
-              wrapper.className = 'fc-block-label';
-              if (block) {
-                wrapper.innerHTML = `
-                  <strong>Bloque ${block.numero}</strong>
-                  <span>${block.inicio} - ${block.fin}</span>
-                `;
-              } else if (breakInfo) {
-                wrapper.classList.add('fc-block-label--break');
-                wrapper.innerHTML = `
-                  <span>Receso</span>
-                  <span>${breakInfo.start} - ${breakInfo.end}</span>
-                `;
-              }
-              return { domNodes: [wrapper] };
-            } catch (err) {
-              console.warn('Error creando etiqueta de bloque', err);
-              return { html: '' };
-            }
-          }
-
-          function refreshBlockGridStyling(containerEl) {
-            if (!containerEl) return;
-            requestAnimationFrame(() => {
-              const slots = containerEl.querySelectorAll('.fc-timegrid-slot');
-              slots.forEach((slot) => {
-                const raw = slot.getAttribute('data-time');
-                if (!raw) return;
-                const normalized = normalizeTimeStr(raw.slice(0, 5));
-                if (!normalized) return;
-                const minutes = timeStrToMinutes(normalized);
-                const blockRange = findBlockByMinutes(minutes);
-                const isBreak = timeIsWithinBreak(normalized);
-                slot.classList.toggle('fc-slot--block', !!blockRange);
-                slot.classList.toggle('fc-slot--block-start', !!(blockRange && minutes === blockRange.start));
-                slot.classList.toggle('fc-slot--break', isBreak);
-              });
-            });
           }
 
           // ===== Conflictos por bloque y día =====
@@ -8933,6 +8805,8 @@
       min-width: 0;
     }
 
+    /* Eliminados estilos específicos de bloques CEDUC; retornamos a estilos genéricos de FullCalendar */
+
     /* small-screen layout: sidebar on top, calendar full width below */
     @media (max-width: 980px) {
       #app {
@@ -9278,51 +9152,15 @@
     /* MEJORAR VISIBILIDAD DE LAS LÍNEAS DE TIEMPO */
     .fc-timegrid-slot {
       border-bottom: 1px solid #e2e8f0 !important;
-      height: 18px !important;
-      transition: background 0.15s ease;
+      height: 60px !important;
     }
-    .fc-slot--block {
-      background-color: rgba(15, 23, 42, 0.02);
-    }
-    .fc-slot--block-start {
-      border-top: 2px solid rgba(15, 23, 42, 0.18) !important;
-      background-color: rgba(79, 70, 229, 0.05);
-    }
-    .fc-slot--break,
-    .fc-slot--break .fc-timegrid-slot-lane {
-      background-color: #fff7ed !important;
-    }
-    .fc-slot--break .fc-timegrid-slot-label-frame {
-      opacity: 0.85;
-    }
-    .fc-block-label {
-      display: flex;
-      flex-direction: column;
-      font-size: 11px;
-      line-height: 1.2;
-      font-weight: 600;
-      text-transform: uppercase;
-      color: #0f172a;
-    }
-    .fc-block-label span {
-      font-size: 10px;
-      font-weight: 500;
-      color: #475569;
-    }
-    .fc-block-label--break {
-      color: #b45309;
-    }
-    .fc-block-label--break span:last-child {
-      color: #92400e;
-      font-weight: 600;
-    }
+    .fc-timegrid-slot:nth-child(odd) { background-color: #fafafa; }
+    .fc-timegrid-slot:nth-child(even) { background-color: #ffffff; }
     /* ETIQUETAS DE TIEMPO MÁS CLARAS */
     .fc-timegrid-slot-label {
-      font-weight: 500;
-      color: #475569;
-      font-size: 11px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 14px;
     }
   </style>
 </head>
