@@ -1157,7 +1157,6 @@
         inputFecha.value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
         if(ctx.carreraId){ selCarrera.value = ctx.carreraId; selCarrera.dispatchEvent(new Event('change')); }
         if(ctx.moduloId){
-          // asegurar carrera si no viene
           const modulo = (window.modulos||[]).find(m=>String(m.id)===String(ctx.moduloId));
           if(modulo && !ctx.carreraId){ selCarrera.value = modulo.carreraId; selCarrera.dispatchEvent(new Event('change')); }
           selModulo.value = ctx.moduloId;
@@ -2885,9 +2884,10 @@
               ...(e.extendedProps || {}),
               __meta: {
                 ...(e.extendedProps?.__meta || {}),
-                moduloId: e.modulo_id ?? e.extendedProps?.moduloId,
-                docenteId: e.docente_id ?? e.extendedProps?.docenteId,
-                salaId: e.sala_id ?? e.extendedProps?.salaId
+                // Forzar a string para evitar mismatches de tipo al comparar
+                moduloId: e.modulo_id !== undefined && e.modulo_id !== null ? String(e.modulo_id) : (e.extendedProps?.moduloId !== undefined ? String(e.extendedProps.moduloId) : undefined),
+                docenteId: e.docente_id !== undefined && e.docente_id !== null ? String(e.docente_id) : (e.extendedProps?.docenteId !== undefined ? String(e.extendedProps.docenteId) : undefined),
+                salaId: e.sala_id !== undefined && e.sala_id !== null ? String(e.sala_id) : (e.extendedProps?.salaId !== undefined ? String(e.extendedProps.salaId) : undefined)
               }
             }
           }));
@@ -3086,11 +3086,8 @@
                 } else {
                   freshEvents = load(KEY_EVENTS, []);
                 }
-                // FILTRO CRÍTICO: Excluir eventos sin moduloId (genéricos azules)
-                storedEvents = (freshEvents || []).filter(ev => {
-                  const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
-                  return meta.moduloId && String(meta.moduloId).trim() !== '';
-                });
+                // Incluir todos los eventos; el filtro por carrera sólo aplica si existe moduloId
+                storedEvents = dedupeEvents(freshEvents || []);
                 // De-duplicación estricta antes de renderizar
                 storedEvents = dedupeEvents(storedEvents);
 
@@ -3122,10 +3119,10 @@
                 let filteredEvents = bloquesEvents.filter(e => {
                   if (!filterCarrera) return true;
                   const meta = (e.extendedProps && e.extendedProps.__meta) || {};
-                  if (!meta.moduloId) return false;
-                  const mod = modulos.find(m => m.id === meta.moduloId);
+                  if (!meta.moduloId) return false; // si no hay módulo, no se puede filtrar por carrera
+                  const mod = modulos.find(m => String(m.id) === String(meta.moduloId));
                   if (!mod) return false;
-                  return mod.carreraId === filterCarrera;
+                  return String(mod.carreraId) === String(filterCarrera);
                 });
                 // Garantizar unicidad también en la salida final
                 filteredEvents = dedupeEvents(filteredEvents);
