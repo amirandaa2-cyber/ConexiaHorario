@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 
 <head>
-  <meta charset='utf-8' />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conexia · Gestión Horaria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap" rel="stylesheet">
@@ -7972,7 +7974,9 @@
       }
     });
   </script>
+</head>
 
+<body>
   <!-- Modal de Asignación Manual -->
   <div id="modal-asignacion-manual" class="modal-asignacion-overlay" aria-hidden="true">
     <div class="modal-asignacion" role="dialog" aria-modal="true" aria-labelledby="manual-modal-title" data-drag-handle=".modal-asignacion-header">
@@ -9139,9 +9143,6 @@
       font-size: 14px;
     }
   </style>
-</head>
-
-<body>
 
   <div id="auth-screen" class="auth-overlay">
     <div class="auth-wrapper">
@@ -9767,7 +9768,7 @@
       window.CEDUC_BLOCKS_INDEPENDIENTES = blocks;
       // Compatibilidad con estructuras previas
       window.CEDUC_BLOCKS35 = blocks.map(b=>({ index:b.index, startHM:b.start, endHM:b.end, startMinutes: (Number(b.start.slice(0,2))*60 + Number(b.start.slice(3))), endMinutes:(Number(b.end.slice(0,2))*60 + Number(b.end.slice(3))) }));
-      window.CEDUC_BLOQUES = blocks.map(b=>({ bloque:b.index, inicio:b.start, fin:b.end }));
+      window.CEDUC_BLOQUES = blocks.map(b=>({ numero:b.index, inicio:b.start, fin:b.end, duracion:35 }));
       window.CEDUC_BLOCKS = window.CEDUC_BLOCKS35;
 
       // Ocupación por día: `${yyyy-mm-dd}:${blockId}` -> {busy,eventId}
@@ -9905,7 +9906,7 @@
       if (Array.isArray(window.CEDUC_BLOQUES) && window.CEDUC_BLOQUES.length) {
         window.CEDUC_BLOCKS = blocks;
       } else {
-        window.CEDUC_BLOQUES = blocks.map(b => ({ bloque: b.index, inicio: b.startHM, fin: b.endHM }));
+        window.CEDUC_BLOQUES = blocks.map(b => ({ numero: b.index, inicio: b.startHM, fin: b.endHM, duracion: 35 }));
         window.CEDUC_BLOCKS = blocks;
       }
       window.CEDUC_getBlockForTime = function(date) {
