@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 
 <head>
-  <meta charset='utf-8' />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conexia · Gestión Horaria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap" rel="stylesheet">
@@ -1196,7 +1198,7 @@
         const carrera=(window.carreras||[]).find(c=>String(c.id)===String(selCarrera.value));
         const color = modulo && modulo.color ? modulo.color : '#3788d8';
         const ev={
-          id:`evt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+          id: typeof generateUniqueEventId === 'function' ? generateUniqueEventId() : `evt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
           title: modulo? modulo.nombre : 'Módulo',
           start:startStr,
           end:endStr,
@@ -1303,6 +1305,82 @@
     const BLOCK_DURATION_MINUTES = 35;
     const BLOCK_DURATION_HOURS = BLOCK_DURATION_MINUTES / 60;
 
+    // Robust unique ID generator to prevent duplicate IDs
+    let _eventIdCounter = 0;
+    function generateUniqueEventId() {
+      const timestamp = Date.now();
+      const counter = ++_eventIdCounter;
+      const random = Math.random().toString(36).slice(2, 10);
+      return `evt_${timestamp}_${counter}_${random}`;
+    }
+
+    // Helper to normalize date to ISO string (first 19 chars) for comparison
+    function normalizeDateTimeForComparison(dateValue) {
+      if (!dateValue) return null;
+      try {
+        return new Date(dateValue).toISOString().slice(0, 19);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // Deduplication helper: check if event already exists by various criteria
+    function isEventDuplicate(newEvent, existingEvents) {
+      if (!newEvent || !Array.isArray(existingEvents)) return false;
+      if (existingEvents.length === 0) return false;
+      
+      // Check by exact ID match
+      if (newEvent.id && existingEvents.some(e => e.id === newEvent.id)) {
+        return true;
+      }
+      
+      // Normalize dates for comparison
+      const newStart = normalizeDateTimeForComparison(newEvent.start);
+      const newEnd = normalizeDateTimeForComparison(newEvent.end);
+      const newTitle = (newEvent.title || '').trim().toLowerCase();
+      
+      // Check for same title + same time slot
+      return existingEvents.some(existing => {
+        const existStart = normalizeDateTimeForComparison(existing.start);
+        const existEnd = normalizeDateTimeForComparison(existing.end);
+        const existTitle = (existing.title || '').trim().toLowerCase();
+        
+        return existStart === newStart && existEnd === newEnd && existTitle === newTitle;
+      });
+    }
+
+    // Clean duplicate events from array
+    function deduplicateEvents(events) {
+      if (!Array.isArray(events)) {
+        console.warn('deduplicateEvents: received non-array input, returning empty array');
+        return [];
+      }
+      if (events.length === 0) return [];
+      
+      const seen = new Map();
+      const result = [];
+      
+      for (const event of events) {
+        if (!event) continue;
+        
+        // Create unique key based on title + start + end
+        const startKey = normalizeDateTimeForComparison(event.start) || '';
+        const endKey = normalizeDateTimeForComparison(event.end) || '';
+        const titleKey = (event.title || '').trim().toLowerCase();
+        const uniqueKey = `${titleKey}|${startKey}|${endKey}`;
+        
+        // If we've seen this exact event before, skip it (keep first occurrence)
+        if (seen.has(uniqueKey)) {
+          console.debug('Deduplication: removed duplicate event', event.title, startKey);
+          continue;
+        }
+        
+        seen.set(uniqueKey, true);
+        result.push(event);
+      }
+      
+      return result;
+    }
 
     function pad2(num) {
       return String(num).padStart(2, '0');
@@ -2029,6 +2107,10 @@
         } catch (metaErr) { console.warn('No se pudo normalizar bloques para un evento', metaErr); }
         return ev;
       });
+      
+      // Deduplicate events after loading to clean up any existing duplicates
+      storedEvents = deduplicateEvents(storedEvents);
+      
       // (removed .fc-event.hidden CSS approach - rely on strict filtering instead)
       // --- DIAGNÓSTICO EN PÁGINA -------------------------------------------------
       // Visible diagnostics panel to capture runtime errors and status without opening devtools
@@ -3174,19 +3256,20 @@
                 if (existingIdx === -1) {
                   const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
                   const toStore = {
-                    id: ev.id || ('evt_' + Date.now()),
+                    id: ev.id || generateUniqueEventId(),
                     title: ev.title,
                     start: startIso,
                     end: endIso,
                     editable: true,
                     extendedProps: { __meta: meta }
                   };
-                  // Prevent duplicates: ensure same title+start+end not already present
-                  const dupIdx = storedEvents.findIndex(se => se.title === toStore.title && se.start === toStore.start && se.end === toStore.end);
-                  if (dupIdx === -1) {
+                  // Use improved deduplication check
+                  if (!isEventDuplicate(toStore, storedEvents)) {
                     storedEvents.push(toStore);
+                    console.log('Evento agregado exitosamente:', toStore.title);
+                  } else {
+                    console.log('Evento duplicado detectado, omitido:', toStore.title);
                   }
-                  console.log('Evento agregado exitosamente:', toStore.title);
                   debouncedPersistEvents();
                 } else {
                   // update existing record
@@ -6181,6 +6264,8 @@
       // Attach to calendar lifecycle: when storedEvents changes we call runRealtimeValidation and refreshCalendarEvents
       const originalSaveEvents = save;
       function persistEventsAndValidate() {
+        // Deduplicate events before saving to prevent persistence of duplicates
+        storedEvents = deduplicateEvents(storedEvents);
         save(KEY_EVENTS, storedEvents);
         runRealtimeValidation();
         try {
@@ -6600,7 +6685,7 @@
                 const confExisting = findConflicts(candidate);
                 const confDraft = findConflictsInList(candidate, draftEvents);
                 if (confExisting.length === 0 && confDraft.length === 0) {
-                  try { candidate.id = 'evt_' + Date.now() + '_' + Math.floor(Math.random() * 10000); } catch (_) { candidate.id = 'evt_' + Date.now(); }
+                  candidate.id = generateUniqueEventId();
                   draftEvents.push(candidate);
                   cursor = new Date(end);
                   diurnoMods.shift();
@@ -6626,7 +6711,7 @@
                 const confExisting = findConflicts(candidate);
                 const confDraft = findConflictsInList(candidate, draftEvents);
                 if (confExisting.length === 0 && confDraft.length === 0) {
-                  try { candidate.id = 'evt_' + Date.now() + '_' + Math.floor(Math.random() * 10000); } catch (_) { candidate.id = 'evt_' + Date.now(); }
+                  candidate.id = generateUniqueEventId();
                   draftEvents.push(candidate);
                   cursor = new Date(end);
                   vespertinoMods.shift();
@@ -6905,9 +6990,13 @@
       async function tryCreateEvent(ev) {
         const conflicts = findConflicts(ev);
         // Ensure the event has a stable id so future operations (drag/drop/resize) can map calendar events
-        try {
-          if (!ev.id) { ev.id = 'evt_' + Date.now() + '_' + Math.floor(Math.random() * 10000); }
-        } catch (_) { ev.id = 'evt_' + Date.now(); }
+        if (!ev.id) { ev.id = generateUniqueEventId(); }
+
+        // Check for duplicates before adding
+        if (isEventDuplicate(ev, storedEvents)) {
+          console.log('tryCreateEvent: duplicate detected, skipping', ev.title);
+          return false;
+        }
 
         if (conflicts.length === 0) {
           // make sure stored event has extendedProps.__meta object
@@ -7972,7 +8061,9 @@
       }
     });
   </script>
+</head>
 
+<body>
   <!-- Modal de Asignación Manual -->
   <div id="modal-asignacion-manual" class="modal-asignacion-overlay" aria-hidden="true">
     <div class="modal-asignacion" role="dialog" aria-modal="true" aria-labelledby="manual-modal-title" data-drag-handle=".modal-asignacion-header">
@@ -9139,9 +9230,6 @@
       font-size: 14px;
     }
   </style>
-</head>
-
-<body>
 
   <div id="auth-screen" class="auth-overlay">
     <div class="auth-wrapper">
@@ -9767,7 +9855,7 @@
       window.CEDUC_BLOCKS_INDEPENDIENTES = blocks;
       // Compatibilidad con estructuras previas
       window.CEDUC_BLOCKS35 = blocks.map(b=>({ index:b.index, startHM:b.start, endHM:b.end, startMinutes: (Number(b.start.slice(0,2))*60 + Number(b.start.slice(3))), endMinutes:(Number(b.end.slice(0,2))*60 + Number(b.end.slice(3))) }));
-      window.CEDUC_BLOQUES = blocks.map(b=>({ bloque:b.index, inicio:b.start, fin:b.end }));
+      window.CEDUC_BLOQUES = blocks.map(b=>({ numero:b.index, inicio:b.start, fin:b.end, duracion:35 }));
       window.CEDUC_BLOCKS = window.CEDUC_BLOCKS35;
 
       // Ocupación por día: `${yyyy-mm-dd}:${blockId}` -> {busy,eventId}
@@ -9905,7 +9993,7 @@
       if (Array.isArray(window.CEDUC_BLOQUES) && window.CEDUC_BLOQUES.length) {
         window.CEDUC_BLOCKS = blocks;
       } else {
-        window.CEDUC_BLOQUES = blocks.map(b => ({ bloque: b.index, inicio: b.startHM, fin: b.endHM }));
+        window.CEDUC_BLOQUES = blocks.map(b => ({ numero: b.index, inicio: b.startHM, fin: b.endHM, duracion: 35 }));
         window.CEDUC_BLOCKS = blocks;
       }
       window.CEDUC_getBlockForTime = function(date) {
