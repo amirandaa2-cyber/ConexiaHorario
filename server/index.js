@@ -25,6 +25,47 @@ const ALLOWED_ROLE_CODES = (process.env.ALLOWED_ROLE_CODES || 'admin,docente')
 	.filter(Boolean);
 const BLOCK_MINUTES = 35;
 
+// DAO helpers for auto-organize
+async function getDocentesPorCarrera(carreraId) {
+	const { rows } = await db.query(
+		`SELECT d.id, d.nombre, d."ContratoHoraSemanal" AS contrato_semana,
+						dc.activo, COALESCE(dc.prioridad, 999) AS prioridad
+			 FROM docente_carrera dc
+			 JOIN docentes d ON d.id = dc.docente_id
+			WHERE dc.carrera_id = $1 AND COALESCE(dc.activo, TRUE)
+			ORDER BY prioridad ASC, d.nombre ASC`,
+		[String(carreraId).trim()]
+	);
+	return rows;
+}
+
+async function getCargaDocente(docenteId) {
+	const { rows } = await db.query(
+		`SELECT COALESCE(SUM(ROUND(EXTRACT(EPOCH FROM ("end" - start)) / (60.0 * $2))), 0)::int AS bloques,
+						COALESCE(MAX(d."ContratoHoraSemanal"), 0) AS contrato_semana
+			 FROM events e
+			 LEFT JOIN docentes d ON d.id = e.docente_id
+			WHERE e.docente_id = $1`,
+		[String(docenteId).trim(), BLOCK_MINUTES]
+	);
+	const bloques = Number(rows[0]?.bloques) || 0;
+	const contratoSemana = Number(rows[0]?.contrato_semana) || 0;
+	return { bloques, contratoSemana };
+}
+
+async function asignarEvento({ moduloId, docenteId, start, end }) {
+	const id = uuidv4();
+	const titleRow = await db.query('SELECT nombre FROM modulos WHERE id=$1', [moduloId]);
+	const title = titleRow.rows[0]?.nombre || `Módulo ${moduloId}`;
+	await db.query(
+		`INSERT INTO events (id, title, start, "end", modulo_id, docente_id, extendedProps)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 ON CONFLICT (title, start, "end") DO NOTHING`,
+		[id, title, start, end, moduloId, docenteId, JSON.stringify({ __meta: { moduloId, docenteId } })]
+	);
+	return { id };
+}
+
 function handleDbError(res, err){
   console.error('Database error', err);
   res.status(500).json({ error: 'Database error', details: err.message });
@@ -335,6 +376,69 @@ app.get('/api/public-config', (req,res)=>{
 
 // Basic CRUD endpoints (only enabled if DB loaded)
 if(dbReady){
+	// Auto-organize endpoint: assigns pending modules to eligible docentes
+	app.post('/api/auto-organizar', async (req, res) => {
+		try {
+			const token = extractToken(req);
+			const session = await loadSessionFromToken(token, { requireAdmin: true });
+			if (!session) return res.status(401).json({ error: 'No autorizado' });
+
+			const { carreraId, startDate, weeks = 1 } = req.body || {};
+			const carrera = String(carreraId || '').trim();
+			if (!carrera) return res.status(400).json({ error: 'carreraId requerido' });
+
+			const docentes = await getDocentesPorCarrera(carrera);
+			if (!docentes.length) return res.status(404).json({ error: 'Sin docentes elegibles para la carrera' });
+
+			// Find modules without templates/events assigned (simple heuristic)
+			const { rows: modulosPend } = await db.query(
+				`SELECT m.id, m.nombre, m."horasSemana"
+					 FROM modulos m
+					WHERE m.carrera_id = $1
+						AND NOT EXISTS (
+							SELECT 1 FROM templates t WHERE t.moduloId = m.id
+						)
+						AND NOT EXISTS (
+							SELECT 1 FROM events e WHERE e.modulo_id = m.id
+						)
+					ORDER BY m.id ASC`,
+				[carrera]
+			);
+
+			const assignments = [];
+			let baseStart = startDate ? new Date(startDate) : new Date();
+			baseStart.setHours(8, 30, 0, 0);
+
+			for (const mod of modulosPend) {
+				// choose docente by lowest carga and prioridad
+				let chosen = null;
+				let bestScore = Number.POSITIVE_INFINITY;
+				for (const d of docentes) {
+					const carga = await getCargaDocente(d.id);
+					const score = (isNaN(d.prioridad) ? 999 : d.prioridad) * 1000 + (carga.bloques || 0);
+					if (score < bestScore) { bestScore = score; chosen = { docenteId: d.id, carga }; }
+				}
+				if (!chosen) continue;
+
+				// build start/end from horasSemana in blocks of 35 minutes across weeks
+				const blocks = Math.max(1, Math.round((mod.horasSemana || 0) * 60 / BLOCK_MINUTES));
+				const start = new Date(baseStart);
+				const end = new Date(start.getTime() + blocks * BLOCK_MINUTES * 60000);
+				const startIso = start.toISOString();
+				const endIso = end.toISOString();
+
+				await asignarEvento({ moduloId: mod.id, docenteId: chosen.docenteId, start: startIso, end: endIso });
+				assignments.push({ moduloId: mod.id, docenteId: chosen.docenteId, start: startIso, end: endIso });
+
+				// move baseStart for next module
+				baseStart = new Date(end.getTime() + 10 * 60000);
+			}
+
+			res.json({ assigned: assignments.length, assignments });
+		} catch (err) {
+			handleDbError(res, err);
+		}
+	});
 	app.post('/api/auth/login', async (req,res)=>{
 		const { identifier, password } = req.body || {};
 		const email = normalizeEmail(identifier);

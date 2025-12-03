@@ -135,6 +135,15 @@ async function initializeSchema() {
 		`CREATE INDEX IF NOT EXISTS idx_events_modulo ON events (modulo_id)`,
 		// Natural-key uniqueness to prevent duplicate rows for same timeslot
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_events_natural_key ON events (title, start, "end")`,
+		// Relación docente_carrera para múltiples pertenencias y activación
+		`CREATE TABLE IF NOT EXISTS docente_carrera (
+			docente_id VARCHAR(20) REFERENCES docentes(id) ON DELETE CASCADE,
+			carrera_id VARCHAR(50) REFERENCES carreras(id) ON DELETE CASCADE,
+			activo BOOLEAN NOT NULL DEFAULT TRUE,
+			prioridad INTEGER,
+			PRIMARY KEY (docente_id, carrera_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_docente_carrera_carrera ON docente_carrera (carrera_id)`,
 		`CREATE TABLE IF NOT EXISTS docente_semana_horas (
 			docente_id VARCHAR(20) REFERENCES docentes(id) ON DELETE CASCADE,
 			semana INTEGER NOT NULL,
