@@ -850,6 +850,16 @@ if(dbReady){
 		const linking = extractEventLinking(payload);
 		const extendedProps = mergeMetaIntoExtendedProps(payload.extendedProps || {}, linking);
 		try{
+			// Soft-dedupe: avoid inserting duplicate event by same title+start+end
+			if (payload.title && payload.start) {
+				const dupCheck = await db.query(
+					'SELECT id FROM events WHERE title=$1 AND start=$2 AND ("end" IS NOT DISTINCT FROM $3) LIMIT 1',
+					[payload.title, payload.start, payload.end || null]
+				);
+				if (dupCheck.rowCount) {
+					return res.json({ ok: true, id: dupCheck.rows[0].id, dedup: true });
+				}
+			}
 			let previousEvent = null;
 			if (payload.id) {
 				const prevResult = await db.query('SELECT docente_id, start FROM events WHERE id=$1 LIMIT 1', [id]);
@@ -921,26 +931,4 @@ if(dbReady){
 
 const port = process.env.PORT || 3001;
 app.listen(port, ()=>{ console.log('Server listening on', port); });
-
-async function fetchModulos() {
-  if (!USE_API) return load(KEY_MODULOS, []);
-  try {
-    const r = await authorizedFetch(API_BASE + '/modulos');
-    const data = r.ok ? await r.json() : [];
-    return (data || []).map(m => {
-      if (!m) return m;
-      let id = m.id ?? m.moduloId ?? m.codigo;
-      if (id != null) id = String(id);
-
-      // añadir carreraid aquí
-      let carreraId = m.carreraId ?? m.carrera_id ?? m.id_carrera ?? m.carreraid;
-      if (!carreraId && m.carrera && m.carrera.id != null) carreraId = m.carrera.id;
-      if (carreraId != null) carreraId = String(carreraId);
-
-      return { ...m, id, carreraId };
-    });
-  } catch (err) {
-    console.error('fetchModulos falló', err);
-    return [];
-  }
-}
+// Eliminado helper fetchModulos: fragmento copiado del frontend que nunca se ejecutaba.

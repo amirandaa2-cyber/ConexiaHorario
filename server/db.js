@@ -133,6 +133,8 @@ async function initializeSchema() {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_start ON events (start)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_modulo ON events (modulo_id)`,
+		// Natural-key uniqueness to prevent duplicate rows for same timeslot
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_events_natural_key ON events (title, start, "end")`,
 		`CREATE TABLE IF NOT EXISTS docente_semana_horas (
 			docente_id VARCHAR(20) REFERENCES docentes(id) ON DELETE CASCADE,
 			semana INTEGER NOT NULL,
