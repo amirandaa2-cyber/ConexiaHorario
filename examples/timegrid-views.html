@@ -1268,8 +1268,8 @@
             await fetch('/api/events/' + encodeURIComponent(eventId), { method: 'DELETE' });
           } catch(_) {}
           return true;
-        };
-      })();
+        ;
+      
     </script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
@@ -4013,7 +4013,7 @@
           const STORAGE_KEY = 'sidebar_collapsed_v1';
           const toggleBtn = document.getElementById('sidebar-toggle');
           const sidebar = document.getElementById('sidebar');
-          if (!toggleBtn || !sidebar) return;
+          if (!toggleBtn) return;
 
           let storedValue = null;
           try { storedValue = localStorage.getItem(STORAGE_KEY); } catch (_) { storedValue = null; }
@@ -4030,11 +4030,15 @@
             try { localStorage.setItem(STORAGE_KEY, collapsed ? 'true' : 'false'); } catch (_) { }
           };
 
-          applyState(initialCollapsed);
-
+          // Instead of toggling embedded sidebar, open external sidebar window
+          applyState(true);
           toggleBtn.addEventListener('click', () => {
-            const nextCollapsed = !document.body.classList.contains('sidebar-hidden');
-            applyState(nextCollapsed);
+            try {
+              const url = new URL('sidebar.html', window.location.href).toString();
+              window.open(url, 'ceducSidebar');
+            } catch (_) {
+              window.open('sidebar.html', 'ceducSidebar');
+            }
           });
 
           window.addEventListener('keydown', (event) => {
