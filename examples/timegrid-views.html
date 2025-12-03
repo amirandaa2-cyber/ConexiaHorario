@@ -9668,3 +9668,126 @@
 </body>
 
 </html>
+  <!-- CEDUC 35-min block snapping and validation -->
+  <script>
+    (function initCeducBlocks() {
+      const dayStart = '08:30';
+      const blockMinutes = 35;
+      const blockCount = 22;
+      function parseHM(hm) { const [h, m] = hm.split(':').map(Number); return h * 60 + m; }
+      function formatHM(totalMin) { const h = Math.floor(totalMin / 60); const m = totalMin % 60; return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
+      const baseStartMin = parseHM(dayStart);
+      const blocks = Array.from({ length: blockCount }, (_, i) => {
+        const startMin = baseStartMin + i * blockMinutes;
+        const endMin = startMin + blockMinutes;
+        return { index: i + 1, startHM: formatHM(startMin), endHM: formatHM(endMin), startMinutes: startMin, endMinutes: endMin };
+      });
+      window.CEDUC_BLOCKS35 = blocks;
+      if (Array.isArray(window.CEDUC_BLOQUES) && window.CEDUC_BLOQUES.length) {
+        window.CEDUC_BLOCKS = blocks;
+      } else {
+        window.CEDUC_BLOQUES = blocks.map(b => ({ bloque: b.index, inicio: b.startHM, fin: b.endHM }));
+        window.CEDUC_BLOCKS = blocks;
+      }
+      window.CEDUC_getBlockForTime = function(date) {
+        const minutes = date.getHours() * 60 + date.getMinutes();
+        for (const b of window.CEDUC_BLOCKS35) { if (minutes >= b.startMinutes && minutes < b.endMinutes) return b; }
+        return null;
+      };
+      window.CEDUC_getBlockIndexByStart = function(date) {
+        const minutes = date.getHours() * 60 + date.getMinutes();
+        for (const b of window.CEDUC_BLOCKS35) { if (minutes === b.startMinutes) return b.index; }
+        return null;
+      };
+      window.CEDUC_computeBlocksBetweenDates = function(start, end) {
+        const sMin = start.getHours() * 60 + start.getMinutes();
+        const eMin = end.getHours() * 60 + end.getMinutes();
+        const res = [];
+        for (const b of window.CEDUC_BLOCKS35) { if (b.startMinutes >= sMin && b.endMinutes <= eMin) res.push(b); }
+        return res;
+      };
+      window.CEDUC_snapToNearestBlock = function(date) {
+        const minutes = date.getHours() * 60 + date.getMinutes();
+        let best = null; let bestDist = Infinity;
+        for (const b of window.CEDUC_BLOCKS35) {
+          const dist = Math.min(Math.abs(minutes - b.startMinutes), Math.abs(minutes - b.endMinutes));
+          if (dist < bestDist) { bestDist = dist; best = b; }
+        }
+        if (!best) return null;
+        const snapped = new Date(date);
+        const h = Math.floor(best.startMinutes / 60); const m = best.startMinutes % 60;
+        snapped.setHours(h, m, 0, 0);
+        return { block: best, date: snapped };
+      };
+    })();
+
+    (function initSnapOverlay() {
+      // Inject minimal CSS for snap overlay
+      (function injectCSS(){
+        const css = ".ceduc-snap-overlay{position:absolute;pointer-events:none;z-index:1000}.ceduc-snap-highlight{position:absolute;background:rgba(79,70,229,0.18);outline:2px solid rgba(79,70,229,0.65);border-radius:6px;transition:top 60ms ease,height 60ms ease}";
+        const style = document.createElement('style'); style.type = 'text/css'; style.appendChild(document.createTextNode(css)); document.head.appendChild(style);
+      })();
+      let overlay;
+      function ensureOverlay() {
+        if (!overlay) { overlay = document.createElement('div'); overlay.className = 'ceduc-snap-overlay'; document.body.appendChild(overlay); }
+      }
+      function clearHighlight() { if (!overlay) return; overlay.innerHTML = ''; }
+      function highlightCellForDate(api, date) {
+        ensureOverlay(); clearHighlight();
+        const scroller = api.view.el.querySelector('.fc-timegrid-body .fc-scroller');
+        if (!scroller) return;
+        const slats = api.view.el.querySelectorAll('.fc-timegrid-slot[data-time]');
+        const isoStr = String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
+        let target = null;
+        slats.forEach(s => { if (s.getAttribute('data-time') === isoStr) target = s; });
+        if (!target) return;
+        const rect = target.getBoundingClientRect();
+        const srect = scroller.getBoundingClientRect();
+        overlay.style.position = 'absolute';
+        overlay.style.left = srect.left + 'px';
+        overlay.style.top = srect.top + 'px';
+        overlay.style.width = srect.width + 'px';
+        overlay.style.height = srect.height + 'px';
+        const hl = document.createElement('div');
+        hl.className = 'ceduc-snap-highlight';
+        hl.style.left = '0px';
+        hl.style.top = (rect.top - srect.top) + 'px';
+        hl.style.height = rect.height + 'px';
+        hl.style.width = '100%';
+        overlay.appendChild(hl);
+      }
+      window.CEDUC_SnapOverlay = { ensureOverlay, clearHighlight, highlightCellForDate };
+    })();
+
+    (function initDnDIntegration() {
+      function getCalendar() { return window.calendar || window.fcCalendar || null; }
+      function attachHandlers(api) {
+        api.setOption('eventAllow', function(dropInfo, draggedEvent) {
+          const snap = window.CEDUC_snapToNearestBlock(dropInfo.start);
+          if (!snap) return false;
+          const proposedDur = dropInfo.end ? (dropInfo.end.getTime() - dropInfo.start.getTime()) : 35 * 60000;
+          return proposedDur === 35 * 60000;
+        });
+        api.setOption('eventDragStart', function(info) {
+          const snap = window.CEDUC_snapToNearestBlock(info.event.start);
+          if (snap) window.CEDUC_SnapOverlay.highlightCellForDate(api, snap.date);
+        });
+        api.setOption('eventDrag', function(info) {
+          const snap = window.CEDUC_snapToNearestBlock(info.event.start);
+          if (snap) window.CEDUC_SnapOverlay.highlightCellForDate(api, snap.date);
+        });
+        api.setOption('eventDragStop', function() { window.CEDUC_SnapOverlay.clearHighlight(); });
+        api.setOption('eventDrop', function(info) {
+          const evt = info.event;
+          const snap = window.CEDUC_snapToNearestBlock(evt.start);
+          if (!snap) { info.revert(); return; }
+          const snappedStart = snap.date;
+          const snappedEnd = new Date(snappedStart.getTime() + 35 * 60000);
+          try { evt.setStart(snappedStart); evt.setEnd(snappedEnd); }
+          catch (e) { console.warn('Snap failed, reverting', e); info.revert(); }
+        });
+      }
+      function tryAttach() { const api = getCalendar(); if (api && !api.__ceducSnapInstalled) { attachHandlers(api); api.__ceducSnapInstalled = true; } }
+      tryAttach(); document.addEventListener('DOMContentLoaded', tryAttach);
+    })();
+  </script>
