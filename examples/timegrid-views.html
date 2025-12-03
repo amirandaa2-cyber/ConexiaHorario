@@ -10379,6 +10379,120 @@
       document.addEventListener('DOMContentLoaded', ensureCalendar);
       bootstrapCalendarBinding();
       ensureCalendar();
+
+      // Carrera filter: inject UI and bind filtering by extendedProps.carreraId
+      (function setupCarreraFilter(){
+        function getToolbarCenter(){
+          const cal = ensureCalendar();
+          if (!cal || !cal.el) return null;
+          return cal.el.querySelector('.fc-header-toolbar .fc-toolbar-center');
+        }
+
+        function collectCarreras(){
+          const cal = ensureCalendar();
+          if (!cal) return [];
+          const set = new Set();
+          cal.getEvents().forEach(ev => {
+            const props = ev.extendedProps || {};
+            const id = props.carreraId || props.carrera || null;
+            if (id) set.add(String(id));
+          });
+          return Array.from(set).sort();
+        }
+
+        function renderFilter(){
+          const center = getToolbarCenter();
+          if (!center) return;
+          // Avoid duplicating filter
+          if (center.querySelector('.toolbar-filter-carrera')) return;
+          const wrap = document.createElement('div');
+          wrap.className = 'toolbar-filter-carrera';
+
+          const select = document.createElement('select');
+          select.className = 'toolbar-filter-select';
+          select.setAttribute('aria-label', 'Filtrar por carrera');
+
+          const optAll = document.createElement('option');
+          optAll.value = '';
+          optAll.textContent = '-- Todas --';
+          select.appendChild(optAll);
+
+          collectCarreras().forEach(id => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = id.toUpperCase();
+            select.appendChild(opt);
+          });
+
+          const clearBtn = document.createElement('button');
+          clearBtn.type = 'button';
+          clearBtn.className = 'toolbar-filter-clear is-hidden fc-button';
+          clearBtn.textContent = 'Limpiar';
+
+          const status = document.createElement('span');
+          status.className = 'toolbar-filter-active';
+          status.textContent = 'Mostrando todos los horarios';
+
+          wrap.appendChild(select);
+          wrap.appendChild(clearBtn);
+          wrap.appendChild(status);
+          center.appendChild(wrap);
+
+          function applyFilter(id){
+            const cal = ensureCalendar();
+            if (!cal) return;
+            const normalized = (id || '').trim();
+            const showAll = normalized === '';
+            cal.getEvents().forEach(ev => {
+              const props = ev.extendedProps || {};
+              const evCarrera = String(props.carreraId || props.carrera || '');
+              const match = showAll ? true : (evCarrera === normalized);
+              // Toggle visibility without removing events
+              ev.setProp('display', match ? 'auto' : 'none');
+            });
+            if (showAll) {
+              status.textContent = 'Mostrando todos los horarios';
+              clearBtn.classList.add('is-hidden');
+            } else {
+              status.textContent = 'Filtrando por carrera: ' + normalized.toUpperCase();
+              clearBtn.classList.remove('is-hidden');
+            }
+          }
+
+          select.addEventListener('change', function(){
+            applyFilter(this.value);
+          });
+          clearBtn.addEventListener('click', function(){
+            select.value = '';
+            applyFilter('');
+          });
+
+          // Rebuild options when events change (e.g., load async)
+          const cal = ensureCalendar();
+          if (cal) {
+            cal.setOption('eventAdd', function(info){
+              const existing = Array.from(select.options).map(o => o.value);
+              const props = info.event.extendedProps || {};
+              const id = String(props.carreraId || props.carrera || '');
+              if (id && !existing.includes(id)) {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = id.toUpperCase();
+                select.appendChild(opt);
+              }
+            });
+            cal.setOption('eventRemove', function(){ /* no-op for now */ });
+          }
+        }
+
+        // Try rendering filter after calendar is ready
+        let tries = 0;
+        (function waitToolbar(){
+          const center = getToolbarCenter();
+          if (center) { renderFilter(); return; }
+          if (tries++ < 20) setTimeout(waitToolbar, 300);
+        })();
+      })();
     })();
   </script>
 
