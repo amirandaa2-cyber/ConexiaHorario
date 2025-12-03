@@ -6224,7 +6224,7 @@
         runRealtimeValidation();
         try {
           if (calendar && typeof calendar.refetchEvents === 'function') {
-            calendar.refetchEvents();
+            // calendar.refetchEvents(); // Simplified: avoid redundant refetch
           } else {
             refreshCalendarEvents();
           }
@@ -6233,7 +6233,7 @@
         setTimeout(() => {
           try {
             if (calendar && typeof calendar.refetchEvents === 'function') {
-              calendar.refetchEvents();
+              // calendar.refetchEvents(); // Simplified: avoid redundant refetch
               if (typeof calendar.render === 'function') calendar.render();
             } else {
               refreshCalendarEvents();
@@ -7373,7 +7373,7 @@
           cleanOldEvents();
 
           // Recargar los eventos forzará a que se aplique el filtro actual
-          calendar.refetchEvents();
+          // calendar.refetchEvents(); // Simplified: avoid redundant refetch
 
           // Actualizar la UI del filtro
           const filterCarrera = document.getElementById('filter-carrera')?.value || '';
@@ -7639,7 +7639,7 @@
             
             // Recargar eventos desde el servidor
             if (calendar) {
-              calendar.refetchEvents();
+              // calendar.refetchEvents(); // Simplified: avoid redundant refetch
             }
           } else {
             // Modo local: filtrar storedEvents
@@ -7652,7 +7652,7 @@
             
             save(KEY_EVENTS, storedEvents);
             if (calendar) {
-              calendar.refetchEvents();
+              // calendar.refetchEvents(); // Simplified: avoid redundant refetch
             }
             
             console.log(`✅ Eliminados ${deleted} eventos genéricos del localStorage`);
@@ -9790,336 +9790,513 @@
     });
   </script>
 
-</body>
-
   <script>
-    // Programmatic insertion with auto color by carrera/turno
     (function(){
-      function colorFor(evt){
+      // CEDUC schedule manager centralizes block-based FullCalendar integration.
+      const CONFIG = { startHour: 8, startMinute: 30, blockMinutes: 35, blockCount: 22 };
+      const BLOCK_DURATION_MS = CONFIG.blockMinutes * 60000;
+      const blocks = buildBlocks();
+      const occupancy = new Map();
+      let calendarRef = null;
+      let overlayEl = null;
+      let overlayCssInjected = false;
+
+      exposeBlockModels();
+
+      function buildBlocks() {
+        return Array.from({ length: CONFIG.blockCount }, (_, idx) => {
+          const startMinutes = (CONFIG.startHour * 60 + CONFIG.startMinute) + idx * CONFIG.blockMinutes;
+          const endMinutes = startMinutes + CONFIG.blockMinutes;
+          const startHM = formatHM(startMinutes);
+          const endHM = formatHM(endMinutes);
+          return {
+            id: 'block_' + String(idx + 1).padStart(3, '0'),
+            index: idx + 1,
+            startMinutes,
+            endMinutes,
+            startHM,
+            endHM,
+            start: startHM,
+            end: endHM,
+            duration: CONFIG.blockMinutes,
+            independent: true
+          };
+        });
+      }
+
+      function formatHM(totalMinutes) {
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+      }
+
+      function exposeBlockModels() {
+        const legacy = blocks.map(b => ({ numero: b.index, inicio: b.startHM, fin: b.endHM }));
+        window.CEDUC_BLOCKS35 = blocks;
+        window.CEDUC_BLOQUES = legacy;
+        window.CEDUC_BLOCKS = blocks;
+        window.CEDUC_BLOCKS_INDEPENDIENTES = blocks;
+      }
+
+      function toMinutes(date) {
+        return date.getHours() * 60 + date.getMinutes();
+      }
+
+      function dayKey(date) {
+        return date.toISOString().slice(0, 10);
+      }
+
+      function findBlockByMinutes(minutes) {
+        return blocks.find(b => minutes >= b.startMinutes && minutes < b.endMinutes) || null;
+      }
+
+      function findBlockByTime(date) {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+        return findBlockByMinutes(toMinutes(date));
+      }
+
+      function findBlockById(id) {
+        return blocks.find(b => b.id === id) || null;
+      }
+
+      function blocksForRange(startDate, endDate) {
+        if (!startDate || !endDate) return [];
+        const startMin = toMinutes(startDate);
+        const endMin = toMinutes(endDate);
+        return blocks.filter(b => b.startMinutes >= startMin && b.endMinutes <= endMin);
+      }
+
+      function normalizeDurationMinutes(value) {
+        const minutes = Math.max(CONFIG.blockMinutes, Math.round(value || CONFIG.blockMinutes));
+        const blockCount = Math.max(1, Math.round(minutes / CONFIG.blockMinutes));
+        return blockCount * CONFIG.blockMinutes;
+      }
+
+      function snapPlacement(startDate, durationMinutes) {
+        if (!(startDate instanceof Date) || Number.isNaN(startDate.getTime())) {
+          return { ok: false, reason: 'invalid-date' };
+        }
+        const base = findBlockByTime(startDate);
+        if (!base) return { ok: false, reason: 'no-block' };
+        const normalizedDuration = normalizeDurationMinutes(durationMinutes);
+        const snappedStart = new Date(startDate);
+        snappedStart.setHours(Math.floor(base.startMinutes / 60), base.startMinutes % 60, 0, 0);
+        const snappedEnd = new Date(snappedStart.getTime() + normalizedDuration * 60000);
+        const seq = blocksForRange(snappedStart, snappedEnd);
+        if (!seq.length) return { ok: false, reason: 'no-block' };
+        if (seq.length !== normalizedDuration / CONFIG.blockMinutes) {
+          return { ok: false, reason: 'range-overflow' };
+        }
+        return { ok: true, start: snappedStart, end: snappedEnd, blocks: seq, primary: seq[0] };
+      }
+
+      function isRangeAvailable(day, blockList, excludeId) {
+        return blockList.every(block => {
+          const key = `${day}:${block.id}`;
+          const entry = occupancy.get(key);
+          return !entry || entry.eventId === excludeId;
+        });
+      }
+
+      function reserveRange(day, blockList, eventId) {
+        blockList.forEach(block => occupancy.set(`${day}:${block.id}`, { eventId }));
+      }
+
+      function releaseRange(day, blockList, eventId) {
+        blockList.forEach(block => {
+          const key = `${day}:${block.id}`;
+          const entry = occupancy.get(key);
+          if (entry && entry.eventId === eventId) occupancy.delete(key);
+        });
+      }
+
+      function preparePlacement(date, durationMinutes, excludeId) {
+        const placement = snapPlacement(date, durationMinutes);
+        if (!placement.ok) return placement;
+        const day = dayKey(placement.start);
+        if (!isRangeAvailable(day, placement.blocks, excludeId)) {
+          return { ok: false, reason: 'busy', start: placement.start, end: placement.end };
+        }
+        return { ok: true, day, ...placement };
+      }
+
+      function eventDurationMinutes(event) {
+        if (!event || !event.start) return CONFIG.blockMinutes;
+        const startDate = new Date(event.start);
+        const endDate = event.end ? new Date(event.end) : new Date(startDate.getTime() + BLOCK_DURATION_MS);
+        const diff = Math.max(CONFIG.blockMinutes, Math.round((endDate - startDate) / 60000));
+        return diff;
+      }
+
+      function updateMetadata(event, blockList) {
+        if (!event || !blockList || !blockList.length) return;
+        const primary = blockList[0];
+        if (typeof event.setExtendedProp === 'function') {
+          event.setExtendedProp('isIndependent', true);
+          event.setExtendedProp('independentBlockId', primary.id);
+          event.setExtendedProp('blockStart', primary.startHM);
+          event.setExtendedProp('blockEnd', primary.endHM);
+        } else if (event.extendedProps) {
+          event.extendedProps.isIndependent = true;
+          event.extendedProps.independentBlockId = primary.id;
+          event.extendedProps.blockStart = primary.startHM;
+          event.extendedProps.blockEnd = primary.endHM;
+        }
+      }
+
+      function registerEvent(event) {
+        if (!event || !event.start) return;
+        const placement = snapPlacement(new Date(event.start), eventDurationMinutes(event));
+        if (!placement.ok) return;
+        const day = dayKey(placement.start);
+        reserveRange(day, placement.blocks, event.id);
+        updateMetadata(event, placement.blocks);
+      }
+
+      function releaseEvent(event) {
+        if (!event || !event.start) return;
+        const startDate = new Date(event.start);
+        const endDate = event.end ? new Date(event.end) : new Date(startDate.getTime() + BLOCK_DURATION_MS);
+        const seq = blocksForRange(startDate, endDate);
+        if (!seq.length) return;
+        releaseRange(dayKey(startDate), seq, event.id);
+      }
+
+      function ensureOverlayCss() {
+        if (overlayCssInjected) return;
+        const css = '.ceduc-snap-overlay{position:absolute;pointer-events:none;z-index:1000}.ceduc-snap-highlight{position:absolute;background:rgba(79,70,229,0.18);outline:2px solid rgba(79,70,229,0.65);border-radius:6px;transition:top 60ms ease,height 60ms ease}';
+        const style = document.createElement('style');
+        style.type = 'text/css';
+        style.appendChild(document.createTextNode(css));
+        document.head.appendChild(style);
+        overlayCssInjected = true;
+      }
+
+      function ensureOverlayEl() {
+        if (!overlayEl) {
+          overlayEl = document.createElement('div');
+          overlayEl.className = 'ceduc-snap-overlay';
+          document.body.appendChild(overlayEl);
+        }
+      }
+
+      function clearOverlay() {
+        if (overlayEl) overlayEl.innerHTML = '';
+      }
+
+      function highlightCell(calendar, date, view) {
+        if (!calendar || !(date instanceof Date)) return;
+        ensureOverlayCss();
+        ensureOverlayEl();
+        clearOverlay();
+        const activeView = view && view.el ? view : (calendar.view || (calendar.getView && calendar.getView()));
+        if (!activeView || !activeView.el) return;
+        const scroller = activeView.el.querySelector('.fc-timegrid-body .fc-scroller');
+        if (!scroller) return;
+        const iso = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        let target = null;
+        activeView.el.querySelectorAll('.fc-timegrid-slot[data-time]').forEach(slot => {
+          if (!target && slot.getAttribute('data-time') === iso) target = slot;
+        });
+        if (!target) return;
+        const targetRect = target.getBoundingClientRect();
+        const scrollerRect = scroller.getBoundingClientRect();
+        overlayEl.style.left = `${scrollerRect.left}px`;
+        overlayEl.style.top = `${scrollerRect.top}px`;
+        overlayEl.style.width = `${scrollerRect.width}px`;
+        overlayEl.style.height = `${scrollerRect.height}px`;
+        const highlight = document.createElement('div');
+        highlight.className = 'ceduc-snap-highlight';
+        highlight.style.left = '0px';
+        highlight.style.top = `${targetRect.top - scrollerRect.top}px`;
+        highlight.style.height = `${targetRect.height}px`;
+        highlight.style.width = '100%';
+        overlayEl.appendChild(highlight);
+      }
+
+      window.CEDUC_SnapOverlay = {
+        highlightCellForDate(api, date, view) { highlightCell(api, date, view); },
+        clearHighlight() { clearOverlay(); }
+      };
+
+      function colorFor(evt) {
         const props = (evt && evt.extendedProps) || {};
         const carrera = props.carreraId || props.carrera || null;
         const turno = props.turno || null;
         const palette = {
-          ap: { Diurno:'#f59e0b', Vespertino:'#b45309' },
-          cc: { Diurno:'#ef4444', Vespertino:'#7f1d1d' },
-          cp: { Diurno:'#6366f1', Vespertino:'#3730a3' },
-          ei: { Diurno:'#10b981', Vespertino:'#065f46' },
-          ep: { Diurno:'#ec4899', Vespertino:'#9d174d' },
-          et: { Diurno:'#14b8a6', Vespertino:'#0f766e' },
-          ir: { Diurno:'#a78bfa', Vespertino:'#6d28d9' },
-          me: { Diurno:'#f97316', Vespertino:'#7c2d12' },
-          mp: { Diurno:'#84cc16', Vespertino:'#3f6212' }
+          ap: { Diurno: '#f59e0b', Vespertino: '#b45309' },
+          cc: { Diurno: '#ef4444', Vespertino: '#7f1d1d' },
+          cp: { Diurno: '#6366f1', Vespertino: '#3730a3' },
+          ei: { Diurno: '#10b981', Vespertino: '#065f46' },
+          ep: { Diurno: '#ec4899', Vespertino: '#9d174d' },
+          et: { Diurno: '#14b8a6', Vespertino: '#0f766e' },
+          ir: { Diurno: '#a78bfa', Vespertino: '#6d28d9' },
+          me: { Diurno: '#f97316', Vespertino: '#7c2d12' },
+          mp: { Diurno: '#84cc16', Vespertino: '#3f6212' }
         };
-        const base = evt.color || props.color || null;
+        const base = (evt && evt.color) || props.color || null;
         if (base) return base;
-        if (carrera && palette[carrera]){
-          return palette[carrera][turno==='Vespertino'?'Vespertino':'Diurno'];
+        if (carrera && palette[carrera]) {
+          return palette[carrera][turno === 'Vespertino' ? 'Vespertino' : 'Diurno'];
         }
         return '#3b82f6';
       }
 
-      // Expose a color-enforcing render hook if calendar exists
-      function ensureEventContentColor(calendar){
-        if (!calendar || calendar.__ceducColorHookApplied) return;
-        const opts = calendar.getOption('eventContent');
-        const baseHandler = typeof opts === 'function' ? opts : null;
-        calendar.setOption('eventContent', function(arg){
-          const el = baseHandler ? baseHandler(arg) : {};
-          const clr = (arg.event.extendedProps && arg.event.extendedProps.color) || arg.event.color || null;
-          if (clr) {
-            // FullCalendar v6 uses backgroundColor via styles on event element
-            if (!el.domNodes) el.domNodes = [];
-            const span = document.createElement('span');
-            span.style.backgroundColor = clr;
-            span.style.display = 'none';
-            el.domNodes.push(span);
-          }
-          return el;
-        });
-        calendar.__ceducColorHookApplied = true;
+      function handleMutableEvent(info, prevHandler) {
+        const event = info.event;
+        const oldSnapshot = info.oldEvent || info.prevEvent || null;
+        if (oldSnapshot) releaseEvent(oldSnapshot);
+        const placement = preparePlacement(new Date(event.start), eventDurationMinutes(event), event.id);
+        if (!placement.ok) {
+          if (typeof info.revert === 'function') info.revert();
+          if (oldSnapshot) registerEvent(oldSnapshot);
+          if (typeof prevHandler === 'function') prevHandler(info);
+          return;
+        }
+        event.setStart(placement.start);
+        event.setEnd(placement.end);
+        updateMetadata(event, placement.blocks);
+        reserveRange(placement.day, placement.blocks, event.id);
+        if (typeof prevHandler === 'function') prevHandler(info);
       }
 
-      window.CEDUC_placeProgrammaticEvent = function(eventLike, targetStartDate, durationMinutes){
-        const cal = window.calendar || window.fcCalendar;
-        if (!cal) return {ok:false, reason:'no-calendar'};
-        ensureEventContentColor(cal);
-        const start = new Date(targetStartDate);
-        const dur = typeof durationMinutes === 'number' && durationMinutes > 0 ? durationMinutes : 35;
-        const end = new Date(start.getTime() + dur*60000);
-        const ev = cal.addEvent({
-          id: eventLike.id,
-          title: eventLike.title,
-          start,
-          end,
+      function bindCalendar(cal) {
+        if (!cal) return null;
+        calendarRef = cal;
+        if (cal.__ceducHooksApplied) {
+          rebuildOccupancy(cal);
+          return cal;
+        }
+
+        const prev = {
+          eventAllow: cal.getOption('eventAllow'),
+          eventDrop: cal.getOption('eventDrop'),
+          eventResize: cal.getOption('eventResize'),
+          eventDragStart: cal.getOption('eventDragStart'),
+          eventDrag: cal.getOption('eventDrag'),
+          eventDragStop: cal.getOption('eventDragStop'),
+          eventAdd: cal.getOption('eventAdd'),
+          eventRemove: cal.getOption('eventRemove'),
+          eventContent: cal.getOption('eventContent')
+        };
+
+        cal.setOption('editable', true);
+        cal.setOption('droppable', true);
+        cal.setOption('eventOverlap', false);
+        cal.setOption('selectOverlap', false);
+        cal.setOption('snapDuration', '00:35:00');
+        cal.setOption('slotDuration', '00:35:00');
+
+        cal.setOption('eventContent', function(arg) {
+          const eventColor = (arg.event.extendedProps && arg.event.extendedProps.color) || arg.event.backgroundColor || arg.event.color;
+          if (eventColor) {
+            try { arg.event.setProp('color', eventColor); } catch (_) {}
+          }
+          if (typeof prev.eventContent === 'function') return prev.eventContent(arg);
+          return prev.eventContent !== undefined ? prev.eventContent : true;
+        });
+
+        cal.setOption('eventAllow', function(dropInfo, draggedEvent) {
+          const startDate = new Date(dropInfo.start);
+          const durationMs = dropInfo.end ? (dropInfo.end.getTime() - dropInfo.start.getTime()) : null;
+          const baseDuration = durationMs ? Math.round(durationMs / 60000) : eventDurationMinutes(draggedEvent);
+          const placement = preparePlacement(startDate, baseDuration, draggedEvent ? draggedEvent.id : null);
+          if (!placement.ok) return false;
+          return typeof prev.eventAllow === 'function' ? prev.eventAllow(dropInfo, draggedEvent) : true;
+        });
+
+        cal.setOption('eventDragStart', function(info) {
+          const placement = snapPlacement(new Date(info.event.start), eventDurationMinutes(info.event));
+          if (placement.ok) highlightCell(cal, placement.start, info.view);
+          if (typeof prev.eventDragStart === 'function') prev.eventDragStart(info);
+        });
+
+        cal.setOption('eventDrag', function(info) {
+          const placement = snapPlacement(new Date(info.event.start), eventDurationMinutes(info.event));
+          if (placement.ok) highlightCell(cal, placement.start, info.view);
+          if (typeof prev.eventDrag === 'function') prev.eventDrag(info);
+        });
+
+        cal.setOption('eventDragStop', function(info) {
+          clearOverlay();
+          if (typeof prev.eventDragStop === 'function') prev.eventDragStop(info);
+        });
+
+        cal.setOption('eventDrop', function(info) {
+          handleMutableEvent(info, prev.eventDrop);
+        });
+
+        cal.setOption('eventResize', function(info) {
+          handleMutableEvent(info, prev.eventResize);
+        });
+
+        cal.setOption('eventAdd', function(info) {
+          registerEvent(info.event);
+          if (typeof prev.eventAdd === 'function') prev.eventAdd(info);
+        });
+
+        cal.setOption('eventRemove', function(info) {
+          releaseEvent(info.event);
+          if (typeof prev.eventRemove === 'function') prev.eventRemove(info);
+        });
+
+        cal.__ceducHooksApplied = true;
+        rebuildOccupancy(cal);
+        return cal;
+      }
+
+      function rebuildOccupancy(cal) {
+        if (!cal) return;
+        occupancy.clear();
+        cal.getEvents().forEach(ev => registerEvent(ev));
+      }
+
+      function ensureCalendar() {
+        const candidate = window.calendar || window.fcCalendar || null;
+        if (!candidate) return null;
+        if (calendarRef !== candidate || !candidate.__ceducHooksApplied) {
+          bindCalendar(candidate);
+        }
+        return candidate;
+      }
+
+      function bootstrapCalendarBinding() {
+        let attempts = 0;
+        (function probe(){
+          if (ensureCalendar()) return;
+          if (attempts >= 20) return;
+          attempts += 1;
+          setTimeout(probe, 400);
+        })();
+      }
+
+      window.findIndependentBlockByTime = function(date) {
+        const target = date instanceof Date ? date : new Date(date);
+        return findBlockByTime(target);
+      };
+
+      window.findIndependentBlockById = function(id) {
+        return findBlockById(id);
+      };
+
+      window.getAvailableIndependentBlocks = function(date, excludeEventId) {
+        if (!date) return blocks.slice();
+        const target = date instanceof Date ? date : new Date(date);
+        if (Number.isNaN(target.getTime())) return blocks.slice();
+        const day = dayKey(target);
+        return blocks.filter(block => isRangeAvailable(day, [block], excludeEventId || null));
+      };
+
+      window.updateIndependentEventMetadata = function(event, block) {
+        if (!block) return;
+        updateMetadata(event, [block]);
+      };
+
+      window.validateIndependentBlockPlacement = function(event, targetBlock) {
+        if (!targetBlock) return false;
+        const baseDate = event && event.start ? new Date(event.start) : new Date();
+        baseDate.setHours(Math.floor(targetBlock.startMinutes / 60), targetBlock.startMinutes % 60, 0, 0);
+        const placement = preparePlacement(baseDate, eventDurationMinutes(event), event ? event.id : null);
+        return placement.ok;
+      };
+
+      window.placeEventInIndependentBlock = function(event, block) {
+        if (!event || !block) return false;
+        const originalStart = event.start ? new Date(event.start) : null;
+        if (originalStart) releaseEvent(event);
+        const targetStart = originalStart ? new Date(originalStart) : new Date();
+        targetStart.setHours(Math.floor(block.startMinutes / 60), block.startMinutes % 60, 0, 0);
+        const placement = preparePlacement(targetStart, eventDurationMinutes(event), event.id);
+        if (!placement.ok) {
+          if (originalStart) {
+            event.setStart(originalStart);
+            const fallbackEnd = new Date(originalStart.getTime() + BLOCK_DURATION_MS);
+            event.setEnd(fallbackEnd);
+            registerEvent(event);
+          }
+          return false;
+        }
+        event.setStart(placement.start);
+        event.setEnd(placement.end);
+        updateMetadata(event, placement.blocks);
+        reserveRange(placement.day, placement.blocks, event.id);
+        return true;
+      };
+
+      window.releaseIndependentBlock = function(event) {
+        releaseEvent(event);
+      };
+
+      window.validateIndependentResize = function(event, newEnd) {
+        if (!event || !event.start || !(newEnd instanceof Date)) return false;
+        const placement = snapPlacement(new Date(event.start), eventDurationMinutes(event));
+        if (!placement.ok) return false;
+        return newEnd.getHours() === placement.end.getHours() && newEnd.getMinutes() === placement.end.getMinutes();
+      };
+
+      window.CEDUC_snapToNearestBlock = function(date) {
+        const target = date instanceof Date ? date : new Date(date);
+        const placement = snapPlacement(target, CONFIG.blockMinutes);
+        if (!placement.ok) return null;
+        return { block: placement.primary, date: placement.start };
+      };
+
+      window.CEDUC_getBlockForTime = function(date) {
+        const target = date instanceof Date ? date : new Date(date);
+        return findBlockByTime(target);
+      };
+
+      window.CEDUC_getBlockIndexByStart = function(date) {
+        const block = window.CEDUC_getBlockForTime(date);
+        return block ? block.index : null;
+      };
+
+      window.CEDUC_computeBlocksBetweenDates = function(start, end) {
+        const startDate = start instanceof Date ? start : new Date(start);
+        const endDate = end instanceof Date ? end : new Date(end);
+        return blocksForRange(startDate, endDate);
+      };
+
+      window.CEDUC_placeProgrammaticEvent = function(eventLike, targetStartDate, durationMinutes) {
+        const cal = ensureCalendar();
+        if (!cal) return { ok: false, reason: 'no-calendar' };
+        const startDate = new Date(targetStartDate);
+        const duration = Math.max(CONFIG.blockMinutes, typeof durationMinutes === 'number' && durationMinutes > 0 ? durationMinutes : CONFIG.blockMinutes);
+        const placement = preparePlacement(startDate, duration, eventLike && eventLike.id ? String(eventLike.id) : null);
+        if (!placement.ok) return { ok: false, reason: placement.reason };
+        const payload = {
+          id: eventLike && eventLike.id ? eventLike.id : undefined,
+          title: eventLike && eventLike.title ? eventLike.title : '',
+          start: placement.start,
+          end: placement.end,
           allDay: false,
-          extendedProps: Object.assign({}, eventLike.extendedProps || {}, {
+          extendedProps: Object.assign({}, eventLike && eventLike.extendedProps ? eventLike.extendedProps : {}, {
             systemInsert: true,
             source: 'programmatic',
+            isIndependent: true,
             color: colorFor(eventLike)
           })
-        });
-        return {ok:true, event:ev};
-      };
-    })();
-  </script>
-</html>
-  <!-- Bloque duplicado de CEDUC eliminado; se conserva la implementación consolidada a continuación. -->
-  <!-- CEDUC 35-min block snapping and validation -->
-  <script>
-    (function initCeducBlocks() {
-      const dayStart = '08:30';
-      const blockMinutes = 35;
-      const blockCount = 22;
-      function parseHM(hm) { const [h, m] = hm.split(':').map(Number); return h * 60 + m; }
-      function formatHM(totalMin) { const h = Math.floor(totalMin / 60); const m = totalMin % 60; return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
-      const baseStartMin = parseHM(dayStart);
-      const blocks = Array.from({ length: blockCount }, (_, i) => {
-        const startMin = baseStartMin + i * blockMinutes;
-        const endMin = startMin + blockMinutes;
-        return { index: i + 1, startHM: formatHM(startMin), endHM: formatHM(endMin), startMinutes: startMin, endMinutes: endMin };
-      });
-      window.CEDUC_BLOCKS35 = blocks;
-      if (Array.isArray(window.CEDUC_BLOQUES) && window.CEDUC_BLOQUES.length) {
-        window.CEDUC_BLOCKS = blocks;
-      } else {
-        window.CEDUC_BLOQUES = blocks.map(b => ({ bloque: b.index, inicio: b.startHM, fin: b.endHM }));
-        window.CEDUC_BLOCKS = blocks;
-      }
-      window.CEDUC_getBlockForTime = function(date) {
-        const minutes = date.getHours() * 60 + date.getMinutes();
-        for (const b of window.CEDUC_BLOCKS35) { if (minutes >= b.startMinutes && minutes < b.endMinutes) return b; }
-        return null;
-      };
-      window.CEDUC_getBlockIndexByStart = function(date) {
-        const minutes = date.getHours() * 60 + date.getMinutes();
-        for (const b of window.CEDUC_BLOCKS35) { if (minutes === b.startMinutes) return b.index; }
-        return null;
-      };
-      window.CEDUC_computeBlocksBetweenDates = function(start, end) {
-        const sMin = start.getHours() * 60 + start.getMinutes();
-        const eMin = end.getHours() * 60 + end.getMinutes();
-        const res = [];
-        for (const b of window.CEDUC_BLOCKS35) { if (b.startMinutes >= sMin && b.endMinutes <= eMin) res.push(b); }
-        return res;
-      };
-      window.CEDUC_snapToNearestBlock = function(date) {
-        const minutes = date.getHours() * 60 + date.getMinutes();
-        let best = null; let bestDist = Infinity;
-        for (const b of window.CEDUC_BLOCKS35) {
-          const dist = Math.min(Math.abs(minutes - b.startMinutes), Math.abs(minutes - b.endMinutes));
-          if (dist < bestDist) { bestDist = dist; best = b; }
-        }
-        if (!best) return null;
-        const snapped = new Date(date);
-        const h = Math.floor(best.startMinutes / 60); const m = best.startMinutes % 60;
-        snapped.setHours(h, m, 0, 0);
-        return { block: best, date: snapped };
-      };
-    })();
-
-    (function initSnapOverlay() {
-      // Inject minimal CSS for snap overlay
-      (function injectCSS(){
-        const css = ".ceduc-snap-overlay{position:absolute;pointer-events:none;z-index:1000}.ceduc-snap-highlight{position:absolute;background:rgba(79,70,229,0.18);outline:2px solid rgba(79,70,229,0.65);border-radius:6px;transition:top 60ms ease,height 60ms ease}";
-        const style = document.createElement('style'); style.type = 'text/css'; style.appendChild(document.createTextNode(css)); document.head.appendChild(style);
-      })();
-      let overlay;
-      function ensureOverlay() {
-        if (!overlay) { overlay = document.createElement('div'); overlay.className = 'ceduc-snap-overlay'; document.body.appendChild(overlay); }
-      }
-      function clearHighlight() { if (!overlay) return; overlay.innerHTML = ''; }
-      function highlightCellForDate(api, date) {
-        ensureOverlay(); clearHighlight();
-        const scroller = api.view.el.querySelector('.fc-timegrid-body .fc-scroller');
-        if (!scroller) return;
-        const slats = api.view.el.querySelectorAll('.fc-timegrid-slot[data-time]');
-        const isoStr = String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
-        let target = null;
-        slats.forEach(s => { if (s.getAttribute('data-time') === isoStr) target = s; });
-        if (!target) return;
-        const rect = target.getBoundingClientRect();
-        const srect = scroller.getBoundingClientRect();
-        overlay.style.position = 'absolute';
-        overlay.style.left = srect.left + 'px';
-        overlay.style.top = srect.top + 'px';
-        overlay.style.width = srect.width + 'px';
-        overlay.style.height = srect.height + 'px';
-        const hl = document.createElement('div');
-        hl.className = 'ceduc-snap-highlight';
-        hl.style.left = '0px';
-        hl.style.top = (rect.top - srect.top) + 'px';
-        hl.style.height = rect.height + 'px';
-        hl.style.width = '100%';
-        overlay.appendChild(hl);
-      }
-      window.CEDUC_SnapOverlay = { ensureOverlay, clearHighlight, highlightCellForDate };
-    })();
-
-    (function initDnDIntegration() {
-      function getCalendar() { return window.calendar || window.fcCalendar || null; }
-      function attachHandlers(api) {
-        api.setOption('eventAllow', function(dropInfo, draggedEvent) {
-          const snap = window.CEDUC_snapToNearestBlock(dropInfo.start);
-          if (!snap) return false;
-          const proposedDur = dropInfo.end ? (dropInfo.end.getTime() - dropInfo.start.getTime()) : 35 * 60000;
-          return proposedDur === 35 * 60000;
-        });
-        api.setOption('eventDragStart', function(info) {
-          const snap = window.CEDUC_snapToNearestBlock(info.event.start);
-          if (snap) window.CEDUC_SnapOverlay.highlightCellForDate(api, snap.date);
-        });
-        api.setOption('eventDrag', function(info) {
-          const snap = window.CEDUC_snapToNearestBlock(info.event.start);
-          if (snap) window.CEDUC_SnapOverlay.highlightCellForDate(api, snap.date);
-        });
-        api.setOption('eventDragStop', function() { window.CEDUC_SnapOverlay.clearHighlight(); });
-        api.setOption('eventDrop', function(info) {
-          const evt = info.event;
-          const snap = window.CEDUC_snapToNearestBlock(evt.start);
-          if (!snap) { info.revert(); return; }
-          const snappedStart = snap.date;
-          const snappedEnd = new Date(snappedStart.getTime() + 35 * 60000);
-          try { evt.setStart(snappedStart); evt.setEnd(snappedEnd); }
-          catch (e) { console.warn('Snap failed, reverting', e); info.revert(); }
-        });
-      }
-      function tryAttach() { const api = getCalendar(); if (api && !api.__ceducSnapInstalled) { attachHandlers(api); api.__ceducSnapInstalled = true; } }
-      tryAttach(); document.addEventListener('DOMContentLoaded', tryAttach);
-    })();
-
-    // Independent Blocks Architecture for CEDUC
-    (function initIndependentBlocks() {
-      // Build independent block list with stable unique IDs
-      const START = { h: 8, m: 30 }; const DURATION = 35; const COUNT = 22;
-      function fmt(n){return String(n).padStart(2,'0');}
-      const blocks = Array.from({length: COUNT}, (_,i)=>{
-        const startMin = (START.h*60+START.m) + i*DURATION;
-        const endMin = startMin + DURATION;
-        const sh = Math.floor(startMin/60), sm = startMin%60;
-        const eh = Math.floor(endMin/60), em = endMin%60;
-        return {
-          id: 'block_' + fmt(i+1).padStart(3,'0'),
-          index: i+1,
-          start: fmt(sh)+':'+fmt(sm),
-          end: fmt(eh)+':'+fmt(em),
-          duration: DURATION,
-          independent: true,
-          state: { busy: false, eventId: null }
         };
-      });
-      window.CEDUC_BLOCKS_INDEPENDIENTES = blocks;
-
-      function timeToMinutes(date){ return date.getHours()*60 + date.getMinutes(); }
-      function findIndependentBlockByTime(date){
-        const minutes = timeToMinutes(date);
-        return blocks.find(b=>{
-          const [sh,sm] = b.start.split(':').map(Number); const s = sh*60+sm;
-          const [eh,em] = b.end.split(':').map(Number); const e = eh*60+em;
-          return minutes>=s && minutes<e;
-        }) || null;
-      }
-      window.findIndependentBlockByTime = findIndependentBlockByTime;
-      window.findIndependentBlockById = function(blockId){ return blocks.find(b=>b.id===blockId)||null; };
-
-      function isBlockAvailable(block, excludeEventId){ return !block.state.busy || block.state.eventId===excludeEventId; }
-      window.getAvailableIndependentBlocks = function(date, excludeEventId){
-        return blocks.filter(b=> isBlockAvailable(b, excludeEventId));
+        const created = cal.addEvent(payload);
+        reserveRange(placement.day, placement.blocks, created.id);
+        updateMetadata(created, placement.blocks);
+        return { ok: true, event: created, block: placement.primary };
       };
 
-      function updateIndependentEventMetadata(event, block){
-        event.setExtendedProp('independentBlockId', block.id);
-        event.setExtendedProp('blockStart', block.start);
-        event.setExtendedProp('blockEnd', block.end);
-        event.setExtendedProp('isIndependent', true);
-      }
-      window.updateIndependentEventMetadata = updateIndependentEventMetadata;
+      window.CEDUC_blocksManager = {
+        ensureCalendar,
+        getCalendar: () => ensureCalendar(),
+        getBlocks: () => blocks.slice(),
+        getOccupancySnapshot: () => new Map(occupancy),
+        preparePlacement
+      };
 
-      function validateIndependentBlockPlacement(event, targetBlock){
-        if (!targetBlock) return false;
-        return isBlockAvailable(targetBlock, event.id);
-      }
-      window.validateIndependentBlockPlacement = validateIndependentBlockPlacement;
-
-      function placeEventInIndependentBlock(event, block){
-        const [sh,sm] = block.start.split(':').map(Number);
-        const [eh,em] = block.end.split(':').map(Number);
-        const start = new Date(event.start); start.setHours(sh, sm, 0, 0);
-        const end = new Date(event.end || start); end.setHours(eh, em, 0, 0);
-        event.setStart(start); event.setEnd(end);
-        block.state.busy = true; block.state.eventId = event.id;
-        updateIndependentEventMetadata(event, block);
-      }
-      window.placeEventInIndependentBlock = placeEventInIndependentBlock;
-
-      function releaseIndependentBlock(event){
-        const blockId = event.extendedProps?.independentBlockId; if (!blockId) return;
-        const block = window.findIndependentBlockById(blockId); if (!block) return;
-        if (block.state.eventId === event.id){ block.state.busy = false; block.state.eventId = null; }
-      }
-      window.releaseIndependentBlock = releaseIndependentBlock;
-
-      function validateIndependentResize(event, newEnd){
-        // Only allow resize to exact block end
-        const block = findIndependentBlockByTime(event.start);
-        if (!block) return false;
-        const [eh,em] = block.end.split(':').map(Number);
-        return newEnd.getHours()===eh && newEnd.getMinutes()===em;
-      }
-      window.validateIndependentResize = validateIndependentResize;
-
-      // UI: mark unavailable blocks during drag
-      function renderAvailabilityOverlay(api){
-        // For simplicity, rely on existing snap overlay highlight; could extend to show red for busy
-      }
-
-      function attachCalendarOptions(api){
-        api.setOption('editable', true);
-        api.setOption('droppable', true);
-        api.setOption('eventOverlap', false);
-        api.setOption('selectOverlap', false);
-        api.setOption('snapDuration', '00:35:00');
-        // Alinear el grid visual y el snap a 35 minutos
-        api.setOption('slotDuration', '00:35:00');
-        api.setOption('eventAllow', function(dropInfo, draggedEvent){
-          const targetBlock = findIndependentBlockByTime(dropInfo.start);
-          return validateIndependentBlockPlacement(draggedEvent, targetBlock);
-        });
-        api.setOption('eventDragStart', function(info){
-          const targetBlock = findIndependentBlockByTime(info.event.start);
-          if (targetBlock) window.CEDUC_SnapOverlay.highlightCellForDate(api, new Date(info.event.start));
-        });
-        api.setOption('eventDrag', function(info){
-          const targetBlock = findIndependentBlockByTime(info.event.start);
-          if (targetBlock) window.CEDUC_SnapOverlay.highlightCellForDate(api, new Date(info.event.start));
-        });
-        api.setOption('eventDragStop', function(){ window.CEDUC_SnapOverlay.clearHighlight(); });
-        api.setOption('eventDrop', function(info){
-          const evt = info.event;
-          const targetBlock = findIndependentBlockByTime(info.start || evt.start);
-          if (!validateIndependentBlockPlacement(evt, targetBlock)) { info.revert(); return; }
-          placeEventInIndependentBlock(evt, targetBlock);
-        });
-        api.setOption('eventResize', function(info){
-          if (!validateIndependentResize(info.event, info.end)) { info.revert(); return; }
-          // exact end update happens via placeEventInIndependentBlock when needed
-          const block = findIndependentBlockByTime(info.event.start);
-          if (block) placeEventInIndependentBlock(info.event, block);
-        });
-
-        // Aplicar color desde extendedProps.color en el render
-        api.setOption('eventContent', function(arg){
-          const color = arg.event.extendedProps && arg.event.extendedProps.color;
-          if (color) {
-            try { arg.event.setProp('color', color); } catch(_) {}
-          }
-          return true; // usa contenido por defecto
-        });
-      }
-
-      function tryAttachOptions(){
-        const api = window.calendar || window.fcCalendar || null;
-        if (api && !api.__independentBlocksInstalled){ attachCalendarOptions(api); api.__independentBlocksInstalled = true; }
-      }
-      tryAttachOptions(); document.addEventListener('DOMContentLoaded', tryAttachOptions);
+      document.addEventListener('DOMContentLoaded', ensureCalendar);
+      bootstrapCalendarBinding();
+      ensureCalendar();
     })();
   </script>
+
+</body>
+
+</html>
