@@ -1244,6 +1244,21 @@
       document.addEventListener('keydown', (ev)=>{ if(ev.key==='Escape' && modalAsignacion.getAttribute('aria-hidden')==='false') cerrarModalAsignacion(); });
     })();
   </script>
+    <script>
+      // Borrado persistente: elimina del calendario y desde la API si disponible
+      (function(){
+        window.CEDUC_deleteEventById = async function(eventId){
+          const cal = window.calendar || window.fcCalendar; if (!cal) return false;
+          const ev = cal.getEventById(eventId); if (!ev) return false;
+          try { if (window.releaseIndependentBlock) window.releaseIndependentBlock(ev); } catch(_) {}
+          ev.remove();
+          try {
+            await fetch('/api/events/' + encodeURIComponent(eventId), { method: 'DELETE' });
+          } catch(_) {}
+          return true;
+        };
+      })();
+    </script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -2928,11 +2943,12 @@
             selectable: true,
             selectMirror: true,
             hiddenDays: [0],
-            // Ajustes de espaciado CEDUC
-            slotMinTime: '08:00:00',
-            slotMaxTime: '23:30:00',
+            // Ajustes de espaciado CEDUC (bloques irregulares de 35min)
+            slotMinTime: '08:30:00',
+            slotMaxTime: '23:00:00',
             slotDuration: '00:35:00',
-            slotLabelInterval: '01:10:00',
+            // Etiquetas en cada inicio de bloque (08:30, 09:05, 09:40, ...)
+            slotLabelInterval: '00:35:00',
             slotLabelFormat: { hour: '2-digit', minute: '2-digit' },
             slotHeight: 60,
             dayMaxEvents: false,
@@ -9668,6 +9684,121 @@
 </body>
 
 </html>
+  <!-- CEDUC: Bloques Independientes, Snap y API de Auto-organizar -->
+  <script>
+    (function ceducIndependentBlocks(){
+      const START = { h:8, m:30 }; const DURATION = 35; const COUNT = 22;
+      function pad(n){return String(n).padStart(2,'0');}
+      const blocks = Array.from({length:COUNT},(_,i)=>{
+        const startMin = (START.h*60+START.m) + i*DURATION; const endMin = startMin + DURATION;
+        const sh = Math.floor(startMin/60), sm = startMin%60; const eh = Math.floor(endMin/60), em = endMin%60;
+        return { id: 'block_'+pad(i+1).padStart(3,'0'), index:i+1, start: pad(sh)+':'+pad(sm), end: pad(eh)+':'+pad(em), duration:DURATION, independent:true };
+      });
+      window.CEDUC_BLOCKS_INDEPENDIENTES = blocks;
+      // Compatibilidad con estructuras previas
+      window.CEDUC_BLOCKS35 = blocks.map(b=>({ index:b.index, startHM:b.start, endHM:b.end, startMinutes: (Number(b.start.slice(0,2))*60 + Number(b.start.slice(3))), endMinutes:(Number(b.end.slice(0,2))*60 + Number(b.end.slice(3))) }));
+      window.CEDUC_BLOQUES = blocks.map(b=>({ bloque:b.index, inicio:b.start, fin:b.end }));
+      window.CEDUC_BLOCKS = window.CEDUC_BLOCKS35;
+
+      // Ocupación por día: `${yyyy-mm-dd}:${blockId}` -> {busy,eventId}
+      const occupancy = new Map();
+      function dayKey(date){ return new Date(date).toISOString().slice(0,10); }
+      function occKey(date, blockId){ return dayKey(date)+':'+blockId; }
+      function timeToMinutes(date){ return date.getHours()*60 + date.getMinutes(); }
+      function findIndependentBlockByTime(date){
+        const minutes = timeToMinutes(date);
+        for(const b of blocks){
+          const [sh,sm] = b.start.split(':').map(Number), [eh,em]=b.end.split(':').map(Number);
+          const s = sh*60+sm, e = eh*60+em; if (minutes>=s && minutes<e) return b;
+        }
+        return null;
+      }
+      window.findIndependentBlockByTime = findIndependentBlockByTime;
+      window.findIndependentBlockById = function(id){ return blocks.find(b=>b.id===id)||null; };
+      function isBlockAvailableOnDate(block, date, excludeId){ const entry = occupancy.get(occKey(date, block.id)); return !entry || entry.eventId===excludeId; }
+      window.getAvailableIndependentBlocks = function(date, excludeId){ return blocks.filter(b=>isBlockAvailableOnDate(b,date,excludeId)); };
+      function updateIndependentEventMetadata(event, block){ event.setExtendedProp('independentBlockId', block.id); event.setExtendedProp('blockStart', block.start); event.setExtendedProp('blockEnd', block.end); event.setExtendedProp('isIndependent', true); }
+      function placeEventInIndependentBlock(event, block){
+        const [sh,sm] = block.start.split(':').map(Number); const [eh,em] = block.end.split(':').map(Number);
+        const start = new Date(event.start||Date.now()); start.setHours(sh,sm,0,0);
+        const end = new Date(start.getTime()+DURATION*60000);
+        event.setStart(start); event.setEnd(end);
+        occupancy.set(occKey(start, block.id), {busy:true, eventId:event.id});
+        updateIndependentEventMetadata(event, block);
+      }
+      window.placeEventInIndependentBlock = placeEventInIndependentBlock;
+      window.releaseIndependentBlock = function(event){ const id = event.extendedProps?.independentBlockId; if(!id||!event.start) return; const key = occKey(event.start, id); const entry = occupancy.get(key); if(entry && entry.eventId===event.id) occupancy.delete(key); };
+      window.validateIndependentResize = function(event, newEnd){ const b = findIndependentBlockByTime(event.start); if(!b) return false; const [eh,em] = b.end.split(':').map(Number); return newEnd.getHours()===eh && newEnd.getMinutes()===em; };
+
+      // Eliminar evento de forma segura: libera ocupación por día+bloque
+      window.CEDUC_deleteEventById = function(eventId){
+        const cal = window.calendar || window.fcCalendar; if (!cal) return false;
+        const ev = cal.getEventById(eventId); if (!ev) return false;
+        // liberar ocupación si existía asignación
+        const blockId = ev.extendedProps && ev.extendedProps.independentBlockId;
+        if (blockId && ev.start){
+          const key = occKey(ev.start, blockId);
+          const entry = occupancy.get(key);
+          if (entry && entry.eventId === ev.id){ occupancy.delete(key); }
+        }
+        ev.remove();
+        return true;
+      };
+
+      // API para Auto-organizar: inserta eventos alineados a bloque si está libre
+      window.CEDUC_placeProgrammaticEvent = function(eventLike, targetDate){
+        const cal = window.calendar || window.fcCalendar; if (!cal) return {ok:false, reason:'no-calendar'};
+        const block = findIndependentBlockByTime(targetDate); if (!block) return {ok:false, reason:'no-block'};
+        if (!isBlockAvailableOnDate(block, targetDate, eventLike.id)) return {ok:false, reason:'busy'};
+        const [sh,sm] = block.start.split(':').map(Number); const start = new Date(targetDate); start.setHours(sh,sm,0,0);
+        const end = new Date(start.getTime()+DURATION*60000);
+        const ev = cal.addEvent({ id:eventLike.id, title:eventLike.title, start, end, allDay:false, extendedProps:Object.assign({}, eventLike.extendedProps||{}, { systemInsert:true }) });
+        occupancy.set(occKey(start, block.id), {busy:true, eventId:eventLike.id});
+        updateIndependentEventMetadata(ev, block);
+        return {ok:true, event:ev, block};
+      };
+
+      // Overlay simple para snap visual
+      (function injectSnapCSS(){ const css = '.ceduc-snap-overlay{position:absolute;pointer-events:none;z-index:1000}.ceduc-snap-highlight{position:absolute;background:rgba(79,70,229,.18);outline:2px solid rgba(79,70,229,.65);border-radius:6px;transition:top 60ms ease,height 60ms ease}'; const st = document.createElement('style'); st.type='text/css'; st.appendChild(document.createTextNode(css)); document.head.appendChild(st); })();
+      (function initSnapOverlay(){
+        let overlay; function ensure(){ if(!overlay){ overlay=document.createElement('div'); overlay.className='ceduc-snap-overlay'; document.body.appendChild(overlay);} }
+        function clear(){ if(overlay) overlay.innerHTML=''; }
+        function highlight(api, date){ ensure(); clear(); const scroller = api.view.el.querySelector('.fc-timegrid-body .fc-scroller'); if(!scroller) return; const iso = pad(date.getHours())+':'+pad(date.getMinutes()); const slots = api.view.el.querySelectorAll('.fc-timegrid-slot[data-time]'); let target=null; slots.forEach(s=>{ if(s.getAttribute('data-time')===iso) target=s; }); if(!target) return; const r=target.getBoundingClientRect(); const sr=scroller.getBoundingClientRect(); overlay.style.left=sr.left+'px'; overlay.style.top=sr.top+'px'; overlay.style.width=sr.width+'px'; overlay.style.height=sr.height+'px'; const hl=document.createElement('div'); hl.className='ceduc-snap-highlight'; hl.style.left='0px'; hl.style.top=(r.top-sr.top)+'px'; hl.style.height=r.height+'px'; hl.style.width='100%'; overlay.appendChild(hl); }
+        window.CEDUC_SnapOverlay = { highlightCellForDate: highlight, clearHighlight: clear };
+      })();
+
+      // Integración con FullCalendar (sin eliminar funciones existentes)
+      function attach(api){
+        api.setOption('editable', true);
+        api.setOption('droppable', true);
+        api.setOption('eventOverlap', false);
+        api.setOption('selectOverlap', false);
+        api.setOption('snapDuration', '00:35:00');
+        // Alinear el grid visual y el snap a 35 minutos
+        api.setOption('slotDuration', '00:35:00');
+        api.setOption('eventAllow', function(dropInfo, draggedEvent){
+          if (draggedEvent && draggedEvent.extendedProps && draggedEvent.extendedProps.systemInsert) return true;
+          const block = findIndependentBlockByTime(dropInfo.start); if(!block) return false;
+          return isBlockAvailableOnDate(block, dropInfo.start, draggedEvent && draggedEvent.id);
+        });
+        api.setOption('eventDragStart', function(info){ const b = findIndependentBlockByTime(info.event.start); if(b) window.CEDUC_SnapOverlay.highlightCellForDate(api, new Date(info.event.start)); });
+        api.setOption('eventDrag', function(info){ const b = findIndependentBlockByTime(info.event.start); if(b) window.CEDUC_SnapOverlay.highlightCellForDate(api, new Date(info.event.start)); });
+        api.setOption('eventDragStop', function(){ window.CEDUC_SnapOverlay.clearHighlight(); });
+        api.setOption('eventDrop', function(info){ const evt=info.event; const b=findIndependentBlockByTime(info.start||evt.start); if(!b || !isBlockAvailableOnDate(b, info.start||evt.start, evt.id)){ info.revert(); return; } placeEventInIndependentBlock(evt,b); });
+        api.setOption('eventResize', function(info){ if(!window.validateIndependentResize(info.event, info.end)){ info.revert(); return; } const b=findIndependentBlockByTime(info.event.start); if(!b){ info.revert(); return; } placeEventInIndependentBlock(info.event,b); });
+
+        // Click para eliminar: si el UI llama window.CEDUC_deleteEventById, aseguramos liberar ocupación
+        api.setOption('eventClick', function(info){
+          // Si tu botón/diálogo usa otra interacción, deja este handler como no intrusivo.
+          const target = info.jsEvent.target;
+          const isDeleteBtn = target && (target.matches && target.matches('.ceduc-delete-btn'));
+          if (isDeleteBtn){ window.CEDUC_deleteEventById(info.event.id); }
+        });
+      }
+      function tryAttach(){ const api = window.calendar || window.fcCalendar || null; if(api && !api.__ceducIndepInstalled){ attach(api); api.__ceducIndepInstalled = true; } }
+      tryAttach(); document.addEventListener('DOMContentLoaded', tryAttach);
+    })();
+  </script>
   <!-- CEDUC 35-min block snapping and validation -->
   <script>
     (function initCeducBlocks() {
@@ -9813,11 +9944,6 @@
       });
       window.CEDUC_BLOCKS_INDEPENDIENTES = blocks;
 
-      // Occupancy is per day. Key: `${yyyy-mm-dd}:${block.id}` -> { busy:boolean, eventId:string|null }
-      const occupancy = new Map();
-      function dayKey(date){ return new Date(date).toISOString().slice(0,10); }
-      function occKey(date, blockId){ return dayKey(date)+":"+blockId; }
-
       function timeToMinutes(date){ return date.getHours()*60 + date.getMinutes(); }
       function findIndependentBlockByTime(date){
         const minutes = timeToMinutes(date);
@@ -9830,14 +9956,9 @@
       window.findIndependentBlockByTime = findIndependentBlockByTime;
       window.findIndependentBlockById = function(blockId){ return blocks.find(b=>b.id===blockId)||null; };
 
-      function isBlockAvailableOnDate(block, date, excludeEventId){
-        const key = occKey(date, block.id);
-        const entry = occupancy.get(key);
-        if (!entry) return true;
-        return !entry.busy || entry.eventId===excludeEventId;
-      }
+      function isBlockAvailable(block, excludeEventId){ return !block.state.busy || block.state.eventId===excludeEventId; }
       window.getAvailableIndependentBlocks = function(date, excludeEventId){
-        return blocks.filter(b=> isBlockAvailableOnDate(b, date, excludeEventId));
+        return blocks.filter(b=> isBlockAvailable(b, excludeEventId));
       };
 
       function updateIndependentEventMetadata(event, block){
@@ -9860,18 +9981,15 @@
         const start = new Date(event.start); start.setHours(sh, sm, 0, 0);
         const end = new Date(event.end || start); end.setHours(eh, em, 0, 0);
         event.setStart(start); event.setEnd(end);
-        const key = occKey(start, block.id);
-        occupancy.set(key, { busy: true, eventId: event.id });
+        block.state.busy = true; block.state.eventId = event.id;
         updateIndependentEventMetadata(event, block);
       }
       window.placeEventInIndependentBlock = placeEventInIndependentBlock;
 
       function releaseIndependentBlock(event){
         const blockId = event.extendedProps?.independentBlockId; if (!blockId) return;
-        const start = event.start; if (!start) return;
-        const key = occKey(start, blockId);
-        const entry = occupancy.get(key);
-        if (entry && entry.eventId === event.id){ occupancy.delete(key); }
+        const block = window.findIndependentBlockById(blockId); if (!block) return;
+        if (block.state.eventId === event.id){ block.state.busy = false; block.state.eventId = null; }
       }
       window.releaseIndependentBlock = releaseIndependentBlock;
 
@@ -9895,11 +10013,11 @@
         api.setOption('eventOverlap', false);
         api.setOption('selectOverlap', false);
         api.setOption('snapDuration', '00:35:00');
-        api.setOption('slotDuration', '00:05:00');
+        // Alinear el grid visual y el snap a 35 minutos
+        api.setOption('slotDuration', '00:35:00');
         api.setOption('eventAllow', function(dropInfo, draggedEvent){
           const targetBlock = findIndependentBlockByTime(dropInfo.start);
-          if (!targetBlock) return false;
-          return isBlockAvailableOnDate(targetBlock, dropInfo.start, draggedEvent.id);
+          return validateIndependentBlockPlacement(draggedEvent, targetBlock);
         });
         api.setOption('eventDragStart', function(info){
           const targetBlock = findIndependentBlockByTime(info.event.start);
@@ -9913,15 +10031,14 @@
         api.setOption('eventDrop', function(info){
           const evt = info.event;
           const targetBlock = findIndependentBlockByTime(info.start || evt.start);
-          if (!targetBlock || !isBlockAvailableOnDate(targetBlock, info.start || evt.start, evt.id)) { info.revert(); return; }
+          if (!validateIndependentBlockPlacement(evt, targetBlock)) { info.revert(); return; }
           placeEventInIndependentBlock(evt, targetBlock);
         });
         api.setOption('eventResize', function(info){
           if (!validateIndependentResize(info.event, info.end)) { info.revert(); return; }
+          // exact end update happens via placeEventInIndependentBlock when needed
           const block = findIndependentBlockByTime(info.event.start);
-          if (!block) { info.revert(); return; }
-          // Ensure occupancy reflects resize for the same day and block
-          placeEventInIndependentBlock(info.event, block);
+          if (block) placeEventInIndependentBlock(info.event, block);
         });
       }
 
