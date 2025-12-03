@@ -1246,9 +1246,20 @@
     })();
   </script>
     <script>
-      // Borrado persistente: elimina del calendario y desde la API si disponible
-      (function(){
-        window.CEDUC_deleteEventById = async function(eventId){
+    // Mejorar el área de usuario tras cargar el DOM
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        document.body.classList.add('sidebar-hidden');
+        const openBtn = document.getElementById('open-sidebar-window');
+        if (openBtn) {
+          openBtn.addEventListener('click', function(){
+            // Open sidebar in a separate window/tab
+            const url = new URL('sidebar.html', window.location.href).toString();
+            window.open(url, 'ceducSidebar');
+          });
+        }
+      } catch(_) {}
+    });
           const cal = window.calendar || window.fcCalendar; if (!cal) return false;
           const ev = cal.getEventById(eventId); if (!ev) return false;
           try { if (window.releaseIndependentBlock) window.releaseIndependentBlock(ev); } catch(_) {}
@@ -1998,6 +2009,27 @@
       let modulos = [];   // {id, nombre, carreraId, horas, tipo}
       let storedEvents = []; // FullCalendar event objects + metadata
       let templates = []; // recurrence templates: {id, moduloId, docenteId, salaId, startDate, time, duration, until}
+
+      // Setup BroadcastChannel to interact with external sidebar.html
+      const CHANNEL_NAME = 'ceduc-calendar';
+      let channel = null;
+      try { channel = new BroadcastChannel(CHANNEL_NAME); } catch (_) { channel = null; }
+      if (channel) {
+        channel.addEventListener('message', (ev) => {
+          const msg = ev.data || {};
+          try {
+            if (msg.type === 'filter-carrera') {
+              const sel = document.getElementById('filter-carrera');
+              if (sel) {
+                sel.value = msg.carreraId || '';
+                if (calendar) calendar.refetchEvents();
+              }
+            } else if (msg.type === 'refresh-events') {
+              if (calendar) calendar.refetchEvents();
+            }
+          } catch (err) { console.warn('Broadcast msg error', err); }
+        });
+      }
       let salas = []; // {id, nombre, capacidad}
       let openManualBlockModal = () => { console.warn('Modal manual no inicializado aún.'); };
       let closeManualBlockModal = () => {};
@@ -8942,12 +8974,7 @@
       }
 
       #sidebar {
-        width: 100%;
-        max-width: 100%;
-        max-height: none;
-        position: relative;
-        order: 1;
-        flex: 1 1 auto;
+        display: none !important;
       }
 
       #calendar-wrap {

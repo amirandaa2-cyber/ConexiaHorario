@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Herramientas Horario — Sidebar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Inter, system-ui, Arial; margin: 16px; }
+    h1 { font-size: 18px; margin: 0 0 8px; }
+    .section { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
+    label { display: block; font-size: 12px; color: #374151; margin-bottom: 6px; }
+    select, input[type=text], input[type=date], input[type=time], button { padding: 8px 10px; font-size: 14px; border: 1px solid #d1d5db; border-radius: 6px; }
+    button { cursor: pointer; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .stack { display: grid; gap: 8px; }
+    .muted { color: #6b7280; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Herramientas del Horario</h1>
+  <p class="muted">Este panel interactúa con el timegrid mediante BroadcastChannel.</p>
+
+  <div class="section stack">
+    <strong>Filtro de Carrera</strong>
+    <label for="carrera-select">Carrera</label>
+    <select id="carrera-select"></select>
+    <div class="row">
+      <button id="apply-filter">Aplicar filtro</button>
+      <button id="clear-filter">Limpiar filtro</button>
+    </div>
+  </div>
+
+  <div class="section stack">
+    <strong>Auto-organizar</strong>
+    <div class="row-3">
+      <div>
+        <label for="auto-carrera">Carrera</label>
+        <select id="auto-carrera"></select>
+      </div>
+      <div>
+        <label for="auto-start">Fecha inicio</label>
+        <input id="auto-start" type="date" />
+      </div>
+      <div>
+        <label for="auto-weeks">Semanas</label>
+        <input id="auto-weeks" type="number" min="1" value="1" />
+      </div>
+    </div>
+    <button id="auto-run">Aplicar auto-organizar</button>
+    <div id="auto-result" class="muted"></div>
+  </div>
+
+  <div class="section stack">
+    <strong>Explorar datos</strong>
+    <div class="row-3">
+      <button id="list-carreras">Carreras</button>
+      <button id="list-docentes">Docentes</button>
+      <button id="list-modulos">Modulos</button>
+    </div>
+    <div class="row">
+      <button id="list-salas">Salas</button>
+      <button id="refresh-events">Refrescar eventos</button>
+    </div>
+    <pre id="data-output" class="muted" style="max-height:240px; overflow:auto"></pre>
+  </div>
+
+  <script>
+    const CHANNEL_NAME = 'ceduc-calendar';
+    const channel = new BroadcastChannel(CHANNEL_NAME);
+
+    const REMOTE_API_BASE = 'https://conexiahorario.onrender.com/api';
+    const LOCAL_API_BASE = 'http://localhost:3001/api';
+    function detectApiBase() {
+      try {
+        const current = location.host.toLowerCase();
+        if (current.includes('localhost') || current.includes('127.0.0.1')) return LOCAL_API_BASE;
+        return REMOTE_API_BASE;
+      } catch(_) { return LOCAL_API_BASE; }
+    }
+    const API_BASE = detectApiBase();
+
+    function getStoredToken() {
+      try { return localStorage.getItem('conexia_admin_token') || null; } catch(_) { return null; }
+    }
+
+    async function authorizedFetch(url, options = {}) {
+      const headers = Object.assign({}, options.headers || {}, { 'Content-Type': 'application/json' });
+      const token = getStoredToken();
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      const opts = Object.assign({}, options, { headers });
+      return fetch(url, opts);
+    }
+
+    async function loadCarreras() {
+      try {
+        const r = await authorizedFetch(API_BASE + '/carreras');
+        const data = r.ok ? await r.json() : [];
+        return (data || []).map(c => ({ id: c.id || c.codigo || c.code || c._id, nombre: c.nombre || c.name || c.title || c.id }));
+      } catch (err) { console.error('carreras error', err); return []; }
+    }
+
+    async function populateCarreraSelects() {
+      const carreras = await loadCarreras();
+      const carreraSelects = [document.getElementById('carrera-select'), document.getElementById('auto-carrera')];
+      for (const sel of carreraSelects) {
+        sel.innerHTML = '';
+        const optEmpty = document.createElement('option'); optEmpty.value = ''; optEmpty.textContent = '—'; sel.appendChild(optEmpty);
+        for (const c of carreras) {
+          const opt = document.createElement('option');
+          opt.value = c.id; opt.textContent = c.nombre;
+          sel.appendChild(opt);
+        }
+      }
+    }
+
+    async function listAndShow(url, label) {
+      const out = document.getElementById('data-output');
+      out.textContent = `${label}: cargando...`;
+      try {
+        const r = await authorizedFetch(API_BASE + url);
+        const data = r.ok ? await r.json() : [];
+        out.textContent = `${label} (${Array.isArray(data)?data.length:0}):\n` + JSON.stringify(data, null, 2);
+      } catch (err) {
+        out.textContent = `${label}: error`;
+        console.error(label, err);
+      }
+    }
+
+    document.getElementById('list-carreras').addEventListener('click', ()=> listAndShow('/carreras', 'Carreras'));
+    document.getElementById('list-docentes').addEventListener('click', ()=> listAndShow('/docentes', 'Docentes'));
+    document.getElementById('list-modulos').addEventListener('click', ()=> listAndShow('/modulos', 'Modulos'));
+    document.getElementById('list-salas').addEventListener('click', ()=> listAndShow('/salas', 'Salas'));
+    document.getElementById('refresh-events').addEventListener('click', ()=> channel.postMessage({ type: 'refresh-events' }));
+
+    document.getElementById('apply-filter').addEventListener('click', () => {
+      const carreraId = document.getElementById('carrera-select').value || '';
+      channel.postMessage({ type: 'filter-carrera', carreraId });
+    });
+    document.getElementById('clear-filter').addEventListener('click', () => {
+      channel.postMessage({ type: 'filter-carrera', carreraId: '' });
+    });
+
+    document.getElementById('auto-run').addEventListener('click', async () => {
+      const carreraId = document.getElementById('auto-carrera').value || '';
+      const startDate = document.getElementById('auto-start').value || '';
+      const weeks = parseInt(document.getElementById('auto-weeks').value || '1', 10) || 1;
+      const resultEl = document.getElementById('auto-result');
+      resultEl.textContent = 'Ejecutando…';
+      try {
+        const r = await authorizedFetch(API_BASE + '/auto-organizar', { method: 'POST', body: JSON.stringify({ carreraId, startDate, weeks }) });
+        const data = r.ok ? await r.json() : { error: 'Error ' + r.status };
+        if (data.error) {
+          resultEl.textContent = 'Error: ' + data.error;
+        } else {
+          resultEl.textContent = `Asignados: ${data.assigned}`;
+          channel.postMessage({ type: 'refresh-events' });
+        }
+      } catch (err) {
+        console.error('auto-organizar error', err);
+        resultEl.textContent = 'Error ejecutando auto-organizar';
+      }
+    });
+
+    populateCarreraSelects();
+  </script>
+</body>
+</html>
