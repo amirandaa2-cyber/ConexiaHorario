@@ -9683,6 +9683,76 @@
 
 </body>
 
+  <script>
+    // Programmatic insertion with auto color by carrera/turno
+    (function(){
+      function colorFor(evt){
+        const props = (evt && evt.extendedProps) || {};
+        const carrera = props.carreraId || props.carrera || null;
+        const turno = props.turno || null;
+        const palette = {
+          ap: { Diurno:'#f59e0b', Vespertino:'#b45309' },
+          cc: { Diurno:'#ef4444', Vespertino:'#7f1d1d' },
+          cp: { Diurno:'#6366f1', Vespertino:'#3730a3' },
+          ei: { Diurno:'#10b981', Vespertino:'#065f46' },
+          ep: { Diurno:'#ec4899', Vespertino:'#9d174d' },
+          et: { Diurno:'#14b8a6', Vespertino:'#0f766e' },
+          ir: { Diurno:'#a78bfa', Vespertino:'#6d28d9' },
+          me: { Diurno:'#f97316', Vespertino:'#7c2d12' },
+          mp: { Diurno:'#84cc16', Vespertino:'#3f6212' }
+        };
+        const base = evt.color || props.color || null;
+        if (base) return base;
+        if (carrera && palette[carrera]){
+          return palette[carrera][turno==='Vespertino'?'Vespertino':'Diurno'];
+        }
+        return '#3b82f6';
+      }
+
+      // Expose a color-enforcing render hook if calendar exists
+      function ensureEventContentColor(calendar){
+        if (!calendar || calendar.__ceducColorHookApplied) return;
+        const opts = calendar.getOption('eventContent');
+        const baseHandler = typeof opts === 'function' ? opts : null;
+        calendar.setOption('eventContent', function(arg){
+          const el = baseHandler ? baseHandler(arg) : {};
+          const clr = (arg.event.extendedProps && arg.event.extendedProps.color) || arg.event.color || null;
+          if (clr) {
+            // FullCalendar v6 uses backgroundColor via styles on event element
+            if (!el.domNodes) el.domNodes = [];
+            const span = document.createElement('span');
+            span.style.backgroundColor = clr;
+            span.style.display = 'none';
+            el.domNodes.push(span);
+          }
+          return el;
+        });
+        calendar.__ceducColorHookApplied = true;
+      }
+
+      window.CEDUC_placeProgrammaticEvent = function(eventLike, targetStartDate, durationMinutes){
+        const cal = window.calendar || window.fcCalendar;
+        if (!cal) return {ok:false, reason:'no-calendar'};
+        ensureEventContentColor(cal);
+        const start = new Date(targetStartDate);
+        const dur = typeof durationMinutes === 'number' && durationMinutes > 0 ? durationMinutes : 35;
+        const end = new Date(start.getTime() + dur*60000);
+        const ev = cal.addEvent({
+          id: eventLike.id,
+          title: eventLike.title,
+          start,
+          end,
+          allDay: false,
+          extendedProps: Object.assign({}, eventLike.extendedProps || {}, {
+            systemInsert: true,
+            source: 'programmatic',
+            color: colorFor(eventLike)
+          })
+        });
+        return {ok:true, event:ev};
+      };
+    })();
+  </script>
 </html>
   <!-- CEDUC: Bloques Independientes, Snap y API de Auto-organizar -->
   <script>
@@ -9752,9 +9822,27 @@
         if (!isBlockAvailableOnDate(block, targetDate, eventLike.id)) return {ok:false, reason:'busy'};
         const [sh,sm] = block.start.split(':').map(Number); const start = new Date(targetDate); start.setHours(sh,sm,0,0);
         const end = new Date(start.getTime()+DURATION*60000);
-        const ev = cal.addEvent({ id:eventLike.id, title:eventLike.title, start, end, allDay:false, extendedProps:Object.assign({}, eventLike.extendedProps||{}, { systemInsert:true }) });
+      // Evitar duplicados por misma fecha+bloque: si ya existe evento en ese occKey, no dupliques
+      const key = occKey(start, block.id);
+      const existing = Array.from(cal.getEvents()||[]).find(e=>{
+        const bid = e.extendedProps && e.extendedProps.independentBlockId;
+        return bid===block.id && e.start && (dayKey(e.start)+':'+bid)===key;
+      });
+      if (existing) { return { ok:false, reason:'duplicate', existing: existing.id }; }
+      const ev = cal.addEvent({ id:eventLike.id, title:eventLike.title, start, end, allDay:false, extendedProps:Object.assign({}, eventLike.extendedProps||{}, { systemInsert:true, color: eventLike.color || '#ff69b4', source: 'programmatic' }) });
         occupancy.set(occKey(start, block.id), {busy:true, eventId:eventLike.id});
         updateIndependentEventMetadata(ev, block);
+      // Persistir solo eventos programáticos coloreados
+      try {
+        const payload = {
+          id: eventLike.id,
+          title: eventLike.title,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          extendedProps: ev.extendedProps
+        };
+        fetch('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(()=>{});
+      } catch(_) {}
         return {ok:true, event:ev, block};
       };
 
@@ -10039,6 +10127,15 @@
           // exact end update happens via placeEventInIndependentBlock when needed
           const block = findIndependentBlockByTime(info.event.start);
           if (block) placeEventInIndependentBlock(info.event, block);
+        });
+
+        // Aplicar color desde extendedProps.color en el render
+        api.setOption('eventContent', function(arg){
+          const color = arg.event.extendedProps && arg.event.extendedProps.color;
+          if (color) {
+            try { arg.event.setProp('color', color); } catch(_) {}
+          }
+          return true; // usa contenido por defecto
         });
       }
 
