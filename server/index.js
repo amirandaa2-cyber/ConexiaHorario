@@ -55,13 +55,19 @@ async function getCargaDocente(docenteId) {
 
 async function asignarEvento({ moduloId, docenteId, start, end }) {
 	const id = uuidv4();
-	const titleRow = await db.query('SELECT nombre FROM modulos WHERE id=$1', [moduloId]);
+	const titleRow = await db.query('SELECT nombre, carrera_id FROM modulos WHERE id=$1', [moduloId]);
 	const title = titleRow.rows[0]?.nombre || `Módulo ${moduloId}`;
+	const carreraId = titleRow.rows[0]?.carrera_id ? String(titleRow.rows[0].carrera_id) : null;
+	const meta = {
+		moduloId,
+		docenteId,
+		...(carreraId ? { carreraId } : {})
+	};
 	await db.query(
 		`INSERT INTO events (id, title, start, "end", modulo_id, docente_id, extendedProps)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 ON CONFLICT (title, start, "end") DO NOTHING`,
-		[id, title, start, end, moduloId, docenteId, JSON.stringify({ __meta: { moduloId, docenteId } })]
+		[id, title, start, end, moduloId, docenteId, JSON.stringify({ __meta: meta })]
 	);
 	return { id };
 }
@@ -147,8 +153,120 @@ function extractEventLinking(payload = {}) {
 	return {
 		moduloId: toSafeInteger(moduloCandidate),
 		docenteId: docenteCandidate ? String(docenteCandidate).trim() : null,
-		salaId: salaCandidate ? String(salaCandidate).trim() : null
+		salaId: salaCandidate ? String(salaCandidate).trim() : null,
+		carreraId: meta.carreraId ? String(meta.carreraId).trim() : null
 	};
+}
+
+function collectHints(...values) {
+	const hints = [];
+	for (const value of values) {
+		if (value === undefined || value === null) continue;
+		const str = String(value).trim();
+		if (!str) continue;
+		hints.push(str);
+	}
+	return hints;
+}
+
+async function findModuloIdFromHints(meta = {}, payload = {}) {
+	const hints = collectHints(
+		meta.moduloId,
+		meta.modulo_id,
+		meta.modulo,
+		meta.moduloCode,
+		meta.moduloCodigo,
+		meta.moduloCodigoAsignatura,
+		meta.codigoAsignatura,
+		meta.codigo_asignatura,
+		meta.moduloName,
+		meta.moduloNombre,
+		payload.moduloId,
+		payload.modulo_id
+	);
+	if (payload.title) {
+		const maybeModulo = String(payload.title).split('-')[0]?.trim();
+		if (maybeModulo) hints.push(maybeModulo);
+	}
+	for (const hint of hints) {
+		const numeric = toSafeInteger(hint);
+		if (Number.isInteger(numeric)) {
+			const checkById = await db.query('SELECT id FROM modulos WHERE id=$1 LIMIT 1', [numeric]);
+			if (checkById.rowCount) return numeric;
+		}
+		if (hint.length <= 2) continue;
+		const byCode = await db.query('SELECT id FROM modulos WHERE LOWER(codigo_asignatura) = LOWER($1) LIMIT 1', [hint]);
+		if (byCode.rowCount) return byCode.rows[0].id;
+		const byName = await db.query('SELECT id FROM modulos WHERE LOWER(nombre) = LOWER($1) LIMIT 1', [hint]);
+		if (byName.rowCount) return byName.rows[0].id;
+	}
+	return null;
+}
+
+function normalizeRut(value) {
+	if (!value) return null;
+	return String(value).replace(/[^0-9kK]/g, '').toUpperCase();
+}
+
+async function findDocenteIdFromHints(meta = {}, payload = {}) {
+	const hints = collectHints(
+		meta.docenteId,
+		meta.docente_id,
+		meta.docente,
+		meta.docenteRut,
+		meta.docenteRUT,
+		meta.docenteName,
+		payload.docenteId,
+		payload.docente_id
+	);
+	if (payload.title && payload.title.includes('-')) {
+		const maybeDocente = payload.title.split('-').slice(1).join('-').trim();
+		if (maybeDocente) hints.push(maybeDocente);
+	}
+	for (const hint of hints) {
+		const checkById = await db.query('SELECT id FROM docentes WHERE id=$1 LIMIT 1', [hint]);
+		if (checkById.rowCount) return checkById.rows[0].id;
+		const rut = normalizeRut(hint);
+		if (rut) {
+			const byRut = await db.query('SELECT id FROM docentes WHERE REPLACE(REPLACE(UPPER(rut), ".", \'\'), \'-\', \'\') = $1 LIMIT 1', [rut]);
+			if (byRut.rowCount) return byRut.rows[0].id;
+		}
+		const byName = await db.query('SELECT id FROM docentes WHERE LOWER(nombre) = LOWER($1) LIMIT 1', [hint]);
+		if (byName.rowCount) return byName.rows[0].id;
+	}
+	return null;
+}
+
+async function findSalaIdFromHints(meta = {}, payload = {}) {
+	const hints = collectHints(meta.salaId, meta.sala_id, meta.sala, meta.salaName, payload.salaId, payload.sala_id);
+	for (const hint of hints) {
+		const byId = await db.query('SELECT id FROM salas WHERE id=$1 LIMIT 1', [hint]);
+		if (byId.rowCount) return byId.rows[0].id;
+		const byName = await db.query('SELECT id FROM salas WHERE LOWER(nombre) = LOWER($1) LIMIT 1', [hint]);
+		if (byName.rowCount) return byName.rows[0].id;
+	}
+	return null;
+}
+
+async function resolveEventLinking(payload = {}) {
+	const linking = extractEventLinking(payload);
+	const meta = (payload.extendedProps && payload.extendedProps.__meta) || {};
+	if (!Number.isInteger(linking.moduloId)) {
+		const resolvedModuloId = await findModuloIdFromHints(meta, payload);
+		linking.moduloId = resolvedModuloId ?? null;
+	}
+	if (!linking.docenteId) {
+		linking.docenteId = await findDocenteIdFromHints(meta, payload);
+	}
+	if (!linking.salaId) {
+		linking.salaId = await findSalaIdFromHints(meta, payload);
+	}
+	if (!linking.carreraId && linking.moduloId) {
+		const carreraLookup = await db.query('SELECT carrera_id FROM modulos WHERE id=$1 LIMIT 1', [linking.moduloId]);
+		const carreraId = carreraLookup.rows[0]?.carrera_id;
+		linking.carreraId = carreraId ? String(carreraId) : null;
+	}
+	return linking;
 }
 
 function normalizeTemplatePayload(raw = {}) {
@@ -178,19 +296,26 @@ function mergeMetaIntoExtendedProps(baseProps = {}, linking = {}) {
 		...existingMeta,
 		...(linking.moduloId !== null && linking.moduloId !== undefined ? { moduloId: String(linking.moduloId) } : {}),
 		...(linking.docenteId ? { docenteId: String(linking.docenteId) } : {}),
-		...(linking.salaId ? { salaId: String(linking.salaId) } : {})
+		...(linking.salaId ? { salaId: String(linking.salaId) } : {}),
+		...(linking.carreraId ? { carreraId: String(linking.carreraId) } : {})
 	};
 	safeProps.__meta = mergedMeta;
 	return safeProps;
 }
 
+
 function mapEventRow(row) {
+	const baseProps = row.extendedProps && typeof row.extendedProps === 'object' ? row.extendedProps : {};
+	const existingMeta = baseProps.__meta && typeof baseProps.__meta === 'object' ? baseProps.__meta : {};
 	const linking = {
 		moduloId: row.modulo_id !== null && row.modulo_id !== undefined ? String(row.modulo_id) : null,
 		docenteId: row.docente_id || null,
-		salaId: row.sala_id || null
+		salaId: row.sala_id || null,
+		carreraId:
+			row.modulo_carrera !== null && row.modulo_carrera !== undefined
+				? String(row.modulo_carrera)
+				: existingMeta.carreraId ?? null
 	};
-	const baseProps = row.extendedProps && typeof row.extendedProps === 'object' ? row.extendedProps : {};
 	const extendedProps = mergeMetaIntoExtendedProps(baseProps, linking);
 	return {
 		id: row.id,
@@ -934,16 +1059,18 @@ if(dbReady){
 	app.get('/api/events', async (req,res)=>{
 		try{
 			const { rows } = await db.query(`
-				SELECT id,
-				       title,
-				       start,
-				       "end",
-				       modulo_id,
-				       docente_id,
-				       sala_id,
-				       COALESCE(extendedProps, '{}'::jsonb) AS "extendedProps"
-			  FROM events
-			 ORDER BY start ASC`);
+				SELECT e.id,
+				       e.title,
+				       e.start,
+				       e."end",
+				       e.modulo_id,
+				       e.docente_id,
+				       e.sala_id,
+				       m.carrera_id AS modulo_carrera,
+				       COALESCE(e.extendedProps, '{}'::jsonb) AS "extendedProps"
+		  FROM events e
+		  LEFT JOIN modulos m ON m.id = e.modulo_id
+		 ORDER BY e.start ASC`);
 			res.json(rows.map(mapEventRow));
 		}catch(err){ handleDbError(res, err); }
 	});
@@ -951,7 +1078,7 @@ if(dbReady){
 	app.post('/api/events', async (req,res)=>{
 		const payload = req.body || {};
 		const id = payload.id || uuidv4();
-		const linking = extractEventLinking(payload);
+		const linking = await resolveEventLinking(payload);
 		const extendedProps = mergeMetaIntoExtendedProps(payload.extendedProps || {}, linking);
 		try{
 			// Soft-dedupe: avoid inserting duplicate event by same title+start+end
@@ -995,7 +1122,7 @@ if(dbReady){
 
 	app.put('/api/events/:id', async (req,res)=>{
 		const payload = req.body || {};
-		const linking = extractEventLinking(payload);
+		const linking = await resolveEventLinking(payload);
 		const extendedProps = mergeMetaIntoExtendedProps(payload.extendedProps || {}, linking);
 		try{
 			const existingResult = await db.query('SELECT docente_id, start FROM events WHERE id=$1 LIMIT 1', [req.params.id]);

@@ -23,6 +23,7 @@ async function initializeSchema() {
 	const statements = [
 		'CREATE EXTENSION IF NOT EXISTS pgcrypto',
 		'CREATE EXTENSION IF NOT EXISTS citext',
+		'CREATE EXTENSION IF NOT EXISTS btree_gist',
 		`CREATE TABLE IF NOT EXISTS carreras (
 			id VARCHAR(50) PRIMARY KEY,
 			nombre VARCHAR(255) NOT NULL,
@@ -58,6 +59,7 @@ async function initializeSchema() {
 		`ALTER TABLE modulos DROP CONSTRAINT IF EXISTS fk_modulos_carrera`,
 		`ALTER TABLE modulos ADD CONSTRAINT fk_modulos_carrera FOREIGN KEY (carrera_id) REFERENCES carreras(id) ON DELETE CASCADE`,
 		`CREATE INDEX IF NOT EXISTS idx_modulos_codigo ON modulos (codigo_asignatura)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_modulos_carrera_codigo ON modulos (carrera_id, LOWER(codigo_asignatura)) WHERE codigo_asignatura IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_modulos_carrera ON modulos (carrera_id)`,
 		`CREATE TABLE IF NOT EXISTS docentes (
 			id VARCHAR(20) PRIMARY KEY,
@@ -113,12 +115,48 @@ async function initializeSchema() {
 			time TIME,
 			duration REAL,
 			until DATE,
+			frequency TEXT DEFAULT 'weekly',
+			repeat_every INTEGER DEFAULT 1,
+			days_of_week SMALLINT[],
+			block_start_index INTEGER,
+			block_count INTEGER,
+			preferred_salas TEXT[],
+			status TEXT NOT NULL DEFAULT 'active',
+			quota_total INTEGER,
+			quota_used INTEGER DEFAULT 0,
+			last_run_at TIMESTAMPTZ,
+			metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS frequency TEXT DEFAULT 'weekly'`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS repeat_every INTEGER DEFAULT 1`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS days_of_week SMALLINT[]`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS block_start_index INTEGER`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS block_count INTEGER`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS preferred_salas TEXT[]`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS quota_total INTEGER`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS quota_used INTEGER DEFAULT 0`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ`,
+		`ALTER TABLE templates ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb`,
 		`CREATE INDEX IF NOT EXISTS idx_templates_modulo ON templates (moduloId)`,
 		`CREATE INDEX IF NOT EXISTS idx_templates_docente ON templates (docenteId)`,
 		`CREATE INDEX IF NOT EXISTS idx_templates_sala ON templates (salaId)`,
+		`CREATE INDEX IF NOT EXISTS idx_templates_status ON templates (status)`,
+		`CREATE TABLE IF NOT EXISTS template_blocks (
+			id SERIAL PRIMARY KEY,
+			template_id TEXT NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+			weekday SMALLINT NOT NULL,
+			start_block SMALLINT NOT NULL,
+			block_count SMALLINT NOT NULL,
+			sala_id VARCHAR(50) REFERENCES salas(id) ON DELETE SET NULL,
+			metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_template_blocks_template ON template_blocks (template_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_template_blocks_weekday ON template_blocks (weekday)`,
 		`CREATE TABLE IF NOT EXISTS events (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
@@ -135,6 +173,16 @@ async function initializeSchema() {
 		`CREATE INDEX IF NOT EXISTS idx_events_modulo ON events (modulo_id)`,
 		// Natural-key uniqueness to prevent duplicate rows for same timeslot
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_events_natural_key ON events (title, start, "end")`,
+		`ALTER TABLE events DROP CONSTRAINT IF EXISTS events_docente_no_overlap`,
+		`ALTER TABLE events ADD CONSTRAINT events_docente_no_overlap EXCLUDE USING gist (
+			docente_id WITH =,
+			tstzrange(start, "end") WITH &&
+		) WHERE (docente_id IS NOT NULL)`,
+		`ALTER TABLE events DROP CONSTRAINT IF EXISTS events_sala_no_overlap`,
+		`ALTER TABLE events ADD CONSTRAINT events_sala_no_overlap EXCLUDE USING gist (
+			sala_id WITH =,
+			tstzrange(start, "end") WITH &&
+		) WHERE (sala_id IS NOT NULL)`,
 		// Relación docente_carrera para múltiples pertenencias y activación
 		`CREATE TABLE IF NOT EXISTS docente_carrera (
 			docente_id VARCHAR(20) REFERENCES docentes(id) ON DELETE CASCADE,
@@ -144,14 +192,24 @@ async function initializeSchema() {
 			PRIMARY KEY (docente_id, carrera_id)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_docente_carrera_carrera ON docente_carrera (carrera_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_docente_carrera_activo_prioridad ON docente_carrera (carrera_id, activo, prioridad)`,
 		`CREATE TABLE IF NOT EXISTS docente_semana_horas (
 			docente_id VARCHAR(20) REFERENCES docentes(id) ON DELETE CASCADE,
 			semana INTEGER NOT NULL,
 			"año" INTEGER NOT NULL,
 			bloques_usados INTEGER DEFAULT 0,
 			horas_usadas NUMERIC(5,2) GENERATED ALWAYS AS (bloques_usados * 35.0 / 60.0) STORED,
+			carrera_id VARCHAR(50) REFERENCES carreras(id) ON DELETE SET NULL,
 			PRIMARY KEY (docente_id, semana, "año")
 		)`,
+		`ALTER TABLE docente_semana_horas ADD COLUMN IF NOT EXISTS carrera_id VARCHAR(50) REFERENCES carreras(id) ON DELETE SET NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_docente_semana_carrera ON docente_semana_horas (carrera_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_docente_semana_scope ON docente_semana_horas (
+			docente_id,
+			COALESCE(carrera_id, '__global__'),
+			semana,
+			"año"
+		)`
 		`CREATE TABLE IF NOT EXISTS auth_role (
 			id SERIAL PRIMARY KEY,
 			code TEXT UNIQUE NOT NULL,
