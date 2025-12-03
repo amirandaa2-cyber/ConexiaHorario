@@ -2966,17 +2966,21 @@
             },
             select: function(selectionInfo) {
               try {
+                // DESACTIVADO: modal manual de bloques genéricos sin módulo
+                // Solo permitir eventos con módulos asignados desde el modal de asignación
                 if (selectionInfo && selectionInfo.allDay) {
                   if (calendar && typeof calendar.unselect === 'function') {
                     calendar.unselect();
                   }
                   return;
                 }
-                if (typeof openManualBlockModal === 'function') {
-                  openManualBlockModal(selectionInfo || {});
+                // openManualBlockModal desactivado para prevenir eventos genéricos azules
+                console.info('Selección manual desactivada. Usa el modal de asignación (dateClick) para crear eventos con módulos.');
+                if (calendar && typeof calendar.unselect === 'function') {
+                  calendar.unselect();
                 }
               } catch (err) {
-                console.error('Error abriendo el modal manual desde la selección', err);
+                console.error('Error en handler de selección', err);
               }
             },
             datesSet: function (info) {
@@ -2997,7 +3001,11 @@
                 } else {
                   freshEvents = load(KEY_EVENTS, []);
                 }
-                storedEvents = freshEvents; // Sincronizar el estado global
+                // FILTRO CRÍTICO: Excluir eventos sin moduloId (genéricos azules)
+                storedEvents = (freshEvents || []).filter(ev => {
+                  const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+                  return meta.moduloId && String(meta.moduloId).trim() !== '';
+                });
 
                 const filterCarrera = document.getElementById('filter-carrera')?.value || '';
                 
@@ -3053,6 +3061,16 @@
               try {
                 const ev = info.event;
                 console.debug('eventAdd invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
+
+                // VALIDACIÓN CRÍTICA: Rechazar eventos sin moduloId (genéricos azules)
+                const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+                if (!meta.moduloId || String(meta.moduloId).trim() === '') {
+                  console.error('eventAdd BLOCKED: evento sin moduloId (genérico azul). No se permite.');
+                  alert('No se puede crear un evento sin módulo asignado.\n\nUsa el modal de asignación para crear eventos con módulos válidos.');
+                  if (typeof info.revert === 'function') info.revert();
+                  else ev.remove();
+                  return;
+                }
 
                 // NOTE: usar toISOString() completa (incluye Z) para evitar pérdidas de zona horaria
                 const startIso = ev.start.toISOString();
@@ -7566,6 +7584,72 @@
       const migrateBtn = document.getElementById('migrate-server');
       if (migrateBtn) { migrateBtn.addEventListener('click', () => { migrateToServer(); }); }
 
+      // Limpiar eventos genéricos sin módulo
+      async function cleanGenericEvents() {
+        const confirmed = confirm(
+          '¿Estás seguro de que deseas eliminar todos los eventos genéricos (sin módulo asignado)?\n\n' +
+          'Esto eliminará permanentemente los bloques azules que no tienen un módulo asociado.\n\n' +
+          'Los eventos con módulos válidos NO serán afectados.'
+        );
+        if (!confirmed) return;
+
+        const btn = document.getElementById('clean-generic-events');
+        if (!btn) return;
+        
+        const origText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ Limpiando...';
+
+        try {
+          if (USE_API) {
+            // Llamar al endpoint de limpieza en el servidor
+            const response = await authorizedFetch(API_BASE + '/events/cleanup/generic', {
+              method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            console.log('✅ Limpieza completada:', result);
+            alert(`✅ Se eliminaron ${result.deleted || 0} eventos genéricos de la base de datos.`);
+            
+            // Recargar eventos desde el servidor
+            if (calendar) {
+              calendar.refetchEvents();
+            }
+          } else {
+            // Modo local: filtrar storedEvents
+            const before = storedEvents.length;
+            storedEvents = storedEvents.filter(ev => {
+              const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+              return meta.moduloId && String(meta.moduloId).trim() !== '';
+            });
+            const deleted = before - storedEvents.length;
+            
+            save(KEY_EVENTS, storedEvents);
+            if (calendar) {
+              calendar.refetchEvents();
+            }
+            
+            console.log(`✅ Eliminados ${deleted} eventos genéricos del localStorage`);
+            alert(`✅ Se eliminaron ${deleted} eventos genéricos del almacenamiento local.`);
+          }
+        } catch (err) {
+          console.error('Error limpiando eventos genéricos:', err);
+          alert('❌ Error al limpiar eventos: ' + (err.message || String(err)));
+        } finally {
+          btn.disabled = false;
+          btn.textContent = origText;
+        }
+      }
+
+      const cleanGenericBtn = document.getElementById('clean-generic-events');
+      if (cleanGenericBtn) { 
+        cleanGenericBtn.addEventListener('click', () => { cleanGenericEvents(); }); 
+      }
 
       // Ensure SheetJS is available, then export selected in-memory arrays to a multi-sheet .xlsx
       function ensureSheetJS(cb) {
@@ -9246,6 +9330,10 @@
                 title="Envía los datos locales al servidor REST (requiere servidor corriendo)">
                 🔄 Migrar datos al servidor
               </button>
+              <button id="clean-generic-events" type="button" class="btn btn-outline-danger btn-hover-lift"
+                title="Elimina eventos genéricos sin módulo asignado (bloques azules)">
+                🗑️ Limpiar eventos genéricos
+              </button>
             </div>
           </div>
         </div>
@@ -9832,17 +9920,8 @@
       const ev = cal.addEvent({ id:eventLike.id, title:eventLike.title, start, end, allDay:false, extendedProps:Object.assign({}, eventLike.extendedProps||{}, { systemInsert:true, color: eventLike.color || '#ff69b4', source: 'programmatic' }) });
         occupancy.set(occKey(start, block.id), {busy:true, eventId:eventLike.id});
         updateIndependentEventMetadata(ev, block);
-      // Persistir solo eventos programáticos coloreados
-      try {
-        const payload = {
-          id: eventLike.id,
-          title: eventLike.title,
-          start: start.toISOString(),
-          end: end.toISOString(),
-          extendedProps: ev.extendedProps
-        };
-        fetch('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(()=>{});
-      } catch(_) {}
+      // Persistencia centralizada: confiar en eventAdd + debouncedPersistEvents/apiSyncForKey
+      // Se elimina POST directo para evitar duplicados en base de datos.
         return {ok:true, event:ev, block};
       };
 
