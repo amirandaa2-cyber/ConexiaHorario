@@ -1456,21 +1456,10 @@
       const blocks = getAvailableBlocks();
       const fallbackEnd = declaredEnd || new Date(startDate.getTime() + BLOCK_DURATION_MINUTES * 60000);
 
-      if (!blocks.length) {
-        return {
-          startDate,
-          endDate: fallbackEnd,
-          startIdx: -1,
-          endIdx: -1,
-          blocksUsed: computeBlocksBetweenDates(startDate, fallbackEnd) || 1
-        };
-      }
+      if (!blocks.length) return null; // sin definición de bloques no se hace snap
 
-      const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
-      let desiredBlocks = parseInt(meta.bloques, 10);
-      if (!Number.isFinite(desiredBlocks) || desiredBlocks <= 0) {
-        desiredBlocks = computeBlocksBetweenDates(startDate, fallbackEnd) || 1;
-      }
+      // Siempre recalcular el número de bloques a partir del rango actual
+      const desiredBlocks = computeBlocksBetweenDates(startDate, fallbackEnd) || 1;
 
       const startTimeStr = normalizeTimeStr(timeStrFromDate(startDate));
       let startIdx = getBlockIndexByStart(startTimeStr);
@@ -1535,7 +1524,7 @@
       const startDate = coerceDate(ev.start);
       if (!startDate) return false;
       const blocks = getAvailableBlocks();
-      if (!blocks.length) return true;
+      if (!blocks.length) return false;
 
       const startBlock = getBlockForTime(timeStrFromDate(startDate));
       if (!startBlock) return false;
@@ -1544,27 +1533,10 @@
       const startIdx = getBlockIndexByStart(blockStartStr);
       if (startIdx === -1) return false;
 
-      const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
-      let desiredBlocks = 0;
-      if (meta && meta.bloques != null) {
-        const parsed = parseInt(meta.bloques, 10);
-        if (Number.isFinite(parsed) && parsed > 0) {
-          desiredBlocks = parsed;
-        }
-      }
+      const endDate = coerceDate(ev.end);
+      const desiredBlocks = endDate ? (computeBlocksBetweenDates(startDate, endDate) || 1) : 1;
 
-      if (!desiredBlocks) {
-        const endDate = coerceDate(ev.end);
-        if (endDate) {
-          desiredBlocks = computeBlocksBetweenDates(startDate, endDate);
-        }
-      }
-
-      if (!Number.isFinite(desiredBlocks) || desiredBlocks <= 0) {
-        desiredBlocks = 1;
-      }
-
-      const endIdx = startIdx + desiredBlocks - 1;
+      const endIdx = startIdx + Math.max(1, desiredBlocks) - 1;
       return endIdx < blocks.length;
     } catch (err) {
       console.warn('canSnapEventToBlocks', err);
@@ -3264,16 +3236,10 @@
                 const ev = info.event;
                 console.debug('eventDrop invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
 
-                const canSnap = canSnapEventToBlocks(ev);
-                if (!canSnap) {
-                  alert('Debes ajustar el evento a un bloque válido.');
-                  if (typeof info.revert === 'function') info.revert();
-                  return;
-                }
-
+                // Normalizar directamente al bloque más cercano; si no se puede, revertir
                 const snapResult = realignToBlockRange(ev);
-                if (!snapResult) {
-                  console.warn('No se pudo alinear el evento tras validar los bloques permitidos.', ev && ev.id);
+                if (!snapResult || !canSnapEventToBlocks(ev)) {
+                  alert('El evento no se puede ubicar en un bloque de 35 minutos válido. Operación revertida.');
                   if (typeof info.revert === 'function') info.revert();
                   return;
                 }
@@ -3412,16 +3378,10 @@
                 const ev = info.event;
                 console.debug('eventResize invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
 
-                const canSnap = canSnapEventToBlocks(ev);
-                if (!canSnap) {
-                  alert('Debes ajustar el evento a un bloque válido.');
-                  if (typeof info.revert === 'function') info.revert();
-                  return;
-                }
-
+                // Normalizar directamente al bloque más cercano; si no se puede, revertir
                 const snapResult = realignToBlockRange(ev);
-                if (!snapResult) {
-                  console.warn('No se pudo ajustar el evento a los bloques válidos durante el redimensionado.', ev && ev.id);
+                if (!snapResult || !canSnapEventToBlocks(ev)) {
+                  alert('El nuevo tamaño no coincide con bloques de 35 minutos válidos. Operación revertida.');
                   if (typeof info.revert === 'function') info.revert();
                   return;
                 }
