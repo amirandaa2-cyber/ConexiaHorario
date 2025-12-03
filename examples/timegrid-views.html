@@ -9790,4 +9790,145 @@
       function tryAttach() { const api = getCalendar(); if (api && !api.__ceducSnapInstalled) { attachHandlers(api); api.__ceducSnapInstalled = true; } }
       tryAttach(); document.addEventListener('DOMContentLoaded', tryAttach);
     })();
+
+    // Independent Blocks Architecture for CEDUC
+    (function initIndependentBlocks() {
+      // Build independent block list with stable unique IDs
+      const START = { h: 8, m: 30 }; const DURATION = 35; const COUNT = 22;
+      function fmt(n){return String(n).padStart(2,'0');}
+      const blocks = Array.from({length: COUNT}, (_,i)=>{
+        const startMin = (START.h*60+START.m) + i*DURATION;
+        const endMin = startMin + DURATION;
+        const sh = Math.floor(startMin/60), sm = startMin%60;
+        const eh = Math.floor(endMin/60), em = endMin%60;
+        return {
+          id: 'block_' + fmt(i+1).padStart(3,'0'),
+          index: i+1,
+          start: fmt(sh)+':'+fmt(sm),
+          end: fmt(eh)+':'+fmt(em),
+          duration: DURATION,
+          independent: true,
+          state: { busy: false, eventId: null }
+        };
+      });
+      window.CEDUC_BLOCKS_INDEPENDIENTES = blocks;
+
+      // Occupancy is per day. Key: `${yyyy-mm-dd}:${block.id}` -> { busy:boolean, eventId:string|null }
+      const occupancy = new Map();
+      function dayKey(date){ return new Date(date).toISOString().slice(0,10); }
+      function occKey(date, blockId){ return dayKey(date)+":"+blockId; }
+
+      function timeToMinutes(date){ return date.getHours()*60 + date.getMinutes(); }
+      function findIndependentBlockByTime(date){
+        const minutes = timeToMinutes(date);
+        return blocks.find(b=>{
+          const [sh,sm] = b.start.split(':').map(Number); const s = sh*60+sm;
+          const [eh,em] = b.end.split(':').map(Number); const e = eh*60+em;
+          return minutes>=s && minutes<e;
+        }) || null;
+      }
+      window.findIndependentBlockByTime = findIndependentBlockByTime;
+      window.findIndependentBlockById = function(blockId){ return blocks.find(b=>b.id===blockId)||null; };
+
+      function isBlockAvailableOnDate(block, date, excludeEventId){
+        const key = occKey(date, block.id);
+        const entry = occupancy.get(key);
+        if (!entry) return true;
+        return !entry.busy || entry.eventId===excludeEventId;
+      }
+      window.getAvailableIndependentBlocks = function(date, excludeEventId){
+        return blocks.filter(b=> isBlockAvailableOnDate(b, date, excludeEventId));
+      };
+
+      function updateIndependentEventMetadata(event, block){
+        event.setExtendedProp('independentBlockId', block.id);
+        event.setExtendedProp('blockStart', block.start);
+        event.setExtendedProp('blockEnd', block.end);
+        event.setExtendedProp('isIndependent', true);
+      }
+      window.updateIndependentEventMetadata = updateIndependentEventMetadata;
+
+      function validateIndependentBlockPlacement(event, targetBlock){
+        if (!targetBlock) return false;
+        return isBlockAvailable(targetBlock, event.id);
+      }
+      window.validateIndependentBlockPlacement = validateIndependentBlockPlacement;
+
+      function placeEventInIndependentBlock(event, block){
+        const [sh,sm] = block.start.split(':').map(Number);
+        const [eh,em] = block.end.split(':').map(Number);
+        const start = new Date(event.start); start.setHours(sh, sm, 0, 0);
+        const end = new Date(event.end || start); end.setHours(eh, em, 0, 0);
+        event.setStart(start); event.setEnd(end);
+        const key = occKey(start, block.id);
+        occupancy.set(key, { busy: true, eventId: event.id });
+        updateIndependentEventMetadata(event, block);
+      }
+      window.placeEventInIndependentBlock = placeEventInIndependentBlock;
+
+      function releaseIndependentBlock(event){
+        const blockId = event.extendedProps?.independentBlockId; if (!blockId) return;
+        const start = event.start; if (!start) return;
+        const key = occKey(start, blockId);
+        const entry = occupancy.get(key);
+        if (entry && entry.eventId === event.id){ occupancy.delete(key); }
+      }
+      window.releaseIndependentBlock = releaseIndependentBlock;
+
+      function validateIndependentResize(event, newEnd){
+        // Only allow resize to exact block end
+        const block = findIndependentBlockByTime(event.start);
+        if (!block) return false;
+        const [eh,em] = block.end.split(':').map(Number);
+        return newEnd.getHours()===eh && newEnd.getMinutes()===em;
+      }
+      window.validateIndependentResize = validateIndependentResize;
+
+      // UI: mark unavailable blocks during drag
+      function renderAvailabilityOverlay(api){
+        // For simplicity, rely on existing snap overlay highlight; could extend to show red for busy
+      }
+
+      function attachCalendarOptions(api){
+        api.setOption('editable', true);
+        api.setOption('droppable', true);
+        api.setOption('eventOverlap', false);
+        api.setOption('selectOverlap', false);
+        api.setOption('snapDuration', '00:35:00');
+        api.setOption('slotDuration', '00:05:00');
+        api.setOption('eventAllow', function(dropInfo, draggedEvent){
+          const targetBlock = findIndependentBlockByTime(dropInfo.start);
+          if (!targetBlock) return false;
+          return isBlockAvailableOnDate(targetBlock, dropInfo.start, draggedEvent.id);
+        });
+        api.setOption('eventDragStart', function(info){
+          const targetBlock = findIndependentBlockByTime(info.event.start);
+          if (targetBlock) window.CEDUC_SnapOverlay.highlightCellForDate(api, new Date(info.event.start));
+        });
+        api.setOption('eventDrag', function(info){
+          const targetBlock = findIndependentBlockByTime(info.event.start);
+          if (targetBlock) window.CEDUC_SnapOverlay.highlightCellForDate(api, new Date(info.event.start));
+        });
+        api.setOption('eventDragStop', function(){ window.CEDUC_SnapOverlay.clearHighlight(); });
+        api.setOption('eventDrop', function(info){
+          const evt = info.event;
+          const targetBlock = findIndependentBlockByTime(info.start || evt.start);
+          if (!targetBlock || !isBlockAvailableOnDate(targetBlock, info.start || evt.start, evt.id)) { info.revert(); return; }
+          placeEventInIndependentBlock(evt, targetBlock);
+        });
+        api.setOption('eventResize', function(info){
+          if (!validateIndependentResize(info.event, info.end)) { info.revert(); return; }
+          const block = findIndependentBlockByTime(info.event.start);
+          if (!block) { info.revert(); return; }
+          // Ensure occupancy reflects resize for the same day and block
+          placeEventInIndependentBlock(info.event, block);
+        });
+      }
+
+      function tryAttachOptions(){
+        const api = window.calendar || window.fcCalendar || null;
+        if (api && !api.__independentBlocksInstalled){ attachCalendarOptions(api); api.__independentBlocksInstalled = true; }
+      }
+      tryAttachOptions(); document.addEventListener('DOMContentLoaded', tryAttachOptions);
+    })();
   </script>
