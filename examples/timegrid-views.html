@@ -2149,7 +2149,8 @@
         const getModulosList = () => safeWindowList('modulos') || modulos || [];
         const getDocentesList = () => safeWindowList('docentes') || docentes || [];
         const getSalasList = () => safeWindowList('salas') || salas || [];
-        const getBlockList = () => safeWindowList('CEDUC_BLOQUES') || window.CEDUC_BLOQUES || [];
+        // Canonical blocks: prefer derived CEDUC_BLOCKS for consistent shape
+        const getBlockList = () => (window.CEDUC_BLOCKS || []).map(b => ({ numero: b.number, inicio: b.start, fin: b.end, duracion: b.durationMinutes }));
 
         function parseTimeParts(value) {
           if (!value || typeof value !== 'string') return null;
@@ -2711,6 +2712,15 @@
       }
 
       // Normalizadores de registros para los catálogos provenientes del API/localStorage
+      // Utilidad: de-duplicación consistente de eventos por `id` o clave natural `title+start+end`
+      function dedupeEvents(list) {
+        const uniqueMap = new Map();
+        for (const e of Array.isArray(list) ? list : []) {
+          const key = e && e.id ? ('id:' + String(e.id)) : ('nat:' + String(e && e.title) + '|' + String(e && e.start) + '|' + String(e && e.end));
+          if (!uniqueMap.has(key)) uniqueMap.set(key, e);
+        }
+        return Array.from(uniqueMap.values());
+      }
       function normalizeCarreraRecord(raw) {
         if (!raw) return raw;
         const color = raw.color || raw.colorDiurno || raw.colorVespertino || '#3788d8';
@@ -2817,8 +2827,39 @@
       async function fetchEvents() {
         if (!USE_API) return load(KEY_EVENTS, []);
         try {
-          const r = await authorizedFetch(API_BASE + '/events');
-          return r.ok ? await r.json() : [];
+          // If calendar is available, request only the visible range
+          let startStr = null, endStr = null;
+          try {
+            const v = calendar?.view;
+            if (v?.currentStart && v?.currentEnd) {
+              startStr = v.currentStart.toISOString();
+              endStr = v.currentEnd.toISOString();
+            }
+          } catch (_) { /* ignore */ }
+
+          const url = new URL(API_BASE + '/events', window.location.origin);
+          if (startStr) url.searchParams.set('start', startStr);
+          if (endStr) url.searchParams.set('end', endStr);
+
+          const r = await authorizedFetch(url.toString());
+          const data = r.ok ? await r.json() : [];
+          // Map DB records to FullCalendar events and dedupe
+          const mapped = (data || []).map(e => ({
+            id: e.id,
+            title: e.title,
+            start: e.start,
+            end: e.end,
+            extendedProps: {
+              ...(e.extendedProps || {}),
+              __meta: {
+                ...(e.extendedProps?.__meta || {}),
+                moduloId: e.modulo_id ?? e.extendedProps?.moduloId,
+                docenteId: e.docente_id ?? e.extendedProps?.docenteId,
+                salaId: e.sala_id ?? e.extendedProps?.salaId
+              }
+            }
+          }));
+          return dedupeEvents(mapped);
         } catch (err) {
           console.error('fetchEvents falló', err);
           return [];
@@ -2846,6 +2887,16 @@
       let runtimeErrorEl = document.getElementById('runtime-error');
       if (!runtimeErrorEl) { runtimeErrorEl = document.createElement('div'); runtimeErrorEl.id = 'runtime-error'; runtimeErrorEl.style.color = 'red'; runtimeErrorEl.style.padding = '8px'; runtimeErrorEl.style.display = 'none'; calendarEl.parentNode.insertBefore(runtimeErrorEl, calendarEl); }
       let calendar = null;
+
+      // Unify dedupe logic: prefer id, else natural key (title+start+end)
+      function dedupeEvents(events) {
+        const seen = new Map();
+        for (const ev of events || []) {
+          const key = ev.id ? `id:${ev.id}` : `nk:${ev.title}|${ev.start}|${ev.end}`;
+          if (!seen.has(key)) seen.set(key, ev);
+        }
+        return Array.from(seen.values());
+      }
 
       // helper: ensure FullCalendar library is available (load from CDN as fallback)
       function ensureFullCalendarReady(cb) {
@@ -3008,15 +3059,8 @@
                   const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
                   return meta.moduloId && String(meta.moduloId).trim() !== '';
                 });
-
                 // De-duplicación estricta antes de renderizar
-                // Regla: preferir id; si no existe, usar "title+start+end" como clave natural
-                const uniqueMap = new Map();
-                for (const e of storedEvents) {
-                  const key = e.id ? ('id:' + String(e.id)) : ('nat:' + String(e.title) + '|' + String(e.start) + '|' + String(e.end));
-                  if (!uniqueMap.has(key)) uniqueMap.set(key, e);
-                }
-                storedEvents = Array.from(uniqueMap.values());
+                storedEvents = dedupeEvents(storedEvents);
 
                 const filterCarrera = document.getElementById('filter-carrera')?.value || '';
                 
@@ -3052,12 +3096,7 @@
                   return mod.carreraId === filterCarrera;
                 });
                 // Garantizar unicidad también en la salida final
-                const outMap = new Map();
-                for (const e of filteredEvents) {
-                  const key = e.id ? ('id:' + String(e.id)) : ('nat:' + String(e.title) + '|' + String(e.start) + '|' + String(e.end));
-                  if (!outMap.has(key)) outMap.set(key, e);
-                }
-                filteredEvents = Array.from(outMap.values());
+                filteredEvents = dedupeEvents(filteredEvents);
                 successCallback(filteredEvents);
               } catch (err) {
                 console.error('Error cargando eventos para el calendario', err);
@@ -3564,7 +3603,11 @@
           });
           // Mark initialized to prevent re-attachment and duplicate calendars
           window.__calendarInitialized = true;
+          // Expose calendar globally for helpers expecting either alias
           window.calendar = calendar;
+          window.fcCalendar = calendar;
+          // Bind hooks once to rebuild occupancy and attach single handlers
+          try { if (typeof bindCalendar === 'function') bindCalendar(calendar); } catch (_) {}
           try {
             if (calendar) {
               calendar.render();
@@ -3602,7 +3645,10 @@
           ];
           try { window.CEDUC_BLOQUES = CEDUC_BLOQUES; } catch (_) { }
           const CEDUC_BLOCKS = CEDUC_BLOQUES.map(b => ({ number: b.numero, start: b.inicio, end: b.fin, durationMinutes: b.duracion }));
+          // Canonical blocks exposed under multiple aliases for backward compatibility
           try { window.CEDUC_BLOCKS = CEDUC_BLOCKS; } catch (_) { }
+          try { window.CEDUC_BLOCKS35 = CEDUC_BLOCKS; } catch (_) { }
+          try { window.CEDUC_BLOCKS_INDEPENDIENTES = CEDUC_BLOCKS; } catch (_) { }
           function calcularNumeroBloque(fechaHora) {
             const hora = fechaHora.getHours();
             const minutos = fechaHora.getMinutes();
@@ -10014,7 +10060,9 @@
         overlayEl.appendChild(highlight);
       }
 
-      window.CEDUC_SnapOverlay = {
+      // Namespace unified to avoid global collisions
+      try { window.CEDUC = window.CEDUC || {}; } catch(_) {}
+      window.CEDUC.SnapOverlay = {
         highlightCellForDate(api, date, view) { highlightCell(api, date, view); },
         clearHighlight() { clearOverlay(); }
       };
@@ -10087,47 +10135,43 @@
         cal.setOption('snapDuration', '00:35:00');
         cal.setOption('slotDuration', '00:35:00');
 
-        cal.setOption('eventContent', function(arg) {
+        if (typeof prev.eventContent !== 'function') cal.setOption('eventContent', function(arg) {
           const eventColor = (arg.event.extendedProps && arg.event.extendedProps.color) || arg.event.backgroundColor || arg.event.color;
           if (eventColor) {
             try { arg.event.setProp('color', eventColor); } catch (_) {}
           }
-          if (typeof prev.eventContent === 'function') return prev.eventContent(arg);
-          return prev.eventContent !== undefined ? prev.eventContent : true;
+          return true;
         });
 
-        cal.setOption('eventAllow', function(dropInfo, draggedEvent) {
+        if (typeof prev.eventAllow !== 'function') cal.setOption('eventAllow', function(dropInfo, draggedEvent) {
           const startDate = new Date(dropInfo.start);
           const durationMs = dropInfo.end ? (dropInfo.end.getTime() - dropInfo.start.getTime()) : null;
           const baseDuration = durationMs ? Math.round(durationMs / 60000) : eventDurationMinutes(draggedEvent);
           const placement = preparePlacement(startDate, baseDuration, draggedEvent ? draggedEvent.id : null);
           if (!placement.ok) return false;
-          return typeof prev.eventAllow === 'function' ? prev.eventAllow(dropInfo, draggedEvent) : true;
+          return true;
         });
 
-        cal.setOption('eventDragStart', function(info) {
+        if (typeof prev.eventDragStart !== 'function') cal.setOption('eventDragStart', function(info) {
           const placement = snapPlacement(new Date(info.event.start), eventDurationMinutes(info.event));
           if (placement.ok) highlightCell(cal, placement.start, info.view);
-          if (typeof prev.eventDragStart === 'function') prev.eventDragStart(info);
         });
 
-        cal.setOption('eventDrag', function(info) {
+        if (typeof prev.eventDrag !== 'function') cal.setOption('eventDrag', function(info) {
           const placement = snapPlacement(new Date(info.event.start), eventDurationMinutes(info.event));
           if (placement.ok) highlightCell(cal, placement.start, info.view);
-          if (typeof prev.eventDrag === 'function') prev.eventDrag(info);
         });
 
-        cal.setOption('eventDragStop', function(info) {
+        if (typeof prev.eventDragStop !== 'function') cal.setOption('eventDragStop', function(info) {
           clearOverlay();
-          if (typeof prev.eventDragStop === 'function') prev.eventDragStop(info);
         });
 
-        cal.setOption('eventDrop', function(info) {
-          handleMutableEvent(info, prev.eventDrop);
+        if (typeof prev.eventDrop !== 'function') cal.setOption('eventDrop', function(info) {
+          handleMutableEvent(info, null);
         });
 
-        cal.setOption('eventResize', function(info) {
-          handleMutableEvent(info, prev.eventResize);
+        if (typeof prev.eventResize !== 'function') cal.setOption('eventResize', function(info) {
+          handleMutableEvent(info, null);
         });
 
         cal.setOption('eventAdd', function(info) {
@@ -10257,7 +10301,8 @@
         return blocksForRange(startDate, endDate);
       };
 
-      window.CEDUC_placeProgrammaticEvent = function(eventLike, targetStartDate, durationMinutes) {
+      try { window.CEDUC = window.CEDUC || {}; } catch(_) {}
+      window.CEDUC.placeProgrammaticEvent = function(eventLike, targetStartDate, durationMinutes) {
         const cal = ensureCalendar();
         if (!cal) return { ok: false, reason: 'no-calendar' };
         const startDate = new Date(targetStartDate);
