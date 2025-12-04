@@ -3572,6 +3572,7 @@
       let persistTimeout = null;
       let validationTimeout = null;
       let isDragging = false;
+      let isProcessingEventChange = false;
       
       function debouncedPersistEvents() {
         if (persistTimeout) clearTimeout(persistTimeout);
@@ -4185,7 +4186,13 @@
               }
             },
             eventChange: function (info) {
+              // Prevenir bucle infinito de actualizaciones
+              if (isProcessingEventChange) {
+                return;
+              }
+              
               try {
+                isProcessingEventChange = true;
                 const ev = info.event;
 
                 // VALIDACIÓN CRÍTICA: Verificar fin de semestre
@@ -4217,7 +4224,14 @@
                   }
                   persistEventsAndValidate();
                 }
-              } catch (e) { console.error('eventChange sync error', e); }
+              } catch (e) { 
+                console.error('eventChange sync error', e); 
+              } finally {
+                // Liberar el flag después de un pequeño delay para permitir que las actualizaciones se completen
+                setTimeout(() => {
+                  isProcessingEventChange = false;
+                }, 0);
+              }
             },
             eventRemove: function (info) {
               try {
@@ -6451,6 +6465,9 @@
         } catch (e) { console.error('hideModal error', e); }
       }
 
+      // NOTA: Función openAssignModalForModule comentada - ahora se usa la versión moderna
+      // definida en el nuevo modal de asignación (línea ~1930) con soporte para cascada de docentes
+      /*
       function openAssignModalForModule(moduloId) {
         const modulo = modulos.find(m => m.id === moduloId);
         if (!modulo) { alert('Módulo no encontrado'); return; }
@@ -6481,6 +6498,7 @@
       }
       // Exponer el modal moderno para que los botones antiguos sigan funcionando
       try { window.openAssignModalForModule = openAssignModalForModule; } catch (_) { }
+      */
 
       assignForm.addEventListener('submit', async function (ev) {
         ev.preventDefault();
@@ -8106,10 +8124,20 @@
         const semanasInput = document.getElementById('auto-organizar-semanas');
         const statusDiv = document.getElementById('auto-organizar-status');
         const btn = document.getElementById('btn-auto-organizar-carrera');
+        const turnoRadios = document.getElementsByName('auto-turno');
         
         const carreraId = carreraSelect?.value || '';
         const fechaInicio = fechaInput?.value || new Date().toISOString().split('T')[0];
         const semanas = parseInt(semanasInput?.value || '1', 10) || 1;
+        
+        // Obtener turno seleccionado (Diurno o Vespertino)
+        let turno = 'Diurno'; // default
+        for (const radio of turnoRadios) {
+          if (radio.checked) {
+            turno = radio.value;
+            break;
+          }
+        }
         
         if (!carreraId) {
           alert('Selecciona una carrera primero');
@@ -8121,14 +8149,14 @@
           return;
         }
         
-        console.log('[AUTO-ORGANIZAR Frontend] Request:', { carreraId, fechaInicio, semanas });
-        statusDiv.textContent = '⏳ Organizando...';
+        console.log('[AUTO-ORGANIZAR Frontend] Request:', { carreraId, fechaInicio, semanas, turno });
+        statusDiv.textContent = `⏳ Organizando turno ${turno}...`;
         btn.disabled = true;
         
         try {
           const response = await authorizedFetch(API_BASE + '/auto-organizar', {
             method: 'POST',
-            body: JSON.stringify({ carreraId, fechaInicio, semanas })
+            body: JSON.stringify({ carreraId, fechaInicio, semanas, turno })
           });
           
           console.log('[AUTO-ORGANIZAR Frontend] Response status:', response.status);
@@ -8551,10 +8579,44 @@
         });
       }
 
-      // Conectar botón Auto-Organizar
+      // Conectar modal Auto-Organizar
+      const autoOrganizarModal = document.getElementById('auto-organizar-modal');
+      const btnOpenAutoOrganizar = document.getElementById('open-auto-organizar-modal');
+      const btnCloseAutoOrganizar = document.getElementById('close-auto-organizar-modal');
       const btnAutoOrganizar = document.getElementById('btn-auto-organizar-carrera');
+      
+      if (btnOpenAutoOrganizar && autoOrganizarModal) {
+        btnOpenAutoOrganizar.addEventListener('click', () => {
+          poblarAutoOrganizarCarreras();
+          // Set fecha por defecto a hoy
+          const fechaInput = document.getElementById('auto-organizar-fecha');
+          if (fechaInput && !fechaInput.value) {
+            fechaInput.value = new Date().toISOString().split('T')[0];
+          }
+          autoOrganizarModal.style.display = 'flex';
+          autoOrganizarModal.setAttribute('aria-hidden', 'false');
+        });
+      }
+      
+      if (btnCloseAutoOrganizar && autoOrganizarModal) {
+        btnCloseAutoOrganizar.addEventListener('click', () => {
+          autoOrganizarModal.style.display = 'none';
+          autoOrganizarModal.setAttribute('aria-hidden', 'true');
+        });
+      }
+      
       if (btnAutoOrganizar) {
         btnAutoOrganizar.addEventListener('click', handleAutoOrganizarCarrera);
+      }
+      
+      // Cerrar modal al hacer click fuera
+      if (autoOrganizarModal) {
+        autoOrganizarModal.addEventListener('click', (e) => {
+          if (e.target === autoOrganizarModal) {
+            autoOrganizarModal.style.display = 'none';
+            autoOrganizarModal.setAttribute('aria-hidden', 'true');
+          }
+        });
       }
 
       // initial render
@@ -10710,6 +10772,15 @@
                   clases)</label>
               </div>
             </div>
+            <div class="entity-section" id="auto-organizar-container">
+              <div class="entity-title">🚀 Auto-organizador</div>
+              <div class="d-flex flex-column gap-3 align-items-stretch">
+                <button id="open-auto-organizar-modal" type="button" class="btn btn-warning btn-hover-lift"
+                  title="Auto-organizar carrera por turno (Diurno o Vespertino)">
+                  🚀 Auto-organizar carrera
+                </button>
+              </div>
+            </div>
             <div class="entity-section mb-0" id="auto-history-container">
               <div class="entity-title">🕒 Historial auto</div>
               <div id="auto-op-history" class="sidebar-history"></div>
@@ -10781,6 +10852,60 @@
         <div style="display:flex;gap:8px;margin-top:8px;"><button type="submit">Crear</button><button type="button"
             id="close-doc-modal">Cancelar</button></div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Auto-Organizar Carrera -->
+  <div id="auto-organizar-modal" class="modal-overlay" style="display:none;" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3>Auto-organizar</h3>
+        <button type="button" id="close-auto-organizar-modal" class="modal-close" aria-label="Cerrar">×</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="auto-organizar-carrera" class="form-label" style="font-weight: 600; margin-bottom: 6px; display: block;">CARRERA</label>
+          <select id="auto-organizar-carrera" class="form-select" style="width: 100%;">
+            <option value="">—</option>
+          </select>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" style="font-weight: 600; margin-bottom: 6px; display: block;">TURNO</label>
+          <div style="display: flex; gap: 20px;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="radio" name="auto-turno" value="Diurno" checked style="cursor: pointer;">
+              <span>Diurno (08:30-14:00)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="radio" name="auto-turno" value="Vespertino" style="cursor: pointer;">
+              <span>Vespertino (18:00-22:00)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="auto-organizar-fecha" class="form-label" style="font-weight: 600; margin-bottom: 6px; display: block;">FECHA INICIO</label>
+          <input type="date" id="auto-organizar-fecha" class="form-input" style="width: 100%;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label for="auto-organizar-semanas" class="form-label" style="font-weight: 600; margin-bottom: 6px; display: block;">SEMANAS</label>
+          <input type="number" id="auto-organizar-semanas" class="form-input" min="1" max="20" value="1" style="width: 100%;">
+        </div>
+
+        <div id="auto-organizar-status" style="margin-bottom: 12px; padding: 10px; background: #f3f4f6; border-radius: 6px; font-size: 13px; min-height: 20px;">
+          Selecciona una carrera para comenzar
+        </div>
+
+        <button type="button" id="btn-auto-organizar-carrera" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 16px; font-weight: 600;">
+          Aplicar auto-organizar
+        </button>
+        
+        <p style="margin-top: 16px; font-size: 12px; color: #6b7280; text-align: center;">
+          Por favor selecciona una carrera
+        </p>
+      </div>
     </div>
   </div>
 
@@ -11191,6 +11316,9 @@
   <script>
     (function () {
       // CEDUC schedule manager centralizes block-based FullCalendar integration.
+      // NOTA: Este módulo es independiente y auto-contenido. No tiene acceso a variables
+      // definidas en otros scripts (como debouncedValidation, isDragging, etc.)
+      // Todas las validaciones y manejo de estado se realizan dentro de este scope.
       const CONFIG = { startHour: 8, startMinute: 30, blockMinutes: 35, blockCount: 22 };
       const BLOCK_DURATION_MS = CONFIG.blockMinutes * 60000;
       const blocks = buildBlocks();
@@ -11520,6 +11648,7 @@
           clearOverlay();
           // Ejecutar validación al finalizar drag
           // debouncedValidation(); // COMENTADO: Esta función no está en scope aquí, la validación se hace en eventDrop
+          // La validación se ejecuta automáticamente en eventDrop/eventResize
         });
 
         if (typeof prev.eventDrop !== 'function') cal.setOption('eventDrop', function (info) {
