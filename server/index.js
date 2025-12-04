@@ -743,6 +743,23 @@ if(dbReady){
 		}
 	});
 
+	// Health endpoint to verify DB connectivity and trigger status
+	app.get('/api/health', async (req, res) => {
+		try {
+			const ping = await db.query('SELECT 1 AS ok');
+			const trg = await db.query(
+				`SELECT tgname AS name
+				   FROM pg_trigger
+				  WHERE tgrelid = 'docentes'::regclass
+				    AND NOT tgisinternal`
+			);
+			const hasDocentesTouch = trg.rows.some(r => r.name === 'docentes_touch_updated');
+			res.json({ db: !!ping.rowCount, docentesTriggerOk: hasDocentesTouch });
+		} catch (err) {
+			return handleDbError(res, err);
+		}
+	});
+
 	app.get('/api/auth/session', async (req,res)=>{
 		const token = extractToken(req);
 		if (!token) {

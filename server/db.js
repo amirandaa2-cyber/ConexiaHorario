@@ -73,6 +73,8 @@ async function initializeSchema() {
 			creado_en TIMESTAMPTZ DEFAULT NOW(),
 			actualizado_en TIMESTAMPTZ DEFAULT NOW()
 		)`,
+		`DROP TRIGGER IF EXISTS update_docentes_modtime ON docentes`,
+		`DROP FUNCTION IF EXISTS update_modified_column() CASCADE`,
 		`CREATE INDEX IF NOT EXISTS idx_docentes_carrera ON docentes (carrera_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_docentes_nombre ON docentes (nombre)`,
 		`CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS TRIGGER AS $$
