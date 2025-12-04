@@ -2541,6 +2541,51 @@
       let storedEvents = []; // FullCalendar event objects + metadata
       let templates = []; // recurrence templates: {id, moduloId, docenteId, salaId, startDate, time, duration, until}
 
+      const moduloIndex = new Map();
+
+      function rebuildModuloIndex(source = modulos) {
+        moduloIndex.clear();
+        (source || []).forEach((m) => {
+          if (!m || m.id === undefined || m.id === null) return;
+          moduloIndex.set(String(m.id), m);
+        });
+      }
+
+      function findModuloById(moduloId) {
+        if (moduloId === undefined || moduloId === null) return null;
+        const key = String(moduloId);
+        if (moduloIndex.has(key)) return moduloIndex.get(key);
+        const modulo = (modulos || []).find((m) => String(m.id) === key) || null;
+        if (modulo) moduloIndex.set(key, modulo);
+        return modulo;
+      }
+
+      function eventMatchesFilters(ev, filters) {
+        if (!ev) return false;
+        const carreraId = filters && filters.carreraId ? String(filters.carreraId) : '';
+        if (carreraId) {
+          const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+          const metaCarrera = meta.carreraId ?? meta.carrera_id ?? meta.idCarrera ?? meta.carrera;
+          if (metaCarrera !== undefined && metaCarrera !== null) {
+            if (String(metaCarrera) !== carreraId) return false;
+          } else {
+            const moduloKey = meta.moduloId ?? meta.modulo_id ?? ev.moduloId ?? ev.modulo_id;
+            if (moduloKey === undefined || moduloKey === null) return false;
+            const modulo = findModuloById(moduloKey);
+            if (!modulo) return false;
+            const moduloCarrera = modulo.carreraId ?? modulo.carrera_id ?? modulo.idCarrera ?? modulo.carrera;
+            if (moduloCarrera === undefined || moduloCarrera === null || String(moduloCarrera) !== carreraId) return false;
+          }
+        }
+        return true;
+      }
+
+      function syncGlobalCatalogs() {
+        window.carreras = carreras;
+        window.modulos = modulos;
+        window.docentes = docentes;
+      }
+
       // Setup BroadcastChannel to interact with external sidebar.html
       const CHANNEL_NAME = 'ceduc-calendar';
       let channel = null;
@@ -2594,6 +2639,8 @@
       modulos = (modulos || []).map(m => normalizeModuloRecord(m, carreras));
       docentes = (docentes || []).map(normalizeDocenteRecord);
       templates = (templates || []).map(normalizeTemplateRecord);
+      rebuildModuloIndex();
+      syncGlobalCatalogs();
 
       storedEvents = (storedEvents || []).map(ev => {
         try {
@@ -3636,6 +3683,7 @@
                 storedEvents = dedupeEvents(storedEvents);
 
                 const filterCarrera = document.getElementById('filter-carrera')?.value || '';
+                rebuildModuloIndex();
                 console.log('[Calendar] events() - Total storedEvents después de dedup:', storedEvents.length);
                 console.log('[Calendar] events() - Filtro carrera activo:', filterCarrera || 'NINGUNO');
 
@@ -3662,14 +3710,9 @@
                   return event;
                 });
 
-                let filteredEvents = bloquesEvents.filter(e => {
-                  if (!filterCarrera) return true;
-                  const meta = (e.extendedProps && e.extendedProps.__meta) || {};
-                  if (!meta.moduloId) return false; // si no hay módulo, no se puede filtrar por carrera
-                  const mod = modulos.find(m => String(m.id) === String(meta.moduloId));
-                  if (!mod) return false;
-                  return String(mod.carreraId) === String(filterCarrera);
-                });
+                const activeFilters = { carreraId: filterCarrera };
+
+                let filteredEvents = bloquesEvents.filter(e => eventMatchesFilters(e, activeFilters));
                 // Garantizar unicidad también en la salida final
                 filteredEvents = dedupeEvents(filteredEvents);
                 console.log('[Calendar] events() - Eventos después de filtro carrera:', filteredEvents.length);
@@ -4806,6 +4849,8 @@
 
       // Renderers
       function renderCarreras() {
+        syncGlobalCatalogs();
+        rebuildModuloIndex();
         // refresh select
         if (selectCarreraForModulo) {
           selectCarreraForModulo.innerHTML = '';
@@ -4982,6 +5027,8 @@
       }
 
       function renderModulos() {
+        rebuildModuloIndex();
+        syncGlobalCatalogs();
         listModulos.innerHTML = '';
         const selectedCarrId = document.getElementById('filter-carrera')?.value || '';
         modulos.filter(m => {
@@ -8129,7 +8176,11 @@
           cleanOldEvents();
 
           // Recargar los eventos forzará a que se aplique el filtro actual
-          // calendar.refetchEvents(); // Simplified: avoid redundant refetch
+          if (calendar && typeof calendar.refetchEvents === 'function') {
+            setTimeout(() => {
+              try { calendar.refetchEvents(); } catch (e) { console.error('refetchEvents error', e); }
+            }, 0);
+          }
 
           // Actualizar la UI del filtro
           const filterCarrera = document.getElementById('filter-carrera')?.value || '';
@@ -10580,18 +10631,87 @@
 
                 var prev = hideAndCollect(toHide);
                 
-                // Esperar a que se actualice el layout
-                await new Promise(function (r) { setTimeout(r, 150); });
+                // Guardar estilos originales del contenedor para restaurar después
+                var originalStyles = {
+                  overflow: calendarWrap.style.overflow,
+                  height: calendarWrap.style.height,
+                  maxHeight: calendarWrap.style.maxHeight
+                };
+                
+                // Expandir el contenedor para mostrar todo el contenido
+                calendarWrap.style.overflow = 'visible';
+                calendarWrap.style.height = 'auto';
+                calendarWrap.style.maxHeight = 'none';
+                
+                // Buscar el contenedor del scroll interno del calendario
+                var fcScroller = calendarWrap.querySelector('.fc-scroller');
+                var scrollerOriginal = null;
+                if (fcScroller) {
+                  scrollerOriginal = {
+                    overflow: fcScroller.style.overflow,
+                    overflowY: fcScroller.style.overflowY,
+                    height: fcScroller.style.height,
+                    maxHeight: fcScroller.style.maxHeight
+                  };
+                  fcScroller.style.overflow = 'visible';
+                  fcScroller.style.overflowY = 'visible';
+                  fcScroller.style.height = 'auto';
+                  fcScroller.style.maxHeight = 'none';
+                }
+                
+                // Expandir todos los scrollers internos de FullCalendar
+                var allScrollers = calendarWrap.querySelectorAll('.fc-scroller, .fc-timegrid-body, .fc-scrollgrid-sync-inner');
+                var scrollersOriginalStyles = [];
+                allScrollers.forEach(function(scroller) {
+                  scrollersOriginalStyles.push({
+                    element: scroller,
+                    overflow: scroller.style.overflow,
+                    overflowY: scroller.style.overflowY,
+                    height: scroller.style.height,
+                    maxHeight: scroller.style.maxHeight
+                  });
+                  scroller.style.overflow = 'visible';
+                  scroller.style.overflowY = 'visible';
+                  scroller.style.height = 'auto';
+                  scroller.style.maxHeight = 'none';
+                });
+                
+                // Esperar a que se actualice el layout completamente
+                await new Promise(function (r) { setTimeout(r, 300); });
 
-                // Capturar el calendario como canvas
+                // Capturar el calendario como canvas con todo el contenido visible
                 var scale = Math.min(2, (window.devicePixelRatio || 1));
                 var canvas = await window.html2canvas(calendarWrap, { 
                   backgroundColor: '#ffffff', 
                   scale: scale,
                   logging: false,
-                  useCORS: true
+                  useCORS: true,
+                  allowTaint: true,
+                  scrollY: 0,
+                  scrollX: 0,
+                  windowHeight: calendarWrap.scrollHeight,
+                  height: calendarWrap.scrollHeight
                 });
 
+                // Restaurar estilos originales
+                calendarWrap.style.overflow = originalStyles.overflow;
+                calendarWrap.style.height = originalStyles.height;
+                calendarWrap.style.maxHeight = originalStyles.maxHeight;
+                
+                if (fcScroller && scrollerOriginal) {
+                  fcScroller.style.overflow = scrollerOriginal.overflow;
+                  fcScroller.style.overflowY = scrollerOriginal.overflowY;
+                  fcScroller.style.height = scrollerOriginal.height;
+                  fcScroller.style.maxHeight = scrollerOriginal.maxHeight;
+                }
+                
+                scrollersOriginalStyles.forEach(function(item) {
+                  item.element.style.overflow = item.overflow;
+                  item.element.style.overflowY = item.overflowY;
+                  item.element.style.height = item.height;
+                  item.element.style.maxHeight = item.maxHeight;
+                });
+                
                 // Restaurar UI
                 restoreFromMap(prev);
 
