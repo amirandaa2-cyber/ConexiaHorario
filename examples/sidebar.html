@@ -10,93 +10,88 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 45%, #312e81 100%);
-      --surface: rgba(15, 23, 42, 0.92);
-      --surface-border: rgba(148, 163, 184, 0.25);
-      --surface-shadow: 0 28px 60px rgba(15, 23, 42, 0.45);
-      --text-primary: #f8fafc;
-      --text-secondary: #94a3b8;
-      --accent: #38bdf8;
-      --accent-hover: #0ea5e9;
-      --muted: #64748b;
-      --input-bg: rgba(30, 41, 59, 0.7);
-      --input-border: rgba(148, 163, 184, 0.4);
-      --input-text: #e2e8f0;
-      --focus-ring: 0 0 0 3px rgba(56, 189, 248, 0.35);
-      --radius-lg: 16px;
+      --brand-orange: #f97316;
+      --brand-orange-light: #fb923c;
+      --brand-green: #10b981;
+      --bg-page: #f7f8fc;
+      --card-bg: #ffffff;
+      --card-border: rgba(15, 23, 42, 0.08);
+      --card-shadow: 0 18px 32px rgba(15, 23, 42, 0.08);
+      --text-color: #1f2933;
+      --muted: #6b7280;
+      --input-border: #d8dee9;
+      --input-bg: rgba(255, 255, 255, 0.96);
+      --focus-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25);
+      --radius-lg: 18px;
       --radius-sm: 10px;
-      color-scheme: dark;
     }
 
     body {
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       margin: 0;
       min-height: 100vh;
-      background: var(--bg-gradient);
-      color: var(--text-primary);
+      background: var(--bg-page);
+      color: var(--text-color);
       display: flex;
-      justify-content: center;
-      padding: 32px 20px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      padding: 40px 24px;
     }
 
     body::before {
       content: '';
       position: fixed;
       inset: 0;
-      background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.22), transparent 55%),
-        radial-gradient(circle at 80% 10%, rgba(236, 72, 153, 0.16), transparent 60%),
-        radial-gradient(circle at 50% 75%, rgba(56, 189, 248, 0.18), transparent 55%);
+      background: radial-gradient(circle at 0% 0%, rgba(249, 115, 22, 0.12), transparent 55%),
+        radial-gradient(circle at 60% -10%, rgba(59, 130, 246, 0.12), transparent 50%);
       pointer-events: none;
       z-index: -1;
     }
 
     body > * {
-      width: min(720px, 100%);
+      width: min(680px, 100%);
+      max-width: 100%;
     }
 
     h1 {
-      font-size: 24px;
+      font-size: 26px;
       font-weight: 600;
-      letter-spacing: 0.3px;
-      margin: 0 0 10px;
-      text-shadow: 0 12px 24px rgba(15, 23, 42, 0.35);
+      letter-spacing: 0.02em;
+      margin: 0 0 8px;
     }
 
     .muted {
-      color: var(--text-secondary);
+      color: var(--muted);
       font-size: 14px;
       margin-bottom: 20px;
     }
 
     .section {
-      background: var(--surface);
-      border: 1px solid var(--surface-border);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
       border-radius: var(--radius-lg);
-      padding: 18px 20px;
-      margin-bottom: 18px;
-      box-shadow: var(--surface-shadow);
-      backdrop-filter: blur(14px);
-      transition: border-color 0.2s ease, transform 0.2s ease;
-    }
-
-    .section:hover {
-      border-color: rgba(148, 163, 184, 0.5);
-      transform: translateY(-2px);
+      padding: 24px 26px;
+      margin-bottom: 20px;
+      box-shadow: var(--card-shadow);
+      display: grid;
+      gap: 18px;
     }
 
     .section strong {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 600;
-      color: var(--text-primary);
+      color: var(--text-color);
     }
 
     label {
       display: block;
       font-size: 13px;
-      letter-spacing: 0.2px;
-      color: var(--text-secondary);
-      margin-bottom: 6px;
+      letter-spacing: 0.02em;
       text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
     }
 
     select,
@@ -105,13 +100,13 @@
     input[type=time],
     input[type=number] {
       width: 100%;
-      padding: 10px 14px;
+      padding: 12px 14px;
       font-size: 14px;
       border-radius: var(--radius-sm);
       border: 1px solid var(--input-border);
       background: var(--input-bg);
-      color: var(--input-text);
-      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+      color: var(--text-color);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     select:focus,
@@ -120,9 +115,8 @@
     input[type=time]:focus,
     input[type=number]:focus {
       outline: none;
-      border-color: var(--accent);
-      box-shadow: var(--focus-ring);
-      transform: translateY(-1px);
+      border-color: var(--brand-orange);
+      box-shadow: var(--focus-shadow);
     }
 
     select:hover,
@@ -130,52 +124,52 @@
     input[type=date]:hover,
     input[type=time]:hover,
     input[type=number]:hover {
-      border-color: rgba(148, 163, 184, 0.55);
+      border-color: rgba(249, 115, 22, 0.6);
     }
 
     button {
       cursor: pointer;
-      border: none;
+      border: 1px solid rgba(249, 115, 22, 0.32);
       border-radius: var(--radius-sm);
-      padding: 10px 16px;
+      padding: 11px 18px;
       font-size: 14px;
       font-weight: 600;
-      letter-spacing: 0.2px;
-      background: linear-gradient(135deg, var(--accent) 0%, #6366f1 100%);
-      color: #0f172a;
-      box-shadow: 0 18px 30px rgba(56, 189, 248, 0.35);
+      letter-spacing: 0.01em;
+      background: linear-gradient(135deg, var(--brand-orange), var(--brand-orange-light));
+      color: #ffffff;
+      box-shadow: 0 14px 24px rgba(249, 115, 22, 0.22);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
     }
 
     button:hover {
       transform: translateY(-1px);
-      filter: brightness(1.02);
-      box-shadow: 0 22px 36px rgba(56, 189, 248, 0.4);
+      box-shadow: 0 18px 30px rgba(249, 115, 22, 0.28);
     }
 
     button:active {
       transform: translateY(0);
-      box-shadow: 0 14px 24px rgba(56, 189, 248, 0.28);
+      box-shadow: 0 10px 18px rgba(249, 115, 22, 0.2);
     }
 
     button:focus-visible {
       outline: none;
-      box-shadow: var(--focus-ring);
+      box-shadow: var(--focus-shadow);
+      border-color: var(--brand-orange);
     }
 
     button.secondary {
-      background: rgba(148, 163, 184, 0.12);
-      color: var(--text-primary);
-      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: #ffffff;
+      color: var(--brand-orange);
+      border: 1px dashed rgba(249, 115, 22, 0.36);
       box-shadow: none;
     }
 
     button.secondary:hover {
-      border-color: rgba(148, 163, 184, 0.55);
+      background: rgba(249, 115, 22, 0.08);
       box-shadow: none;
       transform: translateY(-1px);
     }
@@ -183,36 +177,37 @@
     .row {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      gap: 14px;
     }
 
     .row-3 {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
+      gap: 14px;
     }
 
     .stack {
       display: grid;
-      gap: 14px;
+      gap: 18px;
     }
 
     #data-output {
-      background: rgba(15, 23, 42, 0.7);
-      border: 1px solid rgba(148, 163, 184, 0.18);
+      background: rgba(249, 250, 251, 0.85);
+      border: 1px dashed rgba(15, 23, 42, 0.12);
       border-radius: 12px;
-      padding: 14px;
+      padding: 16px;
       white-space: pre-wrap;
-      color: var(--text-secondary);
+      color: var(--muted);
+      min-height: 120px;
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 720px) {
       body {
-        padding: 26px 16px;
+        padding: 32px 16px;
       }
 
       h1 {
-        font-size: 20px;
+        font-size: 22px;
       }
 
       .row,
@@ -222,7 +217,6 @@
 
       button {
         width: 100%;
-        justify-self: stretch;
       }
     }
   </style>
