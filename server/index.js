@@ -6,7 +6,12 @@ const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
 const db = require('./db');
 const { v4: uuidv4 } = require('uuid');
-const dashboardRoutes = require('./routes/dashboardRoutes');
+let dashboardRoutes = null;
+try {
+	dashboardRoutes = require('./routes/dashboardRoutes');
+} catch (e) {
+	console.warn('dashboardRoutes no disponible:', e && e.message ? e.message : e);
+}
 
 const app = express();
 app.use(cors());
@@ -558,7 +563,9 @@ app.get('/api/public-config', (req,res)=>{
 
 // Basic CRUD endpoints (only enabled if DB loaded)
 if(dbReady){
-	app.use('/api/dashboard', dashboardRoutes);
+	if (dashboardRoutes) {
+		app.use('/api/dashboard', dashboardRoutes);
+	}
 	// Auto-organize endpoint: assigns pending modules to eligible docentes
 	app.post('/api/auto-organizar', async (req, res) => {
 		try {
@@ -732,6 +739,22 @@ if(dbReady){
 			handleDbError(res, err);
 		}
 	});
+
+		app.post('/api/auth/heartbeat', async (req,res)=>{
+			const token = extractToken(req);
+			if (!token) {
+				return res.status(401).json({ error: 'Token no enviado.' });
+			}
+			try {
+				const session = await loadSessionFromToken(token);
+				if (!session) {
+					return res.status(401).json({ error: 'Sesión inválida o expirada.' });
+				}
+				res.json({ ok: true, tokenExpiresAt: session.expiraEn, sessionIdleMinutes: SESSION_IDLE_MINUTES });
+			} catch (err) {
+				handleDbError(res, err);
+			}
+		});
 
 	app.get('/api/carreras', async (req,res)=>{
 		try{
