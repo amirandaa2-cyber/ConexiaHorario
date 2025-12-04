@@ -4106,16 +4106,29 @@
             eventDrop: async function (info) {
               try {
                 isDragging = false; // Asegurar que drag finaliza
+                clearConflictDecisionCache(); // Limpiar decisiones previas para este movimiento
                 const ev = info.event;
                 console.debug('eventDrop invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
+                console.log('🔄 Intentando mover evento:', ev.title);
 
-                // Normalizar directamente al bloque más cercano; si no se puede, revertir
+                // Normalizar directamente al bloque más cercano (opcional, no bloqueante)
                 const snapResult = realignToBlockRange(ev);
+                console.log('📍 Resultado de snap a bloques:', snapResult);
+                if (!snapResult) {
+                  console.warn('⚠️ No se pudo hacer snap del evento a bloques, continuando sin snap');
+                }
+                // CAMBIO: Hacer la validación de bloques opcional en lugar de bloqueante
+                // Si no se puede hacer snap, permitir el movimiento de todas formas
+                /*
+                if (!canSnapEventToBlocks(ev)) {
+                  console.warn('⚠️ canSnapEventToBlocks retornó false');
+                }
                 if (!snapResult || !canSnapEventToBlocks(ev)) {
                   alert('El evento no se puede ubicar en un bloque de 35 minutos válido. Operación revertida.');
                   if (typeof info.revert === 'function') info.revert();
                   return;
                 }
+                */
 
                 // VALIDACIÓN CRÍTICA: Verificar fin de semestre
                 const semesterEndInput = document.getElementById('semester-end')?.value;
@@ -4151,9 +4164,12 @@
                 });
 
                 if (conflicts.length) {
-                  console.warn('eventDrop conflict detected', conflicts);
+                  console.warn('⚠️ eventDrop conflict detected', conflicts);
+                  console.log('Cache de decisiones antes del modal:', conflictDecisionCache);
                   let decision = conflictDecisionCache || await resolveConflictModal(candidate, conflicts);
+                  console.log('Decisión tomada:', decision);
                   if (!decision || decision.action === 'omit') {
+                    console.log('❌ Movimiento cancelado por decisión de usuario (mantener existente)');
                     handleKeepExistingAction({ info, ev });
                     return;
                   }
@@ -4241,11 +4257,12 @@
                     ev.setExtendedProp('__meta', metaSnapshot);
                   }
                   persistEventsAndValidate();
+                  console.log('✅ Evento movido exitosamente:', storedEvents[idx].title);
                   console.debug('Event updated in storedEvents:', storedEvents[idx]);
                 } else {
-                  console.warn('Event not found in storedEvents:', ev.id);
+                  console.warn('⚠️ Event not found in storedEvents:', ev.id);
                 }
-                console.debug('eventDrop completed, storedEvents.length=', storedEvents.length);
+                console.log('✅ eventDrop completado sin conflictos, total eventos:', storedEvents.length);
               } catch (e) {
                 console.error('eventDrop sync error', e);
                 alert('Error al mover evento: ' + e.message);
@@ -4255,16 +4272,26 @@
             eventResize: async function (info) {
               try {
                 isDragging = false; // Asegurar que resize finaliza
+                clearConflictDecisionCache(); // Limpiar decisiones previas para este resize
                 const ev = info.event;
                 console.debug('eventResize invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
+                console.log('📏 Intentando redimensionar evento:', ev.title);
 
-                // Normalizar directamente al bloque más cercano; si no se puede, revertir
+                // Normalizar directamente al bloque más cercano (opcional, no bloqueante)
                 const snapResult = realignToBlockRange(ev);
+                console.log('📍 Resultado de snap a bloques en resize:', snapResult);
+                if (!snapResult) {
+                  console.warn('⚠️ No se pudo hacer snap del evento a bloques en resize, continuando sin snap');
+                }
+                // CAMBIO: Hacer la validación de bloques opcional en lugar de bloqueante
+                // Si no se puede hacer snap, permitir el resize de todas formas
+                /*
                 if (!snapResult || !canSnapEventToBlocks(ev)) {
                   alert('El nuevo tamaño no coincide con bloques de 35 minutos válidos. Operación revertida.');
                   if (typeof info.revert === 'function') info.revert();
                   return;
                 }
+                */
 
                 // VALIDACIÓN CRÍTICA: Verificar fin de semestre
                 const semesterEndInput = document.getElementById('semester-end')?.value;
@@ -4298,10 +4325,14 @@
                   return !(c.event && c.event.id && ev.id && c.event.id === ev.id);
                 });
 
+                console.log('✅ Conflictos detectados en resize:', conflicts.length);
                 if (conflicts.length) {
-                  console.warn('eventResize conflict detected', conflicts);
+                  console.warn('⚠️ eventResize conflict detected', conflicts);
+                  console.log('Cache de decisiones antes del modal:', conflictDecisionCache);
                   let decision = conflictDecisionCache || await resolveConflictModal(candidate, conflicts);
+                  console.log('Decisión tomada:', decision);
                   if (!decision || decision.action === 'omit') {
+                    console.log('❌ Redimensionamiento cancelado por decisión de usuario (mantener existente)');
                     handleKeepExistingAction({ info, ev });
                     return;
                   }
@@ -4384,9 +4415,11 @@
                     ev.setExtendedProp('__meta', metaSnapshot);
                   }
                   persistEventsAndValidate();
-                  console.log('Evento redimensionado exitosamente:', storedEvents[idx].title);
+                  console.log('✅ Evento redimensionado exitosamente:', storedEvents[idx].title);
+                } else {
+                  console.warn('⚠️ Event not found in storedEvents for resize:', ev.id);
                 }
-                console.debug('eventResize completed, storedEvents.length=', storedEvents.length);
+                console.log('✅ eventResize completado sin conflictos, total eventos:', storedEvents.length);
               } catch (e) {
                 console.error('eventResize sync error', e);
                 alert('Error al redimensionar evento: ' + e.message);
@@ -11336,7 +11369,7 @@
         });
 
         if (typeof prev.eventDragStart !== 'function') cal.setOption('eventDragStart', function (info) {
-          isDragging = true; // Deshabilitar validación durante drag
+          // isDragging = true; // COMENTADO: Variable no está en scope aquí
           const placement = snapPlacement(new Date(info.event.start), eventDurationMinutes(info.event));
           if (placement.ok) highlightCell(cal, placement.start, info.view);
         });
@@ -11347,10 +11380,10 @@
         });
 
         if (typeof prev.eventDragStop !== 'function') cal.setOption('eventDragStop', function (info) {
-          isDragging = false; // Habilitar validación después de drag
+          // isDragging = false; // COMENTADO: Variable no está en scope aquí
           clearOverlay();
           // Ejecutar validación al finalizar drag
-          debouncedValidation();
+          // debouncedValidation(); // COMENTADO: Esta función no está en scope aquí, la validación se hace en eventDrop
         });
 
         if (typeof prev.eventDrop !== 'function') cal.setOption('eventDrop', function (info) {
