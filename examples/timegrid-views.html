@@ -4445,6 +4445,11 @@
           updateFilterUI();
         } catch (e) { console.error('filter wiring', e); }
         relocateCarreraFilterToToolbar();
+        try {
+          document.dispatchEvent(new CustomEvent('ceduc:carreras-sync', { detail: { total: carreras.length } }));
+        } catch (eventErr) {
+          console.warn('No se pudo notificar ceduc:carreras-sync', eventErr);
+        }
       }
 
       function renderModulos() {
@@ -10415,141 +10420,146 @@
       bootstrapCalendarBinding();
       ensureCalendar();
 
-      // Carrera filter: inject UI and bind filtering by extendedProps.carreraId
+      // Carrera filter: leverage carrera asociada para mostrar/ocultar bloques sin romper lógica previa
       (function setupCarreraFilter(){
-        function getToolbarCenter(){
-          const cal = ensureCalendar();
-          if (!cal || !cal.el) return null;
-          return cal.el.querySelector('.fc-header-toolbar .fc-toolbar-center');
+        const diacriticRegex = /[\u0300-\u036f]/g;
+        const state = { value: '' };
+
+        function normalizeText(value){
+          return String(value || '')
+            .normalize('NFD')
+            .replace(diacriticRegex, '')
+            .trim()
+            .toLowerCase();
         }
 
-        function normalizeId(val){
-          return String(val || '').trim().toLowerCase();
+        function safeList(globalName){
+          try {
+            const collection = window[globalName];
+            return Array.isArray(collection) ? collection : [];
+          } catch (_) {
+            return [];
+          }
         }
 
-        function normalizeName(val){
-          return String(val || '').trim().toLowerCase();
+        function findModuloById(id){
+          if (id == null) return null;
+          return safeList('modulos').find(m => String(m.id) === String(id)) || null;
         }
 
-        function carreraLabelFromEvent(ev){
-          const props = ev.extendedProps || {};
-          const id = props.carreraId || props.carrera || null;
-          const name = props.carreraNombre || props.carrera_name || props.carreraLabel || null;
-          return name || id || '';
+        function findCarreraById(id){
+          if (id == null) return null;
+          return safeList('carreras').find(c => String(c.id) === String(id)) || null;
         }
 
-        function collectCarreras(){
-          const cal = ensureCalendar();
-          if (!cal) return [];
-          const byKey = new Map();
-          cal.getEvents().forEach(ev => {
-            const props = ev.extendedProps || {};
-            const id = normalizeId(props.carreraId || props.carrera);
-            const name = normalizeName(props.carreraNombre || props.carrera_name || props.carreraLabel);
-            if (id || name) {
-              const key = id || name;
-              if (!byKey.has(key)) byKey.set(key, { id, name, label: (props.carreraNombre || props.carrera_name || props.carreraLabel || props.carrera || props.carreraId || '').toString() });
-            }
-          });
-          return Array.from(byKey.values()).sort((a,b) => a.label.localeCompare(b.label));
-        }
+        function extractCarreraInfo(event){
+          const props = (event && event.extendedProps) || {};
+          const meta = props.__meta || {};
+          let carreraId = props.carreraId ?? props.carrera ?? meta.carreraId ?? null;
+          let carreraLabel = props.carreraNombre ?? props.carrera_name ?? props.carreraLabel ?? null;
 
-        function renderFilter(){
-          const center = getToolbarCenter();
-          if (!center) return;
-          // Avoid duplicating filter
-          if (center.querySelector('.toolbar-filter-carrera')) return;
-          const wrap = document.createElement('div');
-          wrap.className = 'toolbar-filter-carrera';
-
-          const select = document.createElement('select');
-          select.className = 'toolbar-filter-select';
-          select.setAttribute('aria-label', 'Filtrar por carrera');
-
-          const optAll = document.createElement('option');
-          optAll.value = '';
-          optAll.textContent = '-- Todas --';
-          select.appendChild(optAll);
-
-          collectCarreras().forEach(entry => {
-            const opt = document.createElement('option');
-            opt.value = entry.id || entry.name || entry.label;
-            opt.textContent = (entry.label || entry.name || entry.id).toUpperCase();
-            select.appendChild(opt);
-          });
-
-          const clearBtn = document.createElement('button');
-          clearBtn.type = 'button';
-          clearBtn.className = 'toolbar-filter-clear is-hidden fc-button';
-          clearBtn.textContent = 'Limpiar';
-
-          const status = document.createElement('span');
-          status.className = 'toolbar-filter-active';
-          status.textContent = 'Mostrando todos los horarios';
-
-          wrap.appendChild(select);
-          wrap.appendChild(clearBtn);
-          wrap.appendChild(status);
-          center.appendChild(wrap);
-
-          function applyFilter(id){
-            const cal = ensureCalendar();
-            if (!cal) return;
-            const normalized = (id || '').trim();
-            const showAll = normalized === '';
-            cal.getEvents().forEach(ev => {
-              const props = ev.extendedProps || {};
-              const evId = normalizeId(props.carreraId || props.carrera || '');
-              const evName = normalizeName(props.carreraNombre || props.carrera_name || props.carreraLabel || '');
-              const targetId = normalizeId(normalized);
-              const targetName = normalizeName(normalized);
-              const match = showAll ? true : (evId && evId === targetId) || (evName && evName === targetName) || (normalizeName(carreraLabelFromEvent(ev)) === targetName);
-              // Toggle visibility without removing events
-              ev.setProp('display', match ? 'auto' : 'none');
-            });
-            if (showAll) {
-              status.textContent = 'Mostrando todos los horarios';
-              clearBtn.classList.add('is-hidden');
-            } else {
-              status.textContent = 'Filtrando por carrera: ' + normalized.toUpperCase();
-              clearBtn.classList.remove('is-hidden');
+          if (!carreraId && meta.moduloId != null) {
+            const modulo = findModuloById(meta.moduloId);
+            if (modulo) {
+              carreraId = modulo.carreraId ?? carreraId;
+              carreraLabel = carreraLabel || modulo.carreraNombre || modulo.nombre || null;
             }
           }
 
-          select.addEventListener('change', function(){
-            applyFilter(this.value);
-          });
-          clearBtn.addEventListener('click', function(){
-            select.value = '';
-            applyFilter('');
-          });
+          if (carreraId && !carreraLabel) {
+            const carrera = findCarreraById(carreraId);
+            if (carrera) {
+              carreraLabel = carrera.nombre || carrera.descripcion || carrera.id;
+            }
+          }
 
-          // Rebuild options when events change (e.g., load async)
-          const cal = ensureCalendar();
-          if (cal) {
-            cal.setOption('eventAdd', function(info){
-              const existingLabels = Array.from(select.options).map(o => o.textContent.toLowerCase());
-              const label = carreraLabelFromEvent(info.event);
-              if (label) {
-                const normalizedLabel = label.toString().trim().toLowerCase();
-                if (!existingLabels.includes(normalizedLabel)) {
-                  const opt = document.createElement('option');
-                  opt.value = label;
-                  opt.textContent = label.toUpperCase();
-                  select.appendChild(opt);
-                }
+          if (!carreraLabel && carreraId) {
+            carreraLabel = carreraId;
+          }
+
+          return {
+            id: carreraId != null ? String(carreraId) : '',
+            label: carreraLabel != null ? String(carreraLabel) : ''
+          };
+        }
+
+        function applyFilter(value){
+          state.value = value || '';
+          const calendar = ensureCalendar();
+          if (!calendar) return;
+          const target = normalizeText(state.value);
+          calendar.getEvents().forEach(ev => {
+            const info = extractCarreraInfo(ev);
+            const eventId = normalizeText(info.id);
+            const eventLabel = normalizeText(info.label);
+            const match = !target || eventId === target || (!eventId && eventLabel === target);
+            ev.setProp('display', match ? 'auto' : 'none');
+          });
+        }
+
+        function hookCalendar(calendar){
+          const cal = calendar || ensureCalendar();
+          if (!cal || cal.__carreraFilterHooked) return;
+          cal.__carreraFilterHooked = true;
+          ['eventAdd', 'eventChange', 'eventRemove', 'eventsSet'].forEach(optionName => {
+            const previous = cal.getOption(optionName);
+            cal.setOption(optionName, function(arg){
+              let result;
+              if (typeof previous === 'function') {
+                result = previous(arg);
               }
+              const refresh = () => {
+                try {
+                  applyFilter(state.value);
+                } catch (err) {
+                  console.warn('No se pudo actualizar el filtro de carreras', err);
+                }
+              };
+              if (result && typeof result.then === 'function') {
+                result.finally(refresh);
+              } else {
+                refresh();
+              }
+              return result;
             });
-            cal.setOption('eventRemove', function(){ /* no-op for now */ });
-          }
+          });
         }
 
-        // Try rendering filter after calendar is ready
-        let tries = 0;
-        (function waitToolbar(){
-          const center = getToolbarCenter();
-          if (center) { renderFilter(); return; }
-          if (tries++ < 20) setTimeout(waitToolbar, 300);
+        function attachToSelect(){
+          const select = document.getElementById('filter-carrera');
+          if (!select) {
+            setTimeout(attachToSelect, 400);
+            return;
+          }
+          if (!select.classList.contains('toolbar-filter-select')) {
+            select.classList.add('toolbar-filter-select');
+          }
+          if (!select.__carreraFilterEnhanced) {
+            select.__carreraFilterEnhanced = true;
+            select.addEventListener('change', () => {
+              applyFilter(select.value);
+            });
+          }
+          applyFilter(select.value);
+        }
+
+        document.addEventListener('ceduc:carreras-sync', () => {
+          const select = document.getElementById('filter-carrera');
+          if (select) {
+            applyFilter(select.value);
+          }
+        });
+
+        attachToSelect();
+        (function waitForCalendar(){
+          const cal = ensureCalendar();
+          if (!cal) {
+            setTimeout(waitForCalendar, 400);
+            return;
+          }
+          hookCalendar(cal);
+          const select = document.getElementById('filter-carrera');
+          if (select) applyFilter(select.value);
         })();
       })();
     })();
