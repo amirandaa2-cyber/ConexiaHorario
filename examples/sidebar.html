@@ -434,7 +434,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="assets/session-guard.js"></script>
+  <script src="assets/session-guard.js" onerror="console.warn('session-guard.js no disponible - continuando sin autenticación')"></script>
   <script>
     const CHANNEL_NAME = 'ceduc-calendar';
     const channel = new BroadcastChannel(CHANNEL_NAME);
@@ -623,23 +623,31 @@
     }
 
     async function authorizedFetch(url, options = {}) {
-      const headers = Object.assign({}, options.headers || {}, { 'Content-Type': 'application/json' });
-      const token = getStoredToken();
-      if (token) headers['Authorization'] = 'Bearer ' + token;
-      const opts = Object.assign({}, options, { headers });
-      return fetch(url, opts);
+      try {
+        const headers = Object.assign({}, options.headers || {}, { 'Content-Type': 'application/json' });
+        const token = getStoredToken();
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        const opts = Object.assign({}, options, { headers });
+        return fetch(url, opts);
+      } catch (err) {
+        console.error('authorizedFetch error:', err);
+        throw err;
+      }
     }
 
     async function fetchResourceAndShow(path, label) {
       showModalLoader(label);
       try {
         const response = await authorizedFetch(API_BASE + path);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          console.warn(`${label} - HTTP ${response.status}: ${response.statusText}`);
+          throw new Error(`HTTP ${response.status}`);
+        }
         const payload = await response.json();
         const records = Array.isArray(payload) ? payload : [];
         showModalData(label, records);
       } catch (err) {
-        console.error(label, err);
+        console.error(`${label} fetch error:`, err);
         showModalError(label);
       }
     }
@@ -647,22 +655,42 @@
     async function loadCarreras() {
       try {
         const r = await authorizedFetch(API_BASE + '/carreras');
-        const data = r.ok ? await r.json() : [];
-        return (data || []).map(c => ({ id: c.id || c.codigo || c.code || c._id, nombre: c.nombre || c.name || c.title || c.id }));
-      } catch (err) { console.error('carreras error', err); return []; }
+        if (!r.ok) {
+          console.warn('loadCarreras - HTTP', r.status);
+          return [];
+        }
+        const data = await r.json();
+        return (data || []).map(c => ({ 
+          id: c.id || c.codigo || c.code || c._id, 
+          nombre: c.nombre || c.name || c.title || c.id 
+        }));
+      } catch (err) { 
+        console.error('loadCarreras error:', err); 
+        return []; 
+      }
     }
 
     async function populateCarreraSelects() {
-      const carreras = await loadCarreras();
-      const carreraSelects = [document.getElementById('carrera-select'), document.getElementById('auto-carrera')];
-      for (const sel of carreraSelects) {
-        sel.innerHTML = '';
-        const optEmpty = document.createElement('option'); optEmpty.value = ''; optEmpty.textContent = '—'; sel.appendChild(optEmpty);
-        for (const c of carreras) {
-          const opt = document.createElement('option');
-          opt.value = c.id; opt.textContent = c.nombre;
-          sel.appendChild(opt);
+      try {
+        const carreras = await loadCarreras();
+        const carreraSelects = [document.getElementById('carrera-select'), document.getElementById('auto-carrera')];
+        for (const sel of carreraSelects) {
+          if (!sel) continue;
+          sel.innerHTML = '';
+          const optEmpty = document.createElement('option'); 
+          optEmpty.value = ''; 
+          optEmpty.textContent = '—'; 
+          sel.appendChild(optEmpty);
+          
+          for (const c of carreras) {
+            const opt = document.createElement('option');
+            opt.value = c.id; 
+            opt.textContent = c.nombre;
+            sel.appendChild(opt);
+          }
         }
+      } catch (err) {
+        console.error('populateCarreraSelects error:', err);
       }
     }
 
@@ -693,19 +721,50 @@
       const startDate = document.getElementById('auto-start').value || '';
       const weeks = parseInt(document.getElementById('auto-weeks').value || '1', 10) || 1;
       const resultEl = document.getElementById('auto-result');
+      
+      if (!carreraId) {
+        resultEl.textContent = 'Por favor selecciona una carrera';
+        resultEl.style.color = '#dc2626';
+        return;
+      }
+      
+      if (!startDate) {
+        resultEl.textContent = 'Por favor selecciona una fecha de inicio';
+        resultEl.style.color = '#dc2626';
+        return;
+      }
+      
       resultEl.textContent = 'Ejecutando…';
+      resultEl.style.color = '';
+      
       try {
-        const r = await authorizedFetch(API_BASE + '/auto-organizar', { method: 'POST', body: JSON.stringify({ carreraId, startDate, weeks }) });
-        const data = r.ok ? await r.json() : { error: 'Error ' + r.status };
+        const r = await authorizedFetch(API_BASE + '/auto-organizar', { 
+          method: 'POST', 
+          body: JSON.stringify({ carreraId, startDate, weeks }) 
+        });
+        
+        if (!r.ok) {
+          const errorText = await r.text().catch(() => 'Error desconocido');
+          console.error('auto-organizar HTTP error:', r.status, errorText);
+          resultEl.textContent = `Error del servidor (${r.status}): Funcionalidad no disponible`;
+          resultEl.style.color = '#dc2626';
+          return;
+        }
+        
+        const data = await r.json();
+        
         if (data.error) {
           resultEl.textContent = 'Error: ' + data.error;
+          resultEl.style.color = '#dc2626';
         } else {
-          resultEl.textContent = `Asignados: ${data.assigned}`;
+          resultEl.textContent = `✓ Asignados: ${data.assigned || 0} eventos`;
+          resultEl.style.color = '#10b981';
           channel.postMessage({ type: 'refresh-events' });
         }
       } catch (err) {
-        console.error('auto-organizar error', err);
-        resultEl.textContent = 'Error ejecutando auto-organizar';
+        console.error('auto-organizar error:', err);
+        resultEl.textContent = 'Error: No se pudo conectar con el servidor';
+        resultEl.style.color = '#dc2626';
       }
     });
 

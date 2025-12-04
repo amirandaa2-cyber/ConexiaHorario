@@ -3636,6 +3636,7 @@
                 storedEvents = dedupeEvents(storedEvents);
 
                 const filterCarrera = document.getElementById('filter-carrera')?.value || '';
+                console.log('[Calendar] events() - Total storedEvents después de dedup:', storedEvents.length);
                 console.log('[Calendar] events() - Filtro carrera activo:', filterCarrera || 'NINGUNO');
 
                 let bloquesEvents = storedEvents.map(event => {
@@ -3671,7 +3672,8 @@
                 });
                 // Garantizar unicidad también en la salida final
                 filteredEvents = dedupeEvents(filteredEvents);
-                console.log('[Calendar] events() - Eventos filtrados:', filteredEvents.length);
+                console.log('[Calendar] events() - Eventos después de filtro carrera:', filteredEvents.length);
+                console.log('[Calendar] events() - Eventos que se renderizarán:', filteredEvents.length);
                 successCallback(filteredEvents);
               } catch (err) {
                 console.error('Error cargando eventos para el calendario', err);
@@ -4938,12 +4940,11 @@
                 save(KEY_EVENTS, storedEvents);
 
                 // Actualizar UI
-                renderCarreras();
-                renderModulos();
-                renderDocentes();
-                refreshCalendarEvents();
-
-                alert(`Carrera "${c.nombre}" eliminada exitosamente.`);
+        renderCarreras();
+        poblarAutoOrganizarCarreras();
+        renderModulos();
+        renderDocentes();
+        refreshCalendarEvents();                alert(`Carrera "${c.nombre}" eliminada exitosamente.`);
               }
             });
 
@@ -7719,6 +7720,132 @@
         cancelBtn.addEventListener('click', onCancel);
       }
 
+      // Handler para Auto-Organizar Carrera desde API
+      async function handleAutoOrganizarCarrera() {
+        const carreraSelect = document.getElementById('auto-organizar-carrera');
+        const fechaInput = document.getElementById('auto-organizar-fecha');
+        const semanasInput = document.getElementById('auto-organizar-semanas');
+        const statusDiv = document.getElementById('auto-organizar-status');
+        const btn = document.getElementById('btn-auto-organizar-carrera');
+        
+        const carreraId = carreraSelect?.value || '';
+        const fechaInicio = fechaInput?.value || new Date().toISOString().split('T')[0];
+        const semanas = parseInt(semanasInput?.value || '1', 10) || 1;
+        
+        if (!carreraId) {
+          alert('Selecciona una carrera primero');
+          return;
+        }
+        
+        if (!USE_API) {
+          alert('El modo API está desactivado. Actívalo en Ajustes → Alternar Modo API');
+          return;
+        }
+        
+        console.log('[AUTO-ORGANIZAR Frontend] Request:', { carreraId, fechaInicio, semanas });
+        statusDiv.textContent = '⏳ Organizando...';
+        btn.disabled = true;
+        
+        try {
+          const response = await authorizedFetch(API_BASE + '/auto-organizar', {
+            method: 'POST',
+            body: JSON.stringify({ carreraId, fechaInicio, semanas })
+          });
+          
+          console.log('[AUTO-ORGANIZAR Frontend] Response status:', response.status);
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+            console.error('[AUTO-ORGANIZAR Frontend] Error response:', errorData);
+            statusDiv.textContent = `❌ Error ${response.status}: ${errorData.error || 'Fallo en servidor'}`;
+            alert(`Error al auto-organizar: ${errorData.error || response.statusText}`);
+            return;
+          }
+          
+          const data = await response.json();
+          console.log('[AUTO-ORGANIZAR Frontend] Respuesta recibida:', data);
+          console.log('[AUTO-ORGANIZAR Frontend] Total asignaciones:', data.asignaciones?.length || 0);
+          
+          if (!data.asignaciones || data.asignaciones.length === 0) {
+            statusDiv.textContent = '⚠️ Sin asignaciones generadas';
+            alert(data.mensaje || 'No se generaron asignaciones');
+            return;
+          }
+          
+          // Mapear asignaciones del backend a eventos de FullCalendar
+          console.log('[AUTO-ORGANIZAR Frontend] Mapeando asignaciones a eventos...');
+          let eventosAgregados = 0;
+          
+          for (const asignacion of data.asignaciones) {
+            try {
+              // Buscar datos completos del módulo
+              const modulo = modulos.find(m => m.id === asignacion.moduloId || String(m.id) === String(asignacion.moduloId));
+              const docente = docentes.find(d => d.id === asignacion.docenteId || String(d.id) === String(asignacion.docenteId));
+              const carrera = carreras.find(c => c.id === carreraId || String(c.id) === String(carreraId));
+              
+              const eventoFormateado = {
+                id: asignacion.eventoId || uuidv4(),
+                title: `${modulo?.nombre || asignacion.modulo} - ${docente?.nombre || asignacion.docente}`,
+                start: asignacion.start,
+                end: asignacion.end,
+                extendedProps: {
+                  moduloId: asignacion.moduloId,
+                  docenteId: asignacion.docenteId,
+                  salaId: asignacion.salaId,
+                  carreraId: carreraId,
+                  carreraNombre: carrera?.nombre || carrera?.codigo || carreraId,
+                  moduloNombre: modulo?.nombre || asignacion.modulo,
+                  docenteNombre: docente?.nombre || asignacion.docente,
+                  salaNombre: asignacion.sala,
+                  autoGenerado: true,
+                  __meta: {
+                    moduloId: String(asignacion.moduloId),
+                    docenteId: String(asignacion.docenteId),
+                    salaId: asignacion.salaId ? String(asignacion.salaId) : null
+                  }
+                }
+              };
+              
+              console.log('[AUTO-ORGANIZAR Frontend] Evento mapeado:', eventoFormateado);
+              
+              // Agregar al calendario (si estamos en modo API, el calendario llamará fetchEvents)
+              // También guardamos en storedEvents para persistencia
+              storedEvents.push(eventoFormateado);
+              eventosAgregados++;
+              
+              // Agregar visualmente al calendario
+              if (calendar) {
+                calendar.addEvent(eventoFormateado);
+              }
+              
+            } catch (mapError) {
+              console.error('[AUTO-ORGANIZAR Frontend] Error mapeando asignación:', asignacion, mapError);
+            }
+          }
+          
+          console.log(`[AUTO-ORGANIZAR Frontend] Eventos agregados al calendario: ${eventosAgregados}`);
+          console.log('[AUTO-ORGANIZAR Frontend] Total eventos en storedEvents:', storedEvents.length);
+          
+          // Guardar en localStorage si no estamos en modo API puro
+          if (!USE_API) {
+            save(KEY_EVENTS, storedEvents);
+          }
+          
+          // Refrescar calendario para asegurar renderizado
+          refreshCalendarEvents();
+          
+          statusDiv.textContent = `✅ ${eventosAgregados} eventos creados`;
+          alert(`Auto-organización completada:\n- ${eventosAgregados} eventos creados\n- ${data.errores?.length || 0} errores`);
+          
+        } catch (error) {
+          console.error('[AUTO-ORGANIZAR Frontend] Error crítico:', error);
+          statusDiv.textContent = `❌ Error: ${error.message}`;
+          alert(`Error de conexión: ${error.message}`);
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
       // Render operation history UI (simple list in sidebar)
       function renderAutoOpHistoryUI() {
         try {
@@ -8028,8 +8155,27 @@
         refreshCalendarEvents();
       }
 
+      // Poblar select de carreras para Auto-Organizar
+      function poblarAutoOrganizarCarreras() {
+        const select = document.getElementById('auto-organizar-carrera');
+        if (!select) return;
+        select.innerHTML = '<option value="">-- Seleccionar --</option>';
+        carreras.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.nombre || c.codigo || c.id;
+          select.appendChild(opt);
+        });
+      }
+
+      // Conectar botón Auto-Organizar
+      const btnAutoOrganizar = document.getElementById('btn-auto-organizar-carrera');
+      if (btnAutoOrganizar) {
+        btnAutoOrganizar.addEventListener('click', handleAutoOrganizarCarrera);
+      }
+
       // initial render
-      renderCarreras(); renderModulos(); renderDocentes(); refreshCalendarEvents();
+      renderCarreras(); renderModulos(); renderDocentes(); poblarAutoOrganizarCarreras(); refreshCalendarEvents();
       // Guardar automáticamente los eventos/estado antes de cerrar o recargar la página
       try { window.addEventListener('beforeunload', function () { try { persistEventsAndValidate(); } catch (e) { } }); } catch (e) { }
 
@@ -10330,7 +10476,7 @@
     </div>
   </div>
 
-  <!-- Export to PNG: loads html2canvas (CDN) and captures #calendar-wrap as a PNG -->
+  <!-- Export to PNG/PDF: loads html2canvas and jsPDF (CDN) and captures #calendar-wrap -->
   <script>
     (function () {
       function ensureHtml2Canvas(cb) {
@@ -10339,6 +10485,15 @@
         s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
         s.onload = cb;
         s.onerror = function () { alert('No se pudo cargar la dependencia html2canvas. Comprueba tu conexión.'); };
+        document.head.appendChild(s);
+      }
+
+      function ensureJsPDF(cb) {
+        if (window.jspdf && window.jspdf.jsPDF) return cb();
+        var s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        s.onload = cb;
+        s.onerror = function () { alert('No se pudo cargar la dependencia jsPDF. Comprueba tu conexión.'); };
         document.head.appendChild(s);
       }
 
@@ -10395,6 +10550,98 @@
           }
         });
       });
+
+      // Export to PDF functionality
+      var btnPdf = document.getElementById('export-pdf');
+      if (btnPdf) {
+        btnPdf.addEventListener('click', function () {
+          var self = this; 
+          self.disabled = true;
+          
+          ensureHtml2Canvas(function () {
+            ensureJsPDF(async function () {
+              try {
+                var calendarWrap = document.getElementById('calendar-wrap');
+                if (!calendarWrap) { 
+                  alert('No se encontró el contenedor del calendario (#calendar-wrap).'); 
+                  self.disabled = false; 
+                  return; 
+                }
+
+                // Ocultar elementos innecesarios temporalmente
+                var toHide = [];
+                var sidebar = document.getElementById('sidebar'); if (sidebar) toHide.push(sidebar);
+                var diag = document.getElementById('debug-diagnostics'); if (diag) toHide.push(diag);
+                var backdrop = document.getElementById('modal-backdrop'); if (backdrop) toHide.push(backdrop);
+                var runtime = document.getElementById('runtime-error'); if (runtime) toHide.push(runtime);
+                document.querySelectorAll('[role="dialog"]').forEach(function (d) { 
+                  if (d && d.style && d.style.display && d.style.display !== 'none') toHide.push(d); 
+                });
+
+                var prev = hideAndCollect(toHide);
+                
+                // Esperar a que se actualice el layout
+                await new Promise(function (r) { setTimeout(r, 150); });
+
+                // Capturar el calendario como canvas
+                var scale = Math.min(2, (window.devicePixelRatio || 1));
+                var canvas = await window.html2canvas(calendarWrap, { 
+                  backgroundColor: '#ffffff', 
+                  scale: scale,
+                  logging: false,
+                  useCORS: true
+                });
+
+                // Restaurar UI
+                restoreFromMap(prev);
+
+                // Crear el PDF
+                var imgData = canvas.toDataURL('image/png');
+                var imgWidth = canvas.width;
+                var imgHeight = canvas.height;
+
+                // Calcular dimensiones del PDF (landscape A4 o ajustado)
+                var jsPDF = window.jspdf.jsPDF;
+                var pdf = new jsPDF({
+                  orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
+                  unit: 'px',
+                  format: [imgWidth, imgHeight],
+                  compress: true
+                });
+
+                // Agregar la imagen al PDF
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+                // Agregar metadatos
+                var fecha = new Date().toLocaleDateString('es-ES');
+                pdf.setProperties({
+                  title: 'Horario Académico CEDUC',
+                  subject: 'Calendario de asignaciones',
+                  author: 'Sistema CEDUC',
+                  keywords: 'horario, calendario, ceduc',
+                  creator: 'FullCalendar + jsPDF'
+                });
+
+                // Guardar el PDF
+                var fileName = 'horario_ceduc_' + new Date().toISOString().split('T')[0] + '.pdf';
+                pdf.save(fileName);
+
+                self.disabled = false;
+              } catch (err) {
+                console.error('export pdf error', err);
+                alert('Error exportando PDF: ' + (err && err.message ? err.message : String(err)));
+                // Intentar restaurar diálogos
+                try { 
+                  document.querySelectorAll('[role="dialog"]').forEach(function (d) { 
+                    if (d) d.style.display = ''; 
+                  }); 
+                } catch (_) { }
+                self.disabled = false;
+              }
+            });
+          });
+        });
+      }
     })();
   </script>
 
