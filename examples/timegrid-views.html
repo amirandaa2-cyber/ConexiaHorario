@@ -594,7 +594,7 @@
     .modal-asignacion-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       margin-bottom: 24px;
       padding-bottom: 16px;
       border-bottom: 2px solid #f0f0f0;
@@ -605,6 +605,24 @@
       font-weight: 600;
       color: #2d3748;
       margin: 0;
+    }
+
+    .modal-asignacion-subtitle {
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: 6px;
+      font-weight: 400;
+      line-height: 1.4;
+      padding: 8px 12px;
+      background: #f9fafb;
+      border-radius: 6px;
+      border-left: 3px solid #d1d5db;
+      transition: all 0.3s ease;
+    }
+    
+    .modal-asignacion-subtitle strong {
+      color: #374151;
+      font-weight: 600;
     }
 
     .modal-asignacion-close {
@@ -1491,12 +1509,35 @@
       const docenteLegend = document.getElementById('assign-docente-legend');
       const docenteLegendDot = document.getElementById('assign-docente-legend-dot');
       const docenteLegendText = document.getElementById('assign-docente-legend-text');
+      const modalSubtitle = document.getElementById('modal-asignacion-subtitle');
       let horasWarnLogged = false;
+
+      // Función para actualizar el subtítulo con carrera y módulo seleccionados
+      function actualizarSubtitulo() {
+        if (!modalSubtitle) return;
+        const carreraId = selCarrera.value;
+        const moduloId = selModulo.value;
+        
+        const carreraNombre = carreraId ? (window.carreras || []).find(c => String(c.id) === String(carreraId))?.nombre || 'Sin nombre' : null;
+        const moduloNombre = moduloId ? (window.modulos || []).find(m => String(m.id) === String(moduloId))?.nombre || 'Sin nombre' : null;
+        
+        if (carreraNombre && moduloNombre) {
+          modalSubtitle.innerHTML = `<strong>Carrera:</strong> ${carreraNombre} | <strong>Módulo:</strong> ${moduloNombre}`;
+          modalSubtitle.style.color = '#059669';
+        } else if (carreraNombre) {
+          modalSubtitle.innerHTML = `<strong>Carrera:</strong> ${carreraNombre} | <em>Selecciona un módulo</em>`;
+          modalSubtitle.style.color = '#6b7280';
+        } else {
+          modalSubtitle.textContent = 'Selecciona una carrera y módulo para comenzar';
+          modalSubtitle.style.color = '#6b7280';
+        }
+      }
 
       function abrirModalAsignacion(context = {}) {
         try {
           cargarOpciones();
           precargarContexto(context);
+          actualizarSubtitulo(); // Actualizar subtítulo al abrir
           modalAsignacion.style.display = 'flex';
           modalAsignacion.setAttribute('aria-hidden', 'false');
           selCarrera && selCarrera.focus();
@@ -1531,22 +1572,13 @@
             selModulo.appendChild(o);
           });
           
-          // Docentes
+          // Docentes: inicialmente vacío, se carga al seleccionar carrera y módulo
           selDocente.innerHTML = '';
           const optDocenteVacio = document.createElement('option');
           optDocenteVacio.value = '';
-          optDocenteVacio.textContent = '-- Selecciona un docente --';
+          optDocenteVacio.textContent = '-- Primero selecciona carrera y módulo --';
           selDocente.appendChild(optDocenteVacio);
-          (window.docentes || []).filter(d => d.activo !== false).forEach(d => {
-            const o = document.createElement('option');
-            o.value = d.id;
-            o.textContent = d.nombre;
-            if (d.carreraId != null) o.dataset.carreraId = d.carreraId;
-            if (d.turno) o.dataset.turno = d.turno;
-            const contratoHoras = d.contratoHoras ?? d.contrato;
-            if (contratoHoras != null) o.dataset.contrato = contratoHoras;
-            selDocente.appendChild(o);
-          });
+          selDocente.disabled = true;
           
           // Salas
           selSala.innerHTML = '';
@@ -1567,10 +1599,82 @@
           actualizarLeyendaDocente();
         } catch (e) { console.error('cargarOpciones asignación', e); }
       }
+      // Función para cargar docentes filtrados desde la API
+      async function cargarDocentesFiltrados() {
+        const carreraId = selCarrera.value;
+        const moduloId = selModulo.value;
+        
+        // Limpiar dropdown de docentes
+        selDocente.innerHTML = '';
+        const optDocenteVacio = document.createElement('option');
+        optDocenteVacio.value = '';
+        
+        if (!carreraId || !moduloId) {
+          optDocenteVacio.textContent = '-- Primero selecciona carrera y módulo --';
+          selDocente.appendChild(optDocenteVacio);
+          selDocente.disabled = true;
+          actualizarLeyendaDocente();
+          return;
+        }
+        
+        // Mostrar loading
+        optDocenteVacio.textContent = '⏳ Cargando docentes disponibles...';
+        selDocente.appendChild(optDocenteVacio);
+        selDocente.disabled = true;
+        
+        try {
+          const response = await fetch(`/api/docentes-por-modulo-carrera?carreraId=${carreraId}&moduloId=${moduloId}`);
+          if (!response.ok) throw new Error('Error al cargar docentes');
+          
+          const docentes = await response.json();
+          console.log(`[Modal] Docentes filtrados recibidos: ${docentes.length}`);
+          
+          // Limpiar y llenar con docentes filtrados
+          selDocente.innerHTML = '';
+          const optVacio = document.createElement('option');
+          optVacio.value = '';
+          
+          if (docentes.length === 0) {
+            optVacio.textContent = '⚠️ No hay docentes disponibles para esta combinación';
+            selDocente.appendChild(optVacio);
+            selDocente.disabled = true;
+          } else {
+            optVacio.textContent = '-- Selecciona un docente --';
+            selDocente.appendChild(optVacio);
+            
+            docentes.forEach(d => {
+              const o = document.createElement('option');
+              o.value = d.id;
+              o.textContent = `${d.nombre} ${d.rut ? '(' + d.rut + ')' : ''}`;
+              if (d.contrato_hora_semanal != null) o.dataset.contrato = d.contrato_hora_semanal;
+              if (d.turno) o.dataset.turno = d.turno;
+              selDocente.appendChild(o);
+            });
+            
+            selDocente.disabled = false;
+          }
+        } catch (error) {
+          console.error('[Modal] Error cargando docentes:', error);
+          selDocente.innerHTML = '';
+          const optError = document.createElement('option');
+          optError.value = '';
+          optError.textContent = '❌ Error al cargar docentes';
+          selDocente.appendChild(optError);
+          selDocente.disabled = true;
+        }
+        
+        actualizarLeyendaDocente();
+      }
+
       selCarrera && selCarrera.addEventListener('change', () => {
         const cid = selCarrera.value;
         // Filtrar módulos por carrera
         selModulo.innerHTML = '';
+        const optVacio = document.createElement('option');
+        optVacio.value = '';
+        optVacio.textContent = '-- Selecciona un módulo --';
+        selModulo.appendChild(optVacio);
+        
         (window.modulos || []).filter(m => String(m.carreraId) === String(cid)).forEach(m => {
           const codigo = m.codigoAsignatura || m.codigo || m.id;
           const o = document.createElement('option');
@@ -1578,7 +1682,23 @@
           o.textContent = `${codigo} - ${m.nombre}`;
           selModulo.appendChild(o);
         });
+        
+        // Limpiar docentes y deshabilitar hasta que se seleccione módulo
+        selDocente.innerHTML = '';
+        const optDocenteVacio = document.createElement('option');
+        optDocenteVacio.value = '';
+        optDocenteVacio.textContent = '-- Selecciona primero un módulo --';
+        selDocente.appendChild(optDocenteVacio);
+        selDocente.disabled = true;
+        
+        actualizarSubtitulo();
         actualizarLeyendaDocente();
+      });
+      
+      // Evento change en módulo para cargar docentes filtrados
+      selModulo && selModulo.addEventListener('change', () => {
+        cargarDocentesFiltrados();
+        actualizarSubtitulo();
       });
 
       selDocente && selDocente.addEventListener('change', () => {
@@ -1708,13 +1828,24 @@
             selCarrera.dispatchEvent(new Event('change')); 
           }
           selModulo.value = ctx.moduloId;
+          
+          // Cargar docentes filtrados si hay carrera y módulo
+          if (selCarrera.value && selModulo.value) {
+            cargarDocentesFiltrados().then(() => {
+              // Precargar docente después de cargar la lista
+              if (ctx.docenteId) { 
+                selDocente.value = ctx.docenteId;
+                actualizarLeyendaDocente();
+              }
+            });
+          }
         }
         
-        // Precargar docente, sala y bloque si vienen
-        if (ctx.docenteId) { selDocente.value = ctx.docenteId; }
+        // Precargar sala y bloque si vienen
         if (ctx.salaId) { selSala.value = ctx.salaId; }
         if (ctx.bloqueNumero) { selBloque.value = ctx.bloqueNumero; }
         
+        actualizarSubtitulo();
         actualizarLeyendaDocente();
       }
 
@@ -9254,7 +9385,12 @@
   <div id="modal-asignacion" class="modal-asignacion-overlay" aria-hidden="true">
     <div class="modal-asignacion" role="dialog" aria-modal="true" aria-labelledby="modal-asignacion-title">
       <div class="modal-asignacion-header">
-        <h3 id="modal-asignacion-title" class="modal-asignacion-title">Asignar Módulo</h3>
+        <div style="flex: 1;">
+          <h3 id="modal-asignacion-title" class="modal-asignacion-title">Asignar Módulo</h3>
+          <div id="modal-asignacion-subtitle" class="modal-asignacion-subtitle">
+            Selecciona una carrera y módulo para comenzar
+          </div>
+        </div>
         <button type="button" id="btn-cerrar-asignacion" class="modal-asignacion-close" aria-label="Cerrar">×</button>
       </div>
       <form id="form-asignacion" class="asignacion-form">
