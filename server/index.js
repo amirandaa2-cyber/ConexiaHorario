@@ -58,16 +58,12 @@ async function asignarEvento({ moduloId, docenteId, start, end }) {
 	const titleRow = await db.query('SELECT nombre, carrera_id FROM modulos WHERE id=$1', [moduloId]);
 	const title = titleRow.rows[0]?.nombre || `Módulo ${moduloId}`;
 	const carreraId = titleRow.rows[0]?.carrera_id ? String(titleRow.rows[0].carrera_id) : null;
-	const meta = {
-		moduloId,
-		docenteId,
-		...(carreraId ? { carreraId } : {})
-	};
+	const extendedProps = mergeMetaIntoExtendedProps({}, { moduloId, docenteId, carreraId });
 	await db.query(
 		`INSERT INTO events (id, title, start, "end", modulo_id, docente_id, extendedProps)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 ON CONFLICT (title, start, "end") DO NOTHING`,
-		[id, title, start, end, moduloId, docenteId, JSON.stringify({ __meta: meta })]
+		[id, title, start, end, moduloId, docenteId, JSON.stringify(extendedProps)]
 	);
 	return { id };
 }
@@ -150,11 +146,16 @@ function extractEventLinking(payload = {}) {
 	const moduloCandidate = payload.modulo_id ?? payload.moduloId ?? meta.moduloId ?? meta.modulo_id ?? meta.modulo;
 	const docenteCandidate = payload.docente_id ?? payload.docenteId ?? meta.docenteId ?? meta.docente_id;
 	const salaCandidate = payload.sala_id ?? payload.salaId ?? meta.salaId ?? meta.sala_id;
+	const carreraCandidate =
+		payload.carrera_id ??
+		payload.carreraId ??
+		(payload.extendedProps ? payload.extendedProps.carreraId ?? payload.extendedProps.carrera : undefined) ??
+		meta.carreraId ?? meta.carrera_id;
 	return {
 		moduloId: toSafeInteger(moduloCandidate),
 		docenteId: docenteCandidate ? String(docenteCandidate).trim() : null,
 		salaId: salaCandidate ? String(salaCandidate).trim() : null,
-		carreraId: meta.carreraId ? String(meta.carreraId).trim() : null
+		carreraId: carreraCandidate ? String(carreraCandidate).trim() : null
 	};
 }
 
@@ -291,15 +292,24 @@ function normalizeTemplatePayload(raw = {}) {
 
 function mergeMetaIntoExtendedProps(baseProps = {}, linking = {}) {
 	const safeProps = baseProps && typeof baseProps === 'object' ? { ...baseProps } : {};
-	const existingMeta = safeProps.__meta && typeof safeProps.__meta === 'object' ? safeProps.__meta : {};
+	const existingMetaRaw = safeProps.__meta && typeof safeProps.__meta === 'object' ? safeProps.__meta : {};
+	const existingMeta = { ...existingMetaRaw };
+	const legacyCarreraMeta = existingMeta && Object.prototype.hasOwnProperty.call(existingMeta, 'carreraId') ? existingMeta.carreraId : null;
+	if (legacyCarreraMeta !== null) {
+		delete existingMeta.carreraId;
+	}
 	const mergedMeta = {
 		...existingMeta,
 		...(linking.moduloId !== null && linking.moduloId !== undefined ? { moduloId: String(linking.moduloId) } : {}),
 		...(linking.docenteId ? { docenteId: String(linking.docenteId) } : {}),
-		...(linking.salaId ? { salaId: String(linking.salaId) } : {}),
-		...(linking.carreraId ? { carreraId: String(linking.carreraId) } : {})
+		...(linking.salaId ? { salaId: String(linking.salaId) } : {})
 	};
 	safeProps.__meta = mergedMeta;
+	if (linking.carreraId) {
+		safeProps.carreraId = String(linking.carreraId);
+	} else if (safeProps.carreraId === undefined && legacyCarreraMeta) {
+		safeProps.carreraId = String(legacyCarreraMeta);
+	}
 	return safeProps;
 }
 
@@ -314,7 +324,7 @@ function mapEventRow(row) {
 		carreraId:
 			row.modulo_carrera !== null && row.modulo_carrera !== undefined
 				? String(row.modulo_carrera)
-				: existingMeta.carreraId ?? null
+				: baseProps.carreraId ?? existingMeta.carreraId ?? null
 	};
 	const extendedProps = mergeMetaIntoExtendedProps(baseProps, linking);
 	return {

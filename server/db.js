@@ -209,7 +209,7 @@ async function initializeSchema() {
 			COALESCE(carrera_id, '__global__'),
 			semana,
 			"año"
-		)`
+		)`,
 		`CREATE TABLE IF NOT EXISTS auth_role (
 			id SERIAL PRIMARY KEY,
 			code TEXT UNIQUE NOT NULL,
