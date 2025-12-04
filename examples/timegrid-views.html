@@ -1897,6 +1897,9 @@
               moduloId: modulo ? modulo.id : null, 
               docenteId: selDocente.value || null, 
               salaId: selSala.value || null,
+              carreraId: carrera ? carrera.id : null,  // CORRECCI\u00d3N: Agregar carreraId a __meta
+              carreraNombre: carrera ? carrera.nombre : null,  // CORRECCI\u00d3N: Agregar nombre de carrera
+              carreraCodigo: carrera ? carrera.codigo : null,  // CORRECCI\u00d3N: Agregar c\u00f3digo de carrera
               bloques: durBloques,
               horas: horas,
               bloqueInicio: bloqueNum,
@@ -1905,6 +1908,7 @@
             }
           }
         };
+        console.log('[MODAL ASIGNAR] Evento creado con carrera:', carrera ? carrera.nombre : 'Sin carrera', ev.extendedProps.__meta);
         return ajustarEventoABloque(ev);
       }
 
@@ -8329,14 +8333,27 @@
         if (meta.salaId) salaSel.value = meta.salaId;
         const carreraInput = document.getElementById('edit-carrera');
         if (carreraInput) {
-          const moduloFromMeta = meta.moduloId ? (modulos || []).find(m => String(m.id) === String(meta.moduloId)) : null;
-          const carreraId = meta.carreraId || (moduloFromMeta ? moduloFromMeta.carreraId : null);
+          // CORRECCI\u00d3N: Priorizar carreraNombre de __meta que viene del backend
           let carreraLabel = 'Sin carrera asignada';
-          if (carreraId) {
-            const carrera = (carreras || []).find(c => String(c.id) === String(carreraId));
-            carreraLabel = carrera ? `${carrera.nombre} (${carrera.id})` : carreraId;
+          
+          if (meta.carreraNombre) {
+            // Si tenemos el nombre directo de la carrera, usarlo
+            carreraLabel = meta.carreraCodigo ? `${meta.carreraNombre} (${meta.carreraCodigo})` : meta.carreraNombre;
+          } else if (meta.carreraId) {
+            // Fallback: buscar la carrera por ID
+            const carrera = (carreras || []).find(c => String(c.id) === String(meta.carreraId));
+            carreraLabel = carrera ? `${carrera.nombre} (${carrera.codigo || carrera.id})` : `Carrera ${meta.carreraId}`;
+          } else {
+            // \u00daltimo recurso: buscar por m\u00f3dulo
+            const moduloFromMeta = meta.moduloId ? (modulos || []).find(m => String(m.id) === String(meta.moduloId)) : null;
+            if (moduloFromMeta && moduloFromMeta.carreraId) {
+              const carrera = (carreras || []).find(c => String(c.id) === String(moduloFromMeta.carreraId));
+              carreraLabel = carrera ? `${carrera.nombre} (${carrera.codigo || carrera.id})` : `Carrera ${moduloFromMeta.carreraId}`;
+            }
           }
+          
           carreraInput.value = carreraLabel;
+          console.log('[MODAL EDITAR] Carrera cargada:', carreraLabel, 'meta:', meta);
         }
         document.getElementById('edit-hours-worked').value = 0;
         document.getElementById('edit-apply-remaining').checked = false;
@@ -8405,6 +8422,10 @@
           se.extendedProps.__meta.bloques = newBlocks;
           se.extendedProps.__meta.bloqueInicio = startIdx + 1;
           se.extendedProps.__meta.bloqueFin = endIdx + 1;
+          // CORRECCI\u00d3N: Preservar carreraId, carreraNombre y carreraCodigo al editar
+          if (meta.carreraId) se.extendedProps.__meta.carreraId = meta.carreraId;
+          if (meta.carreraNombre) se.extendedProps.__meta.carreraNombre = meta.carreraNombre;
+          if (meta.carreraCodigo) se.extendedProps.__meta.carreraCodigo = meta.carreraCodigo;
           try {
             currentEditingEvent.setStart(startDateObj);
             currentEditingEvent.setEnd(endDateObj);
