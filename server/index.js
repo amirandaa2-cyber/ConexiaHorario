@@ -1296,6 +1296,213 @@ if(dbReady){
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }
 	});
+
+	// =====================================================
+	// ENDPOINT: Auto-organizar (usando disponibilidad_horaria)
+	// =====================================================
+	app.post('/api/auto-organizar', async (req, res) => {
+		try {
+			const { carreraId, semanas = 1, fechaInicio } = req.body;
+
+			if (!carreraId) {
+				return res.status(400).json({ error: 'carreraId es obligatorio' });
+			}
+
+			// 1. Obtener módulos de la carrera que no tienen asignaciones suficientes
+			const { rows: modulos } = await db.query(
+				`SELECT m.id, m.nombre, m.codigo_asignatura, m."horasSemana", 
+				        COALESCE(m."horasSemana", 0) AS horas_requeridas,
+				        COUNT(e.id) * ${BLOCK_MINUTES / 60.0} AS horas_asignadas
+				 FROM modulos m
+				 LEFT JOIN events e ON e.modulo_id = m.id
+				 WHERE m.carrera_id = $1
+				 GROUP BY m.id
+				 HAVING COALESCE(m."horasSemana", 0) > COUNT(e.id) * ${BLOCK_MINUTES / 60.0}
+				 ORDER BY m."horasSemana" DESC`,
+				[carreraId]
+			);
+
+			if (!modulos.length) {
+				return res.json({ 
+					ok: true, 
+					mensaje: 'No hay módulos pendientes de asignar', 
+					asignaciones: [] 
+				});
+			}
+
+			// 2. Obtener docentes disponibles para esta carrera (ordenados por prioridad)
+			const docentes = await getDocentesPorCarrera(carreraId);
+
+			if (!docentes.length) {
+				return res.status(400).json({ 
+					error: 'No hay docentes asignados a esta carrera' 
+				});
+			}
+
+			// 3. Configurar fechas de asignación
+			const fechaBase = fechaInicio ? new Date(fechaInicio) : new Date();
+			const asignaciones = [];
+			const errores = [];
+
+			// 4. Para cada módulo, intentar asignar bloques
+			for (const modulo of modulos) {
+				const horasPendientes = modulo.horas_requeridas - modulo.horas_asignadas;
+				const bloquesPendientes = Math.ceil(horasPendientes / (BLOCK_MINUTES / 60.0));
+
+				// Verificar preferencias de docente para este módulo
+				const { rows: preferencias } = await db.query(
+					`SELECT docente_rut FROM modulo_docente_preferencias 
+					 WHERE codigo_modulo = $1`,
+					[modulo.codigo_asignatura]
+				);
+
+				// Priorizar docente preferido si existe
+				let docentesOrdenados = [...docentes];
+				if (preferencias.length > 0) {
+					const rutPreferido = preferencias[0].docente_rut;
+					const docentePreferido = docentes.find(d => d.id === rutPreferido || d.rut === rutPreferido);
+					if (docentePreferido) {
+						docentesOrdenados = [
+							docentePreferido,
+							...docentes.filter(d => d.id !== docentePreferido.id)
+						];
+					}
+				}
+
+				// Intentar asignar bloques a lo largo de las semanas
+				let bloquesAsignados = 0;
+				for (let semana = 0; semana < semanas && bloquesAsignados < bloquesPendientes; semana++) {
+					// Recorrer días de la semana (Lunes=1 a Viernes=5)
+					for (let diaSemana = 1; diaSemana <= 5 && bloquesAsignados < bloquesPendientes; diaSemana++) {
+						// Calcular fecha específica
+						const fecha = new Date(fechaBase);
+						fecha.setDate(fecha.getDate() + (semana * 7) + (diaSemana - 1));
+
+						// Recorrer bloques del día (1-22)
+						for (let bloque = 1; bloque <= 22 && bloquesAsignados < bloquesPendientes; bloque++) {
+							// Buscar docente disponible con mejor score
+							let mejorDocente = null;
+							let mejorScore = 0;
+							let mejorSala = null;
+
+							for (const docente of docentesOrdenados) {
+								// Verificar disponibilidad del docente
+								const disponible = await docenteDisponibleEnBloque(
+									docente.id, 
+									diaSemana, 
+									bloque, 
+									fecha
+								);
+
+								if (!disponible) continue;
+
+								// Verificar carga del docente
+								const carga = await getCargaDocente(docente.id);
+								const bloquesContrato = (carga.contratoSemana * 60) / BLOCK_MINUTES;
+								if (carga.bloques >= bloquesContrato) continue;
+
+								// Obtener salas disponibles
+								const salas = await obtenerSalasDisponibles(carreraId, diaSemana, bloque, bloque);
+								
+								for (const sala of salas) {
+									// Calcular timestamp para el bloque
+									const startTime = new Date(fecha);
+									const horaInicio = 8 * 60 + 30 + (bloque - 1) * BLOCK_MINUTES;
+									startTime.setHours(Math.floor(horaInicio / 60), horaInicio % 60, 0, 0);
+									
+									const endTime = new Date(startTime);
+									endTime.setMinutes(endTime.getMinutes() + BLOCK_MINUTES);
+
+									// Validar que la sala esté libre
+									const salaLibre = await validarConflictosSala(sala.id, startTime, endTime);
+									if (!salaLibre) continue;
+
+									// Calcular score de esta combinación
+									const score = await calcularScoreDisponibilidad(
+										docente.id,
+										sala.id,
+										modulo.id,
+										diaSemana,
+										bloque,
+										fecha
+									);
+
+									if (score > mejorScore) {
+										mejorScore = score;
+										mejorDocente = docente;
+										mejorSala = sala;
+									}
+								}
+							}
+
+							// Si encontramos una buena combinación, asignar el evento
+							if (mejorDocente && mejorSala && mejorScore > 0) {
+								try {
+									const startTime = new Date(fecha);
+									const horaInicio = 8 * 60 + 30 + (bloque - 1) * BLOCK_MINUTES;
+									startTime.setHours(Math.floor(horaInicio / 60), horaInicio % 60, 0, 0);
+									
+									const endTime = new Date(startTime);
+									endTime.setMinutes(endTime.getMinutes() + BLOCK_MINUTES);
+
+									const resultado = await asignarEvento({
+										moduloId: modulo.id,
+										docenteId: mejorDocente.id,
+										salaId: mejorSala.id,
+										start: startTime.toISOString(),
+										end: endTime.toISOString()
+									});
+
+									asignaciones.push({
+										eventoId: resultado.id,
+										modulo: modulo.nombre,
+										docente: mejorDocente.nombre,
+										sala: mejorSala.nombre,
+										fecha: fecha.toISOString().split('T')[0],
+										bloque,
+										score: mejorScore
+									});
+
+									bloquesAsignados++;
+								} catch (error) {
+									errores.push({
+										modulo: modulo.nombre,
+										error: error.message
+									});
+								}
+							}
+						}
+					}
+				}
+
+				// Si no se pudieron asignar todos los bloques necesarios
+				if (bloquesAsignados < bloquesPendientes) {
+					errores.push({
+						modulo: modulo.nombre,
+						mensaje: `Solo se asignaron ${bloquesAsignados} de ${bloquesPendientes} bloques requeridos`
+					});
+				}
+			}
+
+			res.json({
+				ok: true,
+				asignaciones,
+				errores: errores.length > 0 ? errores : undefined,
+				resumen: {
+					totalAsignaciones: asignaciones.length,
+					modulosProcesados: modulos.length,
+					errores: errores.length
+				}
+			});
+
+		} catch (error) {
+			console.error('Error en auto-organizar:', error);
+			res.status(500).json({ 
+				error: 'Error al auto-organizar', 
+				details: error.message 
+			});
+		}
+	});
 } else {
 	// DB missing — return 503 for API routes
 	app.get('/api/*', (req,res)=>{ res.status(503).json({ error: 'DB not available on server. Define DATABASE_URL to enable API endpoints.' }); });
