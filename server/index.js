@@ -44,18 +44,17 @@ const BLOCK_MINUTES = 35;
 // DAO helpers for auto-organize
 async function getDocentesPorCarrera(carreraId) {
 	const { rows } = await db.query(
-		`SELECT d.id, d.nombre, d.contrato_hora_semanal AS contrato_semana,
-						dc.activo, COALESCE(dc.prioridad, 999) AS prioridad
-			 FROM docente_carrera dc
+		`SELECT d.id, d.nombre, d.rut, d.contrato_hora_semanal AS contrato_semana,
+						COALESCE(dc.prioridad, 999) AS prioridad
+			 FROM docentes_carreras dc
 			 JOIN docentes d ON d.id = dc.docente_id
-			WHERE dc.carrera_id = $1 AND COALESCE(dc.activo, TRUE)
-			ORDER BY prioridad ASC, d.nombre ASC`,
+		WHERE dc.carrera_id = $1
+		ORDER BY prioridad ASC, d.nombre ASC`,
 		[String(carreraId).trim()]
 	);
+	console.log(`[auto-organizar] Docentes encontrados para carrera ${carreraId}:`, rows.length);
 	return rows;
-}
-
-async function getCargaDocente(docenteId) {
+}async function getCargaDocente(docenteId) {
 	const { rows } = await db.query(
 		`SELECT COALESCE(SUM(ROUND(EXTRACT(EPOCH FROM ("end" - start)) / (60.0 * $2))), 0)::int AS bloques,
 					COALESCE(MAX(d.contrato_hora_semanal), 0) AS contrato_semana
@@ -1303,6 +1302,7 @@ if(dbReady){
 	app.post('/api/auto-organizar', async (req, res) => {
 		try {
 			const { carreraId, semanas = 1, fechaInicio } = req.body;
+			console.log('[auto-organizar] Petición recibida:', { carreraId, semanas, fechaInicio });
 
 			if (!carreraId) {
 				return res.status(400).json({ error: 'carreraId es obligatorio' });
@@ -1312,21 +1312,24 @@ if(dbReady){
 			const { rows: modulos } = await db.query(
 				`SELECT m.id, m.nombre, m.codigo_asignatura, m."horasSemana", 
 				        COALESCE(m."horasSemana", 0) AS horas_requeridas,
-				        COUNT(e.id) * ${BLOCK_MINUTES / 60.0} AS horas_asignadas
+				        COALESCE(SUM(EXTRACT(EPOCH FROM (e."end" - e.start)) / 3600.0), 0) AS horas_asignadas
 				 FROM modulos m
 				 LEFT JOIN events e ON e.modulo_id = m.id
 				 WHERE m.carrera_id = $1
 				 GROUP BY m.id
-				 HAVING COALESCE(m."horasSemana", 0) > COUNT(e.id) * ${BLOCK_MINUTES / 60.0}
+				 HAVING COALESCE(m."horasSemana", 0) > COALESCE(SUM(EXTRACT(EPOCH FROM (e."end" - e.start)) / 3600.0), 0)
 				 ORDER BY m."horasSemana" DESC`,
 				[carreraId]
 			);
+			console.log('[auto-organizar] Módulos pendientes:', modulos.length);
 
 			if (!modulos.length) {
+				console.log('[auto-organizar] No hay módulos pendientes');
 				return res.json({ 
 					ok: true, 
 					mensaje: 'No hay módulos pendientes de asignar', 
-					asignaciones: [] 
+					asignaciones: [],
+					resumen: { totalAsignaciones: 0, modulosProcesados: 0, errores: 0 }
 				});
 			}
 
@@ -1334,13 +1337,21 @@ if(dbReady){
 			const docentes = await getDocentesPorCarrera(carreraId);
 
 			if (!docentes.length) {
+				console.log('[auto-organizar] No hay docentes para esta carrera');
 				return res.status(400).json({ 
-					error: 'No hay docentes asignados a esta carrera' 
+					error: 'No hay docentes asignados a esta carrera en docentes_carreras' 
 				});
 			}
 
 			// 3. Configurar fechas de asignación
-			const fechaBase = fechaInicio ? new Date(fechaInicio) : new Date();
+			let fechaBase = fechaInicio ? new Date(fechaInicio + 'T00:00:00') : new Date();
+			// Ajustar al próximo lunes si no es lunes
+			const diaSemana = fechaBase.getDay();
+			if (diaSemana !== 1) {
+				const diasHastaLunes = diaSemana === 0 ? 1 : (8 - diaSemana);
+				fechaBase.setDate(fechaBase.getDate() + diasHastaLunes);
+			}
+			console.log('[auto-organizar] Fecha base (lunes):', fechaBase.toISOString().split('T')[0]);
 			const asignaciones = [];
 			const errores = [];
 
@@ -1348,6 +1359,7 @@ if(dbReady){
 			for (const modulo of modulos) {
 				const horasPendientes = modulo.horas_requeridas - modulo.horas_asignadas;
 				const bloquesPendientes = Math.ceil(horasPendientes / (BLOCK_MINUTES / 60.0));
+				console.log(`[auto-organizar] Módulo: ${modulo.nombre} - Req: ${modulo.horas_requeridas}h, Asig: ${modulo.horas_asignadas}h, Pendientes: ${bloquesPendientes} bloques`);
 
 				// Verificar preferencias de docente para este módulo
 				const { rows: preferencias } = await db.query(
@@ -1374,7 +1386,7 @@ if(dbReady){
 				for (let semana = 0; semana < semanas && bloquesAsignados < bloquesPendientes; semana++) {
 					// Recorrer días de la semana (Lunes=1 a Viernes=5)
 					for (let diaSemana = 1; diaSemana <= 5 && bloquesAsignados < bloquesPendientes; diaSemana++) {
-						// Calcular fecha específica
+						// Calcular fecha específica (Lunes base + días)
 						const fecha = new Date(fechaBase);
 						fecha.setDate(fecha.getDate() + (semana * 7) + (diaSemana - 1));
 
@@ -1484,6 +1496,12 @@ if(dbReady){
 				}
 			}
 
+			console.log('[auto-organizar] Resultado final:', {
+				totalAsignaciones: asignaciones.length,
+				modulosProcesados: modulos.length,
+				errores: errores.length
+			});
+
 			res.json({
 				ok: true,
 				asignaciones,
@@ -1496,10 +1514,11 @@ if(dbReady){
 			});
 
 		} catch (error) {
-			console.error('Error en auto-organizar:', error);
+			console.error('[auto-organizar] ERROR CRÍTICO:', error);
 			res.status(500).json({ 
 				error: 'Error al auto-organizar', 
-				details: error.message 
+				details: error.message,
+				stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
 			});
 		}
 	});
