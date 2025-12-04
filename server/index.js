@@ -1327,195 +1327,191 @@ if(dbReady){
 	});
 
 	// =====================================================
-	// ENDPOINT: Auto-organizar (usando disponibilidad_horaria)
+	// =====================================================
+	// ENDPOINT: Auto-organizar carrera (versión optimizada)
 	// =====================================================
 	app.post('/api/auto-organizar', async (req, res) => {
 		try {
-			const { carreraId, semanas = 1, fechaInicio } = req.body;
-			console.log('[AUTO-ORGANIZAR] Request recibido:', { carreraId, semanas, fechaInicio });
+			const { carreraId, semanas = 1, fechaInicio, turno = 'Diurno' } = req.body;
+			console.log('[AUTO-ORGANIZAR] Iniciando auto-organizaci\u00f3n:', { carreraId, semanas, fechaInicio, turno });
 
 			if (!carreraId) {
 				console.warn('[AUTO-ORGANIZAR] Error: carreraId faltante');
 				return res.status(400).json({ error: 'carreraId es obligatorio' });
 			}
 
-			// 1. Obtener módulos de la carrera que no tienen asignaciones suficientes
+			// Definir rangos horarios seg\u00fan turno
+			const rangosHorarios = {
+				Diurno: { 
+					bloqueInicio: 1,  // 08:30
+					bloqueFin: 11,    // 14:00 (aprox)
+					horaInicio: 8.5,
+					horaFin: 14
+				},
+				Vespertino: { 
+					bloqueInicio: 18, // 18:00
+					bloqueFin: 22,    // 22:00
+					horaInicio: 18,
+					horaFin: 22
+				}
+			};
+
+			const rango = rangosHorarios[turno] || rangosHorarios.Diurno;
+			console.log(`[AUTO-ORGANIZAR] Turno ${turno}: bloques ${rango.bloqueInicio}-${rango.bloqueFin}`);
+
+			// 1. Obtener TODOS los módulos de la carrera (sin filtrar por asignaciones previas)
 			const { rows: modulos } = await db.query(
-				`SELECT m.id, m.nombre, m.codigo_asignatura, m."horasSemana", 
-				        COALESCE(m."horasSemana", 0) AS horas_requeridas,
-				        COUNT(e.id) * ${BLOCK_MINUTES / 60.0} AS horas_asignadas
+				`SELECT m.id, m.nombre, m.codigo_asignatura, m."horasSemana", m.turno
 				 FROM modulos m
-				 LEFT JOIN events e ON e.modulo_id = m.id
 				 WHERE m.carrera_id = $1
-				 GROUP BY m.id
-				 HAVING COALESCE(m."horasSemana", 0) > COUNT(e.id) * ${BLOCK_MINUTES / 60.0}
 				 ORDER BY m."horasSemana" DESC`,
 				[carreraId]
 			);
 
-			console.log(`[AUTO-ORGANIZAR] Módulos pendientes encontrados: ${modulos.length}`);
+			console.log(`[AUTO-ORGANIZAR] M\u00f3dulos encontrados: ${modulos.length}`);
 			if (!modulos.length) {
-				console.log('[AUTO-ORGANIZAR] Sin módulos pendientes, finalizando');
+				console.log('[AUTO-ORGANIZAR] Sin m\u00f3dulos para la carrera, finalizando');
 				return res.json({ 
 					ok: true, 
-					mensaje: 'No hay módulos pendientes de asignar', 
+					mensaje: 'No hay m\u00f3dulos en esta carrera', 
 					asignaciones: [] 
 				});
 			}
 
-			// 2. Obtener docentes disponibles para esta carrera (ordenados por prioridad)
+			// 2. Obtener docentes asignados a esta carrera
 			const docentes = await getDocentesPorCarrera(carreraId);
 			console.log(`[AUTO-ORGANIZAR] Docentes elegibles: ${docentes.length}`);
 
 			if (!docentes.length) {
 				console.warn('[AUTO-ORGANIZAR] Error: sin docentes para carrera', carreraId);
 				return res.status(400).json({ 
-					error: 'No hay docentes asignados a esta carrera' 
+					error: 'No hay docentes asignados a esta carrera en docentes_carreras' 
 				});
 			}
 
-			// 3. Configurar fechas de asignación
+			// 3. Obtener salas disponibles
+			const { rows: todasLasSalas } = await db.query(
+				`SELECT id, nombre, capacidad FROM salas ORDER BY nombre ASC`
+			);
+			console.log(`[AUTO-ORGANIZAR] Salas disponibles: ${todasLasSalas.length}`);
+
+			// 4. Configurar fechas de asignaci\u00f3n
 			const fechaBase = fechaInicio ? new Date(fechaInicio) : new Date();
 			const asignaciones = [];
 			const errores = [];
+			let docenteIndex = 0; // Para rotar entre docentes
 
-			// 4. Para cada módulo, intentar asignar bloques
+			// 5. Para cada m\u00f3dulo, calcular bloques necesarios y asignar
 			for (const modulo of modulos) {
-				const horasPendientes = modulo.horas_requeridas - modulo.horas_asignadas;
-				const bloquesPendientes = Math.ceil(horasPendientes / (BLOCK_MINUTES / 60.0));
+				// SOLUCI\u00d3N 4: Calcular duraci\u00f3n real del m\u00f3dulo en bloques
+				const horasSemanales = Number(modulo.horasSemana) || 0;
+				const bloquesNecesarios = Math.ceil((horasSemanales * 60) / BLOCK_MINUTES);
+				
+				console.log(`[AUTO-ORGANIZAR] M\u00f3dulo "${modulo.nombre}": ${horasSemanales}h/sem = ${bloquesNecesarios} bloques necesarios`);
 
-				// Verificar preferencias de docente para este módulo
-				const { rows: preferencias } = await db.query(
-					`SELECT docente_rut FROM modulo_docente_preferencias 
-					 WHERE codigo_modulo = $1`,
-					[modulo.codigo_asignatura]
-				);
-
-				// Priorizar docente preferido si existe
-				let docentesOrdenados = [...docentes];
-				if (preferencias.length > 0) {
-					const rutPreferido = preferencias[0].docente_rut;
-					const docentePreferido = docentes.find(d => d.id === rutPreferido || d.rut === rutPreferido);
-					if (docentePreferido) {
-						docentesOrdenados = [
-							docentePreferido,
-							...docentes.filter(d => d.id !== docentePreferido.id)
-						];
-					}
+				if (bloquesNecesarios === 0) {
+					console.log(`[AUTO-ORGANIZAR] M\u00f3dulo sin horas semanales, omitiendo`);
+					continue;
 				}
 
-				// Intentar asignar bloques a lo largo de las semanas
+				// SOLUCI\u00d3N 2: Rotar entre docentes (no asignar el mismo a todos)
+				const docenteAsignado = docentes[docenteIndex % docentes.length];
+				docenteIndex++;
+
+				console.log(`[AUTO-ORGANIZAR] Docente asignado: ${docenteAsignado.nombre} (${docenteAsignado.id})`);
+
+				// Intentar asignar todos los bloques necesarios
 				let bloquesAsignados = 0;
-				for (let semana = 0; semana < semanas && bloquesAsignados < bloquesPendientes; semana++) {
-					// Recorrer días de la semana (Lunes=1 a Viernes=5)
-					for (let diaSemana = 1; diaSemana <= 5 && bloquesAsignados < bloquesPendientes; diaSemana++) {
-						// Calcular fecha específica
+
+				for (let semana = 0; semana < semanas && bloquesAsignados < bloquesNecesarios; semana++) {
+					for (let diaSemana = 1; diaSemana <= 5 && bloquesAsignados < bloquesNecesarios; diaSemana++) {
+						// Calcular fecha del día
 						const fecha = new Date(fechaBase);
 						fecha.setDate(fecha.getDate() + (semana * 7) + (diaSemana - 1));
+						const fechaStr = fecha.toISOString().split('T')[0];
 
-						// Recorrer bloques del día (1-22)
-						for (let bloque = 1; bloque <= 22 && bloquesAsignados < bloquesPendientes; bloque++) {
-							// Buscar docente disponible con mejor score
-							let mejorDocente = null;
-							let mejorScore = 0;
-							let mejorSala = null;
+						// SOLUCI\u00d3N 1: Solo recorrer bloques del turno seleccionado
+						for (let bloque = rango.bloqueInicio; bloque <= rango.bloqueFin && bloquesAsignados < bloquesNecesarios; bloque++) {
+							// Calcular horarios del bloque
+							const bloqueStartTime = getBlockTime(bloque);
+							const bloqueEndTime = getBlockTime(bloque + 1);
 
-							for (const docente of docentesOrdenados) {
-								// Verificar disponibilidad del docente
-								const disponible = await docenteDisponibleEnBloque(
-									docente.id, 
-									diaSemana, 
-									bloque, 
-									fecha
+							// SOLUCI\u00d3N 3: Buscar sala disponible
+							let salaDisponible = null;
+							for (const sala of todasLasSalas) {
+								const { rows: conflictos } = await db.query(
+									`SELECT id FROM events 
+									 WHERE sala_id = $1 AND date = $2 AND start < $3 AND "end" > $4`,
+									[sala.id, fechaStr, bloqueEndTime, bloqueStartTime]
 								);
 
-								if (!disponible) continue;
-
-								// Verificar carga del docente
-								const carga = await getCargaDocente(docente.id);
-								const bloquesContrato = (carga.contratoSemana * 60) / BLOCK_MINUTES;
-								if (carga.bloques >= bloquesContrato) continue;
-
-								// Obtener salas disponibles
-								const salas = await obtenerSalasDisponibles(carreraId, diaSemana, bloque, bloque);
-								
-								for (const sala of salas) {
-									// Calcular timestamp para el bloque
-									const startTime = new Date(fecha);
-									const horaInicio = 8 * 60 + 30 + (bloque - 1) * BLOCK_MINUTES;
-									startTime.setHours(Math.floor(horaInicio / 60), horaInicio % 60, 0, 0);
-									
-									const endTime = new Date(startTime);
-									endTime.setMinutes(endTime.getMinutes() + BLOCK_MINUTES);
-
-									// Validar que la sala esté libre
-									const salaLibre = await validarConflictosSala(sala.id, startTime, endTime);
-									if (!salaLibre) continue;
-
-									// Calcular score de esta combinación
-									const score = await calcularScoreDisponibilidad(
-										docente.id,
-										sala.id,
-										modulo.id,
-										diaSemana,
-										bloque,
-										fecha
-									);
-
-									if (score > mejorScore) {
-										mejorScore = score;
-										mejorDocente = docente;
-										mejorSala = sala;
-									}
+								if (conflictos.length === 0) {
+									salaDisponible = sala;
+									break; // Usar primera sala disponible
 								}
 							}
 
-							// Si encontramos una buena combinación, asignar el evento
-							if (mejorDocente && mejorSala && mejorScore > 0) {
-								try {
-									const startTime = new Date(fecha);
-									const horaInicio = 8 * 60 + 30 + (bloque - 1) * BLOCK_MINUTES;
-									startTime.setHours(Math.floor(horaInicio / 60), horaInicio % 60, 0, 0);
-									
-									const endTime = new Date(startTime);
-									endTime.setMinutes(endTime.getMinutes() + BLOCK_MINUTES);
+							if (!salaDisponible) {
+								continue; // No hay salas disponibles en este bloque
+							}
 
-									const resultado = await asignarEvento({
-										moduloId: modulo.id,
-										docenteId: mejorDocente.id,
-										salaId: mejorSala.id,
-										start: startTime.toISOString(),
-										end: endTime.toISOString()
-									});
+							// SOLUCI\u00d3N 5: Verificar que docente no esté ocupado
+							const { rows: conflictosDocente } = await db.query(
+								`SELECT id FROM events 
+								 WHERE docente_id = $1 AND date = $2 AND start < $3 AND "end" > $4`,
+								[docenteAsignado.id, fechaStr, bloqueEndTime, bloqueStartTime]
+							);
 
-									asignaciones.push({
-										eventoId: resultado.id,
-										modulo: modulo.nombre,
-										docente: mejorDocente.nombre,
-										sala: mejorSala.nombre,
-										fecha: fecha.toISOString().split('T')[0],
-										bloque,
-										score: mejorScore
-									});
+							if (conflictosDocente.length > 0) {
+								continue; // Docente ocupado
+							}
 
-									bloquesAsignados++;
-								} catch (error) {
-									errores.push({
-										modulo: modulo.nombre,
-										error: error.message
-									});
-								}
+							// SOLUCI\u00d3N 6: Crear evento con IDs consolidados
+							const nuevoEvento = await asignarEvento(
+								modulo.codigo_asignatura,  // moduloId
+								docenteAsignado.id,        // docenteId
+								salaDisponible.id,         // salaId
+								carreraId,                 // carreraId
+								fechaStr,
+								bloqueStartTime,
+								bloqueEndTime,
+								1 // Duración: 1 bloque
+							);
+
+							if (nuevoEvento) {
+								bloquesAsignados++;
+								asignaciones.push({
+									titulo: modulo.nombre,
+									docente: docenteAsignado.nombre,
+									sala: salaDisponible.nombre,
+									fecha: fechaStr,
+									horaInicio: bloqueStartTime,
+									horaFin: bloqueEndTime,
+									bloques: 1,
+									moduloId: modulo.codigo_asignatura,
+									docenteId: docenteAsignado.id,
+									salaId: salaDisponible.id,
+									carreraId
+								});
+
+								console.log(`[AUTO-ORGANIZAR] ✅ Bloque asignado: ${modulo.nombre} - ${fechaStr} ${bloqueStartTime} - Sala ${salaDisponible.nombre} (${bloquesAsignados}/${bloquesNecesarios})`);
 							}
 						}
 					}
 				}
 
-				// Si no se pudieron asignar todos los bloques necesarios
-				if (bloquesAsignados < bloquesPendientes) {
-					errores.push({
+				// SOLUCI\u00d3N 7: Log de errores si no se completaron
+				if (bloquesAsignados < bloquesNecesarios) {
+					const error = {
 						modulo: modulo.nombre,
-						mensaje: `Solo se asignaron ${bloquesAsignados} de ${bloquesPendientes} bloques requeridos`
-					});
+						bloquesNecesarios,
+						bloquesAsignados,
+						mensaje: `Solo ${bloquesAsignados}/${bloquesNecesarios} bloques asignados`
+					};
+					errores.push(error);
+					console.error(`[AUTO-ORGANIZAR] ❌ ERROR: ${error.mensaje}`);
+				} else {
+					console.log(`[AUTO-ORGANIZAR] ✅ Módulo completado: ${modulo.nombre} (${bloquesAsignados} bloques)`);
 				}
 			}
 
