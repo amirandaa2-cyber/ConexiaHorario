@@ -8185,30 +8185,26 @@
           
           for (const asignacion of data.asignaciones) {
             try {
-              // Buscar datos completos del módulo
-              const modulo = modulos.find(m => m.id === asignacion.moduloId || String(m.id) === String(asignacion.moduloId));
-              const docente = docentes.find(d => d.id === asignacion.docenteId || String(d.id) === String(asignacion.docenteId));
-              const carrera = carreras.find(c => c.id === carreraId || String(c.id) === String(carreraId));
-              
+              // Los datos ya vienen completos desde el backend con extendedProps
               const eventoFormateado = {
                 id: asignacion.eventoId || uuidv4(),
-                title: `${modulo?.nombre || asignacion.modulo} - ${docente?.nombre || asignacion.docente}`,
+                title: asignacion.title || `${asignacion.modulo} - ${asignacion.docente}`,
                 start: asignacion.start,
                 end: asignacion.end,
-                extendedProps: {
+                extendedProps: asignacion.extendedProps || {
                   moduloId: asignacion.moduloId,
                   docenteId: asignacion.docenteId,
                   salaId: asignacion.salaId,
-                  carreraId: carreraId,
-                  carreraNombre: carrera?.nombre || carrera?.codigo || carreraId,
-                  moduloNombre: modulo?.nombre || asignacion.modulo,
-                  docenteNombre: docente?.nombre || asignacion.docente,
+                  carreraId: asignacion.carreraId,
+                  moduloNombre: asignacion.modulo,
+                  docenteNombre: asignacion.docente,
                   salaNombre: asignacion.sala,
                   autoGenerado: true,
                   __meta: {
                     moduloId: String(asignacion.moduloId),
                     docenteId: String(asignacion.docenteId),
-                    salaId: asignacion.salaId ? String(asignacion.salaId) : null
+                    salaId: asignacion.salaId ? String(asignacion.salaId) : null,
+                    carreraId: String(asignacion.carreraId)
                   }
                 }
               };
