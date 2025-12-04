@@ -1090,6 +1090,7 @@ if(dbReady){
 		const id = payload.id || uuidv4();
 		const linking = await resolveEventLinking(payload);
 		const extendedProps = mergeMetaIntoExtendedProps(payload.extendedProps || {}, linking);
+		const extendedPropsJson = JSON.stringify(extendedProps);
 		try{
 			// Soft-dedupe: avoid inserting duplicate event by same title+start+end
 			if (payload.title && payload.start) {
@@ -1119,7 +1120,7 @@ if(dbReady){
 		     extendedProps=EXCLUDED.extendedProps,
 		     updated_at=NOW()
 		     RETURNING id, docente_id, start`,
-				[id, payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedProps]
+				[id, payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedPropsJson]
 			);
 			const savedEvent = upsertResult.rows[0] || null;
 			await refreshDocenteSemanaHoras([
@@ -1134,6 +1135,7 @@ if(dbReady){
 		const payload = req.body || {};
 		const linking = await resolveEventLinking(payload);
 		const extendedProps = mergeMetaIntoExtendedProps(payload.extendedProps || {}, linking);
+		const extendedPropsJson = JSON.stringify(extendedProps);
 		try{
 			const existingResult = await db.query('SELECT docente_id, start FROM events WHERE id=$1 LIMIT 1', [req.params.id]);
 			if (!existingResult.rowCount) {
@@ -1142,7 +1144,7 @@ if(dbReady){
 			const previousEvent = existingResult.rows[0];
 			const updatedResult = await db.query(
 				'UPDATE events SET title=$1, start=$2, "end"=$3, modulo_id=$4, docente_id=$5, sala_id=$6, extendedProps=$7, updated_at=NOW() WHERE id=$8 RETURNING id, docente_id, start',
-				[payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedProps, req.params.id]
+				[payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedPropsJson, req.params.id]
 			);
 			const updatedEvent = updatedResult.rows[0] || null;
 			await refreshDocenteSemanaHoras([
