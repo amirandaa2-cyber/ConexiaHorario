@@ -413,6 +413,12 @@
     </div>
   </div>
 
+  <div class="section stack">
+    <strong>Exportar</strong>
+    <button id="export-pdf">📄 Exportar como PDF</button>
+    <div id="export-status" class="muted"></div>
+  </div>
+
   <div id="data-modal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-window" role="dialog" aria-modal="true" aria-labelledby="data-modal-title">
       <div class="modal-header">
@@ -426,6 +432,8 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="assets/session-guard.js"></script>
   <script>
     const CHANNEL_NAME = 'ceduc-calendar';
@@ -698,6 +706,220 @@
       } catch (err) {
         console.error('auto-organizar error', err);
         resultEl.textContent = 'Error ejecutando auto-organizar';
+      }
+    });
+
+    document.getElementById('export-pdf').addEventListener('click', async () => {
+      const statusEl = document.getElementById('export-status');
+      statusEl.textContent = 'Preparando exportación...';
+      
+      try {
+        // Solicitar al calendario principal que exporte su contenido
+        channel.postMessage({ type: 'export-pdf-request' });
+        
+        // Esperar respuesta del calendario con los datos
+        const exportData = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timeout')), 10000);
+          
+          const handleMessage = (event) => {
+            if (event.data && event.data.type === 'export-pdf-data') {
+              clearTimeout(timeout);
+              channel.removeEventListener('message', handleMessage);
+              resolve(event.data);
+            }
+          };
+          
+          channel.addEventListener('message', handleMessage);
+        });
+        
+        statusEl.textContent = 'Generando PDF...';
+        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+          orientation: 'landscape',
+          unit: 'mm',
+          format: 'a4'
+        });
+        
+        // Configurar el documento
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 15;
+        
+        // Título del documento
+        doc.setFontSize(18);
+        doc.setFont(undefined, 'bold');
+        doc.text('Horario Académico - CEDUC', margin, margin);
+        
+        // Fecha de generación
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        const fecha = new Date().toLocaleDateString('es-ES', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        doc.text(`Generado: ${fecha}`, margin, margin + 7);
+        
+        let yPos = margin + 15;
+        
+        // Resumen de información
+        if (exportData.events && exportData.events.length > 0) {
+          doc.setFontSize(14);
+          doc.setFont(undefined, 'bold');
+          doc.text('Resumen de Eventos', margin, yPos);
+          yPos += 7;
+          
+          doc.setFontSize(10);
+          doc.setFont(undefined, 'normal');
+          doc.text(`Total de eventos: ${exportData.events.length}`, margin, yPos);
+          yPos += 10;
+          
+          // Tabla de eventos
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          doc.text('Listado de Eventos', margin, yPos);
+          yPos += 7;
+          
+          doc.setFontSize(9);
+          doc.setFont(undefined, 'normal');
+          
+          // Encabezados de la tabla
+          const colWidths = [60, 40, 35, 35, 35];
+          const startX = margin;
+          let currentX = startX;
+          
+          doc.setFont(undefined, 'bold');
+          doc.text('Evento', currentX, yPos);
+          currentX += colWidths[0];
+          doc.text('Docente', currentX, yPos);
+          currentX += colWidths[1];
+          doc.text('Sala', currentX, yPos);
+          currentX += colWidths[2];
+          doc.text('Inicio', currentX, yPos);
+          currentX += colWidths[3];
+          doc.text('Fin', currentX, yPos);
+          yPos += 6;
+          
+          doc.setFont(undefined, 'normal');
+          
+          // Eventos
+          for (const event of exportData.events) {
+            // Verificar si necesitamos nueva página
+            if (yPos > pageHeight - margin - 10) {
+              doc.addPage();
+              yPos = margin;
+            }
+            
+            currentX = startX;
+            
+            // Título del evento (truncado si es muy largo)
+            const title = event.title || 'Sin título';
+            const truncatedTitle = title.length > 35 ? title.substring(0, 32) + '...' : title;
+            doc.text(truncatedTitle, currentX, yPos);
+            currentX += colWidths[0];
+            
+            // Docente
+            const docente = event.docente || '-';
+            const truncatedDocente = docente.length > 20 ? docente.substring(0, 17) + '...' : docente;
+            doc.text(truncatedDocente, currentX, yPos);
+            currentX += colWidths[1];
+            
+            // Sala
+            const sala = event.sala || '-';
+            doc.text(sala, currentX, yPos);
+            currentX += colWidths[2];
+            
+            // Fecha/hora inicio
+            const inicio = event.start ? new Date(event.start).toLocaleString('es-ES', {
+              day: '2-digit',
+              month: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            }) : '-';
+            doc.text(inicio, currentX, yPos);
+            currentX += colWidths[3];
+            
+            // Fecha/hora fin
+            const fin = event.end ? new Date(event.end).toLocaleString('es-ES', {
+              hour: '2-digit',
+              minute: '2-digit'
+            }) : '-';
+            doc.text(fin, currentX, yPos);
+            
+            yPos += 5;
+          }
+        }
+        
+        // Información adicional en nueva página si hay espacio
+        if (exportData.carreras || exportData.docentes || exportData.salas) {
+          doc.addPage();
+          yPos = margin;
+          
+          doc.setFontSize(14);
+          doc.setFont(undefined, 'bold');
+          doc.text('Información de Catálogos', margin, yPos);
+          yPos += 10;
+          
+          doc.setFontSize(10);
+          doc.setFont(undefined, 'normal');
+          
+          if (exportData.carreras && exportData.carreras.length > 0) {
+            doc.setFont(undefined, 'bold');
+            doc.text(`Carreras (${exportData.carreras.length}):`, margin, yPos);
+            doc.setFont(undefined, 'normal');
+            yPos += 5;
+            
+            exportData.carreras.slice(0, 15).forEach(c => {
+              if (yPos > pageHeight - margin - 10) {
+                doc.addPage();
+                yPos = margin;
+              }
+              doc.text(`  • ${c.nombre || c.id}`, margin + 5, yPos);
+              yPos += 5;
+            });
+            yPos += 5;
+          }
+          
+          if (exportData.docentes && exportData.docentes.length > 0) {
+            if (yPos > pageHeight - 50) {
+              doc.addPage();
+              yPos = margin;
+            }
+            
+            doc.setFont(undefined, 'bold');
+            doc.text(`Docentes (${exportData.docentes.length}):`, margin, yPos);
+            doc.setFont(undefined, 'normal');
+            yPos += 5;
+            
+            exportData.docentes.slice(0, 20).forEach(d => {
+              if (yPos > pageHeight - margin - 10) {
+                doc.addPage();
+                yPos = margin;
+              }
+              doc.text(`  • ${d.nombre || d.id}`, margin + 5, yPos);
+              yPos += 5;
+            });
+          }
+        }
+        
+        // Guardar el PDF
+        const fileName = `horario_ceduc_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        
+        statusEl.textContent = '✅ PDF descargado exitosamente';
+        setTimeout(() => {
+          statusEl.textContent = '';
+        }, 3000);
+        
+      } catch (err) {
+        console.error('Error exportando PDF:', err);
+        statusEl.textContent = '❌ Error al generar PDF. Intenta nuevamente.';
+        setTimeout(() => {
+          statusEl.textContent = '';
+        }, 5000);
       }
     });
 
