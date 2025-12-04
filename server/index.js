@@ -579,7 +579,9 @@ function mapEventRow(row) {
 		carreraId:
 			row.modulo_carrera !== null && row.modulo_carrera !== undefined
 				? String(row.modulo_carrera)
-				: baseProps.carreraId ?? existingMeta.carreraId ?? null
+				: baseProps.carreraId ?? existingMeta.carreraId ?? null,
+		carreraNombre: row.carrera_nombre || baseProps.carreraNombre || existingMeta.carreraNombre || null,
+		carreraCodigo: row.carrera_codigo || baseProps.carreraCodigo || existingMeta.carreraCodigo || null
 	};
 	const extendedProps = mergeMetaIntoExtendedProps(baseProps, linking);
 	return {
@@ -1404,9 +1406,12 @@ if(dbReady){
 				       e.docente_id,
 				       e.sala_id,
 				       m.carrera_id AS modulo_carrera,
+				       c.nombre AS carrera_nombre,
+				       c.codigo AS carrera_codigo,
 				       COALESCE(e.extendedProps, '{}'::jsonb) AS "extendedProps"
 		  FROM events e
 		  LEFT JOIN modulos m ON m.id = e.modulo_id
+		  LEFT JOIN carreras c ON c.id = m.carrera_id
 		 ORDER BY e.start ASC`);
 			res.json(rows.map(mapEventRow));
 		}catch(err){ handleDbError(res, err); }
