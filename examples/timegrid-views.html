@@ -3413,8 +3413,10 @@
           if (startStr) url.searchParams.set('start', startStr);
           if (endStr) url.searchParams.set('end', endStr);
 
+          console.log('[API] GET /events', url.toString());
           const r = await authorizedFetch(url.toString());
           const data = r.ok ? await r.json() : [];
+          console.log('[API] /events status:', r.status, 'items:', (data||[]).length);
           // Map DB records to FullCalendar events and dedupe
           const mapped = (data || []).map(e => ({
             id: e.id,
@@ -3432,10 +3434,44 @@
               }
             }
           }));
+          console.log('[Calendar] events() mapping count:', mapped.length);
           return dedupeEvents(mapped);
         } catch (err) {
           console.error('fetchEvents falló', err);
           return [];
+        }
+      }
+
+      // Fetch módulos por carrera (frontend filter + log)
+      async function fetchModulosPorCarrera(carreraId) {
+        try {
+          console.log('[API] GET /modulos');
+          const r = await authorizedFetch(API_BASE + '/modulos');
+          const all = r.ok ? await r.json() : [];
+          const filtered = (all || []).filter(m => String(m.carreraId||'') === String(carreraId||''));
+          console.log('[API] /modulos-por-carrera', carreraId, 'items:', filtered.length);
+          return filtered;
+        } catch (err) {
+          console.error('fetchModulosPorCarrera falló', err);
+          return [];
+        }
+      }
+
+      // Auto-organizar carrera: call backend and render
+      async function autoOrganizarCarrera({ carreraId, startDate, weeks }) {
+        try {
+          const params = new URLSearchParams({ carreraId: String(carreraId||''), startDate: startDate || '', weeks: String(weeks||1) });
+          const url = API_BASE + '/auto-organizar?' + params.toString();
+          console.log('[API] GET /auto-organizar', url);
+          const r = await authorizedFetch(url);
+          const data = r.ok ? await r.json() : null;
+          console.log('[API] /auto-organizar status:', r.status, 'assigned:', data?.assigned || 0);
+          if (!r.ok || !data) { alert('Auto-organizar falló'); return; }
+          // After backend assigns events, refetch and render
+          await refreshCalendarEvents();
+        } catch (err) {
+          console.error('autoOrganizarCarrera error', err);
+          alert('No se pudo auto-organizar.');
         }
       }
 
@@ -4854,7 +4890,13 @@
         document.querySelectorAll('.pal-vespertino').forEach(inp => {
           inp.addEventListener('change', function () { const cid = this.getAttribute('data-cid'); const c = carreras.find(x => x.id === cid); if (c) { c.colorVespertino = this.value; save(KEY_CARRERAS, carreras); refreshCalendarEvents(); } });
         });
-        if (filterCarrera) filterCarrera.addEventListener('change', () => refreshCalendarEvents());
+        if (filterCarrera) filterCarrera.addEventListener('change', async () => {
+          const carreraId = filterCarrera.value || '';
+          console.log('[UI] Carrera seleccionada:', carreraId || '(todas)');
+          const mods = await fetchModulosPorCarrera(carreraId);
+          console.log('[UI] Dropdown módulos actualizado con', mods.length, 'items para carrera');
+          refreshCalendarEvents();
+        });
         if (filterWeek) filterWeek.addEventListener('change', () => {
           const v = document.getElementById('filter-week').value; if (v && calendar) { calendar.gotoDate(v); }
           refreshCalendarEvents();
