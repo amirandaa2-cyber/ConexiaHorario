@@ -44,12 +44,11 @@ const BLOCK_MINUTES = 35;
 // DAO helpers for auto-organize
 async function getDocentesPorCarrera(carreraId) {
 	const { rows } = await db.query(
-		`SELECT d.id, d.nombre, d.contrato_hora_semanal AS contrato_semana,
-						dc.activo, COALESCE(dc.prioridad, 999) AS prioridad
+		`SELECT d.id, d.nombre, d.contrato_hora_semanal AS contrato_semana
 			 FROM docentes_carreras dc
 			 JOIN docentes d ON d.id = dc.docente_id
-			WHERE dc.carrera_id = $1 AND COALESCE(dc.activo, TRUE)
-			ORDER BY prioridad ASC, d.nombre ASC`,
+			WHERE dc.carrera_id = $1
+			ORDER BY d.nombre ASC`,
 		[String(carreraId).trim()]
 	);
 	return rows;
