@@ -258,7 +258,11 @@ async function initializeSchema() {
 	];
 
 	for (const statement of statements) {
-		await pool.query(statement);
+		try {
+			await pool.query(statement);
+		} catch (err) {
+			console.error('Schema statement failed but continuing to next statement:', statement, err.message || err);
+		}
 	}
 
 	await ensureSeedAdmin();
