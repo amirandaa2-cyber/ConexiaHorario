@@ -62,45 +62,27 @@ async function initializeSchema() {
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_modulos_carrera_codigo ON modulos (carrera_id, LOWER(codigo_asignatura)) WHERE codigo_asignatura IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_modulos_carrera ON modulos (carrera_id)`,
 		`CREATE TABLE IF NOT EXISTS docentes (
-			id VARCHAR(20) PRIMARY KEY,
-			rut VARCHAR(20) UNIQUE NOT NULL,
-			nombre VARCHAR(255) NOT NULL,
-			email VARCHAR(255),
-			titulo TEXT,
-			"contratoHoras" NUMERIC(5,2) DEFAULT 0,
-			"ContratoHoraSemanal" NUMERIC(4,1) DEFAULT 0 CHECK ("ContratoHoraSemanal" <= 40),
-			carrera_id VARCHAR(50) REFERENCES carreras(id) ON DELETE SET NULL,
-			edad INTEGER,
-			estadoCivil TEXT,
-			turno TEXT,
-			activo BOOLEAN DEFAULT TRUE,
-			"TotalHrsModulos" NUMERIC(6,1) DEFAULT 0,
-			"Hrs Teóricas" NUMERIC(4,1) DEFAULT 0,
-			"Hrs Prácticas" NUMERIC(4,1) DEFAULT 0,
-			"Total hrs Semana" NUMERIC(4,1) DEFAULT 0,
-			created_at TIMESTAMPTZ DEFAULT NOW(),
-			updated_at TIMESTAMPTZ DEFAULT NOW()
+			id VARCHAR(50) PRIMARY KEY,
+			nombre TEXT NOT NULL,
+			email TEXT,
+			telefono TEXT,
+			turno VARCHAR(20) CHECK (turno IN ('Diurno','Vespertino')),
+			contrato_horas NUMERIC(6,2),
+			contrato_hora_semanal NUMERIC(6,2),
+			carrera_id VARCHAR(50) REFERENCES carreras(id) ON UPDATE CASCADE ON DELETE SET NULL,
+			creado_en TIMESTAMPTZ DEFAULT NOW(),
+			actualizado_en TIMESTAMPTZ DEFAULT NOW()
 		)`,
-		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS carrera_id VARCHAR(50)`,
-		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS edad INTEGER`,
-		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS estadoCivil TEXT`,
-		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS turno TEXT`,
-		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE`,
-		`ALTER TABLE docentes ADD COLUMN IF NOT EXISTS "ContratoHoraSemanal" NUMERIC(4,1) DEFAULT 0 CHECK ("ContratoHoraSemanal" <= 40)`,
-		`ALTER TABLE docentes DROP CONSTRAINT IF EXISTS fk_docente_carrera`,
-		`ALTER TABLE docentes ADD CONSTRAINT fk_docente_carrera FOREIGN KEY (carrera_id) REFERENCES carreras(id) ON DELETE SET NULL`,
-		`CREATE OR REPLACE FUNCTION update_modified_column()
-		RETURNS TRIGGER AS $$
+		`CREATE INDEX IF NOT EXISTS idx_docentes_carrera ON docentes (carrera_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_docentes_nombre ON docentes (nombre)`,
+		`CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS TRIGGER AS $$
 		BEGIN
-			NEW.updated_at = NOW();
+			NEW.actualizado_en = NOW();
 			RETURN NEW;
 		END;
-		$$ language 'plpgsql'`,
-		`DROP TRIGGER IF EXISTS update_docentes_modtime ON docentes`,
-		`CREATE TRIGGER update_docentes_modtime
-		    BEFORE UPDATE ON docentes
-		    FOR EACH ROW
-		    EXECUTE FUNCTION update_modified_column()`,
+		$$ LANGUAGE plpgsql`,
+		`DROP TRIGGER IF EXISTS docentes_touch_updated ON docentes`,
+		`CREATE TRIGGER docentes_touch_updated BEFORE UPDATE ON docentes FOR EACH ROW EXECUTE FUNCTION touch_updated_at()`,
 		`CREATE TABLE IF NOT EXISTS salas (
 			id TEXT PRIMARY KEY,
 			nombre TEXT,

@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
 const db = require('./db');
 const { v4: uuidv4 } = require('uuid');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 app.use(cors());
@@ -15,6 +16,9 @@ app.use(bodyParser.json());
 
 const dbReady = db && db.ready;
 const AUTH_TOKEN_TTL_HOURS = parseInt(process.env.SESSION_TTL_HOURS || '12', 10);
+const SESSION_IDLE_MINUTES = Math.max(parseInt(process.env.SESSION_IDLE_MINUTES || '30', 10), 0);
+const SESSION_ACTIVITY_GRACE_SECONDS = Math.max(parseInt(process.env.SESSION_ACTIVITY_GRACE_SECONDS || '60', 10), 0);
+const SESSION_ACTIVITY_GRACE_MS = SESSION_ACTIVITY_GRACE_SECONDS * 1000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET || undefined) : null;
@@ -28,7 +32,7 @@ const BLOCK_MINUTES = 35;
 // DAO helpers for auto-organize
 async function getDocentesPorCarrera(carreraId) {
 	const { rows } = await db.query(
-		`SELECT d.id, d.nombre, d."ContratoHoraSemanal" AS contrato_semana,
+		`SELECT d.id, d.nombre, d.contrato_hora_semanal AS contrato_semana,
 						dc.activo, COALESCE(dc.prioridad, 999) AS prioridad
 			 FROM docente_carrera dc
 			 JOIN docentes d ON d.id = dc.docente_id
@@ -42,7 +46,7 @@ async function getDocentesPorCarrera(carreraId) {
 async function getCargaDocente(docenteId) {
 	const { rows } = await db.query(
 		`SELECT COALESCE(SUM(ROUND(EXTRACT(EPOCH FROM ("end" - start)) / (60.0 * $2))), 0)::int AS bloques,
-						COALESCE(MAX(d."ContratoHoraSemanal"), 0) AS contrato_semana
+					COALESCE(MAX(d.contrato_hora_semanal), 0) AS contrato_semana
 			 FROM events e
 			 LEFT JOIN docentes d ON d.id = e.docente_id
 			WHERE e.docente_id = $1`,
@@ -99,6 +103,40 @@ function mapRoleCodes(roleArray = []) {
 		.filter(Boolean)
 		.map((code) => String(code).toLowerCase())
 		.filter((code, idx, list) => list.indexOf(code) === idx);
+}
+
+function cloneMetadata(raw) {
+	if (!raw) return {};
+	if (typeof raw === 'object') return { ...raw };
+	try {
+		return JSON.parse(raw);
+	} catch (_) {
+		return {};
+	}
+}
+
+function getLastActivityDate(metadata, fallback = null) {
+	if (!metadata || typeof metadata !== 'object') return fallback;
+	const raw = metadata.lastActivity || metadata.last_activity || metadata.lastactivity || null;
+	if (!raw) return fallback;
+	const date = new Date(raw);
+	return Number.isNaN(date.getTime()) ? fallback : date;
+}
+
+async function refreshSessionActivity(token, metadata = {}, { force = false } = {}) {
+	if (!token) return null;
+	const now = new Date();
+	const ttlMs = AUTH_TOKEN_TTL_HOURS * 60 * 60 * 1000;
+	const updatedExpiresAt = new Date(now.getTime() + ttlMs);
+	const lastActivity = getLastActivityDate(metadata);
+	const shouldSkip = !force && lastActivity && now - lastActivity < SESSION_ACTIVITY_GRACE_MS;
+	if (shouldSkip) {
+		return { expiresAt: updatedExpiresAt.toISOString(), metadata };
+	}
+	const safeMetadata = cloneMetadata(metadata);
+	safeMetadata.lastActivity = now.toISOString();
+	await db.query('UPDATE auth_session_token SET expires_at=$2, metadata=$3 WHERE token=$1', [token, updatedExpiresAt.toISOString(), JSON.stringify(safeMetadata)]);
+	return { expiresAt: updatedExpiresAt.toISOString(), metadata: safeMetadata };
 }
 
 function formatUserPayload(row) {
@@ -214,8 +252,6 @@ async function findDocenteIdFromHints(meta = {}, payload = {}) {
 		meta.docenteId,
 		meta.docente_id,
 		meta.docente,
-		meta.docenteRut,
-		meta.docenteRUT,
 		meta.docenteName,
 		payload.docenteId,
 		payload.docente_id
@@ -227,11 +263,6 @@ async function findDocenteIdFromHints(meta = {}, payload = {}) {
 	for (const hint of hints) {
 		const checkById = await db.query('SELECT id FROM docentes WHERE id=$1 LIMIT 1', [hint]);
 		if (checkById.rowCount) return checkById.rows[0].id;
-		const rut = normalizeRut(hint);
-		if (rut) {
-			const byRut = await db.query('SELECT id FROM docentes WHERE REPLACE(REPLACE(UPPER(rut), ".", \'\'), \'-\', \'\') = $1 LIMIT 1', [rut]);
-			if (byRut.rowCount) return byRut.rows[0].id;
-		}
 		const byName = await db.query('SELECT id FROM docentes WHERE LOWER(nombre) = LOWER($1) LIMIT 1', [hint]);
 		if (byName.rowCount) return byName.rows[0].id;
 	}
@@ -448,24 +479,27 @@ async function touchUserLogin(userId) {
 }
 
 async function createLoginSession(userId, req){
-	const expiresAt = new Date(Date.now() + AUTH_TOKEN_TTL_HOURS * 60 * 60 * 1000);
+	const now = new Date();
+	const expiresAt = new Date(now.getTime() + AUTH_TOKEN_TTL_HOURS * 60 * 60 * 1000);
 	const token = uuidv4();
+	const metadata = {
+		source: 'admin-ui',
+		ip: req?.ip || null,
+		userAgent: req?.headers?.['user-agent'] || null,
+		lastActivity: now.toISOString()
+	};
 	await db.query(
 		`INSERT INTO auth_session_token (token, user_id, expires_at, metadata)
 		 VALUES ($1, $2, $3, $4)`,
-		[token, userId, expiresAt.toISOString(), JSON.stringify({
-			source: 'admin-ui',
-			ip: req?.ip || null,
-			userAgent: req?.headers?.['user-agent'] || null
-		})]
+		[token, userId, expiresAt.toISOString(), JSON.stringify(metadata)]
 	);
-	return { token, expiresAt: expiresAt.toISOString() };
+	return { token, expiresAt: expiresAt.toISOString(), metadata };
 }
 
 async function loadSessionFromToken(rawToken, { requireAdmin = false } = {}){
 	if (!rawToken) return null;
 	const { rows } = await db.query(
-		`SELECT s.token, s.user_id, s.expires_at,
+		`SELECT s.token, s.user_id, s.expires_at, s.metadata,
 		        u.full_name, u.email, u.is_active,
 		        ARRAY_REMOVE(ARRAY_AGG(r.code), NULL) AS roles
 		   FROM auth_session_token s
@@ -473,14 +507,24 @@ async function loadSessionFromToken(rawToken, { requireAdmin = false } = {}){
 		   LEFT JOIN auth_user_role ur ON ur.user_id = u.id
 		   LEFT JOIN auth_role r ON r.id = ur.role_id
 		  WHERE s.token = $1
-		  GROUP BY s.token, s.user_id, s.expires_at, u.full_name, u.email, u.is_active
+		  GROUP BY s.token, s.user_id, s.expires_at, s.metadata, u.full_name, u.email, u.is_active
 		  LIMIT 1`,
 		[rawToken]
 	);
 	if (!rows.length) return null;
 	const row = rows[0];
-	const expired = row.expires_at && new Date(row.expires_at) < new Date();
+	const metadata = cloneMetadata(row.metadata);
+	const now = new Date();
+	const expired = row.expires_at && new Date(row.expires_at) < now;
 	if (!row.is_active || expired) {
+		await db.query('DELETE FROM auth_session_token WHERE token = $1', [rawToken]);
+		return null;
+	}
+	const ttlMs = AUTH_TOKEN_TTL_HOURS * 60 * 60 * 1000;
+	const fallbackLastActivity = row.expires_at ? new Date(new Date(row.expires_at).getTime() - ttlMs) : null;
+	const lastActivityDate = getLastActivityDate(metadata, fallbackLastActivity);
+	const idleLimitMs = SESSION_IDLE_MINUTES > 0 ? SESSION_IDLE_MINUTES * 60 * 1000 : null;
+	if (idleLimitMs && lastActivityDate && now - lastActivityDate > idleLimitMs) {
 		await db.query('DELETE FROM auth_session_token WHERE token = $1', [rawToken]);
 		return null;
 	}
@@ -488,10 +532,12 @@ async function loadSessionFromToken(rawToken, { requireAdmin = false } = {}){
 	if (requireAdmin && !roles.includes('admin')) {
 		return null;
 	}
+	const refreshed = await refreshSessionActivity(row.token, metadata);
+	const nextExpiry = refreshed?.expiresAt || row.expires_at;
 	return {
 		sessionId: row.token,
 		userId: row.user_id,
-		expiraEn: row.expires_at,
+		expiraEn: nextExpiry,
 		user: {
 			id: row.user_id,
 			email: row.email,
@@ -505,12 +551,14 @@ app.get('/api/public-config', (req,res)=>{
 	res.json({
 		googleClientId: GOOGLE_CLIENT_ID || null,
 		useDbOnly: USE_DB_ONLY,
-		allowedRoles: ALLOWED_ROLE_CODES
+		allowedRoles: ALLOWED_ROLE_CODES,
+		sessionIdleMinutes: SESSION_IDLE_MINUTES
 	});
 });
 
 // Basic CRUD endpoints (only enabled if DB loaded)
 if(dbReady){
+	app.use('/api/dashboard', dashboardRoutes);
 	// Auto-organize endpoint: assigns pending modules to eligible docentes
 	app.post('/api/auto-organizar', async (req, res) => {
 		try {
@@ -605,6 +653,7 @@ if(dbReady){
 			res.json({
 				token: session.token,
 				expiresAt: session.expiresAt,
+				sessionIdleMinutes: SESSION_IDLE_MINUTES,
 				user: formatUserPayload(user)
 			});
 		} catch (err) {
@@ -646,6 +695,7 @@ if(dbReady){
 			res.json({
 				token: session.token,
 				expiresAt: session.expiresAt,
+				sessionIdleMinutes: SESSION_IDLE_MINUTES,
 				user: formatUserPayload(user)
 			});
 		} catch (err) {
@@ -677,7 +727,7 @@ if(dbReady){
 			if (!session) {
 				return res.status(401).json({ error: 'Sesión inválida o expirada.' });
 			}
-			res.json({ user: session.user, tokenExpiresAt: session.expiraEn });
+			res.json({ user: session.user, tokenExpiresAt: session.expiraEn, sessionIdleMinutes: SESSION_IDLE_MINUTES });
 		} catch (err) {
 			handleDbError(res, err);
 		}
@@ -842,25 +892,17 @@ if(dbReady){
 		try{
 			const { rows } = await db.query(`
 				SELECT id,
-				       rut,
 				       nombre,
 				       email,
-				       titulo,
-				       "contratoHoras" AS "contratoHoras",
-			       "ContratoHoraSemanal" AS "ContratoHoraSemanal",
-	       carrera_id AS "carreraId",
-			       edad AS edad,
-			       estadoCivil AS "estadoCivil",
-			       turno AS turno,
-			       COALESCE(activo, TRUE) AS activo,
-				       "TotalHrsModulos" AS "TotalHrsModulos",
-				       "Hrs Teóricas" AS "Hrs Teóricas",
-				       "Hrs Prácticas" AS "Hrs Prácticas",
-				       "Total hrs Semana" AS "Total hrs Semana",
-				       created_at,
-				       updated_at
-				  FROM docentes
-				 ORDER BY nombre ASC`);
+				       telefono,
+				       turno,
+				       contrato_horas AS "contrato_horas",
+				       contrato_hora_semanal AS "contrato_hora_semanal",
+			       carrera_id AS "carreraId",
+			       creado_en,
+			       actualizado_en
+			  FROM docentes
+			 ORDER BY nombre ASC`);
 			res.json(rows);
 		}catch(err){ handleDbError(res, err); }
 	});
@@ -870,41 +912,25 @@ if(dbReady){
 		const id = d.id || uuidv4();
 		try{
 			await db.query(
-				`INSERT INTO docentes (id,rut,nombre,email,titulo,"contratoHoras","ContratoHoraSemanal",carrera_id,edad,estadoCivil,turno,activo,"TotalHrsModulos","Hrs Teóricas","Hrs Prácticas","Total hrs Semana")
-				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+				`INSERT INTO docentes (id, nombre, email, telefono, turno, contrato_horas, contrato_hora_semanal, carrera_id)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 				 ON CONFLICT (id) DO UPDATE
-				 SET rut=EXCLUDED.rut,
-				     nombre=EXCLUDED.nombre,
+				 SET nombre=EXCLUDED.nombre,
 				     email=EXCLUDED.email,
-				     titulo=EXCLUDED.titulo,
-				     "contratoHoras"=EXCLUDED."contratoHoras",
-		     "ContratoHoraSemanal"=EXCLUDED."ContratoHoraSemanal",
-		     carrera_id=EXCLUDED.carrera_id,
-			     edad=EXCLUDED.edad,
-			     estadoCivil=EXCLUDED.estadoCivil,
-			     turno=EXCLUDED.turno,
-			     activo=EXCLUDED.activo,
-				     "TotalHrsModulos"=EXCLUDED."TotalHrsModulos",
-				     "Hrs Teóricas"=EXCLUDED."Hrs Teóricas",
-				     "Hrs Prácticas"=EXCLUDED."Hrs Prácticas",
-				     "Total hrs Semana"=EXCLUDED."Total hrs Semana"`,
+				     telefono=EXCLUDED.telefono,
+				     turno=EXCLUDED.turno,
+				     contrato_horas=EXCLUDED.contrato_horas,
+				     contrato_hora_semanal=EXCLUDED.contrato_hora_semanal,
+				     carrera_id=EXCLUDED.carrera_id`,
 				[
 					id,
-					d.rut,
 					d.nombre,
 					d.email||null,
-					d.titulo||null,
-					d.contratoHoras||0,
-					d.ContratoHoraSemanal||0,
-					d.carreraId||null,
-					Number.isFinite(d.edad) ? d.edad : null,
-					d.estadoCivil||null,
+					d.telefono||null,
 					d.turno||null,
-					(d.activo === false ? false : true),
-					d.TotalHrsModulos||0,
-					d['Hrs Teóricas']||0,
-					d['Hrs Prácticas']||0,
-					d['Total hrs Semana']||0
+					Number.isFinite(d.contrato_horas) ? d.contrato_horas : null,
+					Number.isFinite(d.contrato_hora_semanal) ? d.contrato_hora_semanal : null,
+					d.carreraId||null
 				]
 			);
 			res.json({ok:true,id});
@@ -915,8 +941,8 @@ if(dbReady){
 		const d = req.body;
 		try{
 			await db.query(
-				'UPDATE docentes SET rut=$1, nombre=$2, email=$3, titulo=$4, "contratoHoras"=$5, "ContratoHoraSemanal"=$6, carrera_id=$7, edad=$8, estadoCivil=$9, turno=$10, activo=$11, "TotalHrsModulos"=$12, "Hrs Teóricas"=$13, "Hrs Prácticas"=$14, "Total hrs Semana"=$15 WHERE id=$16',
-				[d.rut, d.nombre, d.email||null, d.titulo||null, d.contratoHoras||0, d.ContratoHoraSemanal||0, d.carreraId||null, Number.isFinite(d.edad)?d.edad:null, d.estadoCivil||null, d.turno||null, (d.activo===false?false:true), d.TotalHrsModulos||0, d['Hrs Teóricas']||0, d['Hrs Prácticas']||0, d['Total hrs Semana']||0, req.params.id]
+				'UPDATE docentes SET nombre=$1, email=$2, telefono=$3, turno=$4, contrato_horas=$5, contrato_hora_semanal=$6, carrera_id=$7 WHERE id=$8',
+				[d.nombre, d.email||null, d.telefono||null, d.turno||null, Number.isFinite(d.contrato_horas)?d.contrato_horas:null, Number.isFinite(d.contrato_hora_semanal)?d.contrato_hora_semanal:null, d.carreraId||null, req.params.id]
 			);
 			res.json({ok:true});
 		}catch(err){ handleDbError(res, err); }
