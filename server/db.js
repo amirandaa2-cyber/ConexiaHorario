@@ -167,16 +167,6 @@ async function initializeSchema() {
 			sala_id WITH =,
 			tstzrange(start, "end") WITH &&
 		) WHERE (sala_id IS NOT NULL)`,
-		// Relación docente_carrera para múltiples pertenencias y activación
-		`CREATE TABLE IF NOT EXISTS docente_carrera (
-			docente_id VARCHAR(20) REFERENCES docentes(id) ON DELETE CASCADE,
-			carrera_id VARCHAR(50) REFERENCES carreras(id) ON DELETE CASCADE,
-			activo BOOLEAN NOT NULL DEFAULT TRUE,
-			prioridad INTEGER,
-			PRIMARY KEY (docente_id, carrera_id)
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_docente_carrera_carrera ON docente_carrera (carrera_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_docente_carrera_activo_prioridad ON docente_carrera (carrera_id, activo, prioridad)`,
 		`CREATE TABLE IF NOT EXISTS docente_semana_horas (
 			docente_id VARCHAR(20) REFERENCES docentes(id) ON DELETE CASCADE,
 			semana INTEGER NOT NULL,
