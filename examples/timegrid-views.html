@@ -8463,6 +8463,7 @@
       transition: gap 0.25s ease;
       width: 100%;
       min-height: 0;
+      flex: 1 1 auto;
     }
 
     #sidebar {
@@ -8962,6 +8963,9 @@
     #calendar-wrap {
       flex: 1 1 calc(100% - var(--sidebar-width) - 24px);
       min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
 
     /* make calendar use available width and not overflow */
@@ -8970,6 +8974,33 @@
       max-width: 100%;
       box-sizing: border-box;
       min-width: 0;
+      flex: 1 1 auto;
+      min-height: clamp(520px, 70vh, 960px);
+    }
+
+    /* medium screens: calendar first, sidebar stacked below */
+    @media (max-width: 1280px) {
+      #app {
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      #calendar-wrap {
+        order: -1;
+        width: 100%;
+        flex: 1 1 auto;
+      }
+
+      #sidebar {
+        width: 100%;
+        max-width: 100%;
+        flex: 0 0 auto;
+        max-height: none;
+      }
+
+      #sidebar-resize-handle {
+        display: none;
+      }
     }
 
     /* ensure FullCalendar inner containers can shrink inside flex items */
@@ -8995,7 +9026,7 @@
       }
 
       #calendar-wrap {
-        order: 2;
+        order: -1;
         width: 100%;
         flex: 1 1 auto;
       }
@@ -10392,16 +10423,35 @@
           return cal.el.querySelector('.fc-header-toolbar .fc-toolbar-center');
         }
 
+        function normalizeId(val){
+          return String(val || '').trim().toLowerCase();
+        }
+
+        function normalizeName(val){
+          return String(val || '').trim().toLowerCase();
+        }
+
+        function carreraLabelFromEvent(ev){
+          const props = ev.extendedProps || {};
+          const id = props.carreraId || props.carrera || null;
+          const name = props.carreraNombre || props.carrera_name || props.carreraLabel || null;
+          return name || id || '';
+        }
+
         function collectCarreras(){
           const cal = ensureCalendar();
           if (!cal) return [];
-          const set = new Set();
+          const byKey = new Map();
           cal.getEvents().forEach(ev => {
             const props = ev.extendedProps || {};
-            const id = props.carreraId || props.carrera || null;
-            if (id) set.add(String(id));
+            const id = normalizeId(props.carreraId || props.carrera);
+            const name = normalizeName(props.carreraNombre || props.carrera_name || props.carreraLabel);
+            if (id || name) {
+              const key = id || name;
+              if (!byKey.has(key)) byKey.set(key, { id, name, label: (props.carreraNombre || props.carrera_name || props.carreraLabel || props.carrera || props.carreraId || '').toString() });
+            }
           });
-          return Array.from(set).sort();
+          return Array.from(byKey.values()).sort((a,b) => a.label.localeCompare(b.label));
         }
 
         function renderFilter(){
@@ -10421,10 +10471,10 @@
           optAll.textContent = '-- Todas --';
           select.appendChild(optAll);
 
-          collectCarreras().forEach(id => {
+          collectCarreras().forEach(entry => {
             const opt = document.createElement('option');
-            opt.value = id;
-            opt.textContent = id.toUpperCase();
+            opt.value = entry.id || entry.name || entry.label;
+            opt.textContent = (entry.label || entry.name || entry.id).toUpperCase();
             select.appendChild(opt);
           });
 
@@ -10449,8 +10499,11 @@
             const showAll = normalized === '';
             cal.getEvents().forEach(ev => {
               const props = ev.extendedProps || {};
-              const evCarrera = String(props.carreraId || props.carrera || '');
-              const match = showAll ? true : (evCarrera === normalized);
+              const evId = normalizeId(props.carreraId || props.carrera || '');
+              const evName = normalizeName(props.carreraNombre || props.carrera_name || props.carreraLabel || '');
+              const targetId = normalizeId(normalized);
+              const targetName = normalizeName(normalized);
+              const match = showAll ? true : (evId && evId === targetId) || (evName && evName === targetName) || (normalizeName(carreraLabelFromEvent(ev)) === targetName);
               // Toggle visibility without removing events
               ev.setProp('display', match ? 'auto' : 'none');
             });
@@ -10475,14 +10528,16 @@
           const cal = ensureCalendar();
           if (cal) {
             cal.setOption('eventAdd', function(info){
-              const existing = Array.from(select.options).map(o => o.value);
-              const props = info.event.extendedProps || {};
-              const id = String(props.carreraId || props.carrera || '');
-              if (id && !existing.includes(id)) {
-                const opt = document.createElement('option');
-                opt.value = id;
-                opt.textContent = id.toUpperCase();
-                select.appendChild(opt);
+              const existingLabels = Array.from(select.options).map(o => o.textContent.toLowerCase());
+              const label = carreraLabelFromEvent(info.event);
+              if (label) {
+                const normalizedLabel = label.toString().trim().toLowerCase();
+                if (!existingLabels.includes(normalizedLabel)) {
+                  const opt = document.createElement('option');
+                  opt.value = label;
+                  opt.textContent = label.toUpperCase();
+                  select.appendChild(opt);
+                }
               }
             });
             cal.setOption('eventRemove', function(){ /* no-op for now */ });
