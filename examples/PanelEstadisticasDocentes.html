@@ -20,11 +20,7 @@
       --border-color: rgba(15, 23, 42, 0.08);
       --shadow-soft: 0 15px 35px rgba(15, 23, 42, 0.08);
     }
-
-    *, *::before, *::after {
-      box-sizing: border-box;
-    }
-
+    *, *::before, *::after { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -34,7 +30,6 @@
       color: var(--text-color);
       min-height: 100vh;
     }
-
     .page-shell {
       max-width: 1200px;
       margin: 0 auto;
@@ -42,9 +37,7 @@
       display: flex;
       flex-direction: column;
       gap: 32px;
-      position: relative;
     }
-
     header.hero {
       display: flex;
       flex-wrap: wrap;
@@ -57,7 +50,6 @@
       box-shadow: var(--shadow-soft);
       border: 1px solid rgba(19, 32, 51, 0.08);
     }
-
     .hero-eyebrow {
       text-transform: uppercase;
       letter-spacing: 0.2em;
@@ -65,20 +57,17 @@
       color: var(--muted-text);
       margin-bottom: 6px;
     }
-
     .hero h1 {
       margin: 0 0 12px;
       font-family: 'Bowlby One', cursive;
       letter-spacing: 0.01em;
     }
-
     .hero-lead {
       margin: 0;
       color: var(--muted-text);
       max-width: 560px;
       line-height: 1.5;
     }
-
     .hero-actions {
       display: flex;
       gap: 12px;
@@ -88,7 +77,6 @@
       border-radius: 18px;
       border: 1px solid rgba(19, 32, 51, 0.06);
     }
-
     .primary-btn,
     .ghost-btn {
       border-radius: 999px;
@@ -103,31 +91,26 @@
       gap: 8px;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-
     .primary-btn {
       background: linear-gradient(135deg, var(--brand-orange), #d9620f);
       color: #fff;
       box-shadow: 0 14px 32px rgba(249, 115, 22, 0.28);
     }
-
     .ghost-btn {
       background: rgba(19, 32, 51, 0.04);
       color: var(--text-color);
       border: 1px solid rgba(19, 32, 51, 0.12);
     }
-
     .primary-btn:hover,
     .ghost-btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 18px 28px rgba(15, 23, 42, 0.15);
     }
-
     .cards-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 18px;
     }
-
     .metric-card {
       background: var(--card-bg);
       border-radius: 24px;
@@ -140,7 +123,6 @@
       position: relative;
       overflow: hidden;
     }
-
     .metric-card::after {
       content: '';
       position: absolute;
@@ -149,42 +131,17 @@
       opacity: 0.6;
       pointer-events: none;
     }
-
-    .metric-card > * {
-      position: relative;
-      z-index: 1;
-    }
-
+    .metric-card > * { position: relative; z-index: 1; }
     .metric-label {
       text-transform: uppercase;
       font-size: 0.75rem;
       letter-spacing: 0.15em;
       color: var(--muted-text);
     }
-
-    .metric-value {
-      font-size: 2.25rem;
-      font-weight: 700;
-    }
-
-    .metric-trend {
-      font-size: 0.9rem;
-      color: var(--brand-green);
-      font-weight: 600;
-    }
-
-    .section-title {
-      margin: 12px 0 8px;
-      font-size: 1.15rem;
-      font-weight: 600;
-    }
-
-    .section-description {
-      margin: 0 0 18px;
-      color: var(--muted-text);
-      font-size: 0.95rem;
-    }
-
+    .metric-value { font-size: 2.25rem; font-weight: 700; }
+    .metric-trend { font-size: 0.9rem; color: var(--brand-green); font-weight: 600; }
+    .section-title { margin: 12px 0 6px; font-size: 1.15rem; font-weight: 600; }
+    .section-description { margin: 0 0 18px; color: var(--muted-text); font-size: 0.95rem; }
     .panel-section {
       background: linear-gradient(145deg, var(--card-bg), var(--card-muted));
       border-radius: 26px;
@@ -192,58 +149,59 @@
       border: 1px solid rgba(19, 32, 51, 0.08);
       box-shadow: var(--shadow-soft);
     }
-
-    .progress-row {
+    .section-header {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 10px;
-      font-size: 0.9rem;
-    }
-
-    .progress-bar {
-      width: 100%;
-      height: 12px;
-      border-radius: 999px;
-      background: rgba(148, 163, 184, 0.25);
-      overflow: hidden;
-      position: relative;
-    }
-
-    .progress-value {
-      height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, var(--brand-blue), var(--brand-green));
-      box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.15);
-    }
-
-    .list-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 18px;
+      flex-wrap: wrap;
+      align-items: flex-start;
     }
-
-    .list-card ul {
+    .highlight-chip {
+      background: rgba(31, 78, 168, 0.08);
+      border: 1px solid rgba(31, 78, 168, 0.2);
+      color: var(--brand-blue);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .chart-wrapper {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 12px;
+      border: 1px solid rgba(19, 32, 51, 0.06);
+      min-height: 260px;
+    }
+    .salas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+    }
+    .subheading {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted-text);
+    }
+    .simple-list,
+    .badge-list {
       list-style: none;
       padding: 0;
       margin: 0;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
     }
-
-    .list-card li {
+    .simple-list li,
+    .badge-list li {
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px dashed rgba(15, 23, 42, 0.08);
       padding-bottom: 10px;
     }
-
-    .list-card li:last-child {
-      border-bottom: none;
-      padding-bottom: 0;
-    }
-
+    .simple-list li:last-child,
+    .badge-list li:last-child { border-bottom: none; padding-bottom: 0; }
     .chip {
       padding: 4px 12px;
       border-radius: 999px;
@@ -252,21 +210,72 @@
       background: rgba(16, 185, 129, 0.1);
       color: var(--brand-green);
       border: 1px solid rgba(16, 185, 129, 0.2);
+      white-space: nowrap;
     }
-
+    .badge-pill {
+      background: rgba(15, 23, 42, 0.05);
+      border-radius: 16px;
+      padding: 6px 12px;
+      font-weight: 600;
+    }
+    .progress-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.25);
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 14px;
+    }
+    .progress-value {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--brand-blue), var(--brand-green));
+      box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.15);
+    }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+    }
+    .stat-item {
+      background: var(--card-bg);
+      border: 1px solid rgba(19, 32, 51, 0.08);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: var(--shadow-soft);
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--muted-text);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .stat-value { font-size: 1.4rem; font-weight: 700; margin-top: 6px; }
+    .insight-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+    .insight-card { text-align: center; }
+    .insight-value { font-size: 2rem; font-weight: 700; margin: 12px 0 6px; }
+    .insight-caption { margin: 0; color: var(--muted-text); }
     footer.page-footer {
       text-align: center;
       color: var(--muted-text);
       font-size: 0.85rem;
+      padding: 24px 0 0;
     }
-
     @media (max-width: 640px) {
-      header.hero {
-        padding: 24px;
-      }
-      .metric-value {
-        font-size: 1.9rem;
-      }
+      header.hero { padding: 24px; }
+      .metric-value { font-size: 1.9rem; }
+      .section-header { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
@@ -276,7 +285,7 @@
       <div>
         <p class="hero-eyebrow">Conexia · Insights</p>
         <h1>Panel de estadísticas docentes</h1>
-        <p class="hero-lead">Monitorea la ocupación de docentes, identifica brechas de cobertura y toma decisiones rápidas antes de publicar nuevos bloques en el calendario.</p>
+        <p class="hero-lead">Analiza la carga semanal, detecta cuellos de botella y optimiza salas, docentes y bloques críticos en base a los datos reales del calendario.</p>
       </div>
       <div class="hero-actions">
         <a class="ghost-btn" href="timegrid-views.html">⟵ Volver al calendario</a>
@@ -284,99 +293,116 @@
       </div>
     </header>
 
-    <section class="cards-grid" aria-label="Indicadores destacados">
+    <section class="cards-grid" aria-label="Indicadores principales">
+      <article class="metric-card">
+        <span class="metric-label">Clases programadas</span>
+        <span class="metric-value" id="total-clases-value">—</span>
+        <span class="metric-trend" id="total-clases-caption">Bloques publicados</span>
+      </article>
       <article class="metric-card">
         <span class="metric-label">Docentes activos</span>
-        <span class="metric-value" id="docentes-activos-value">46</span>
-        <span class="metric-trend" id="docentes-activos-trend">+3 incorporados este mes</span>
+        <span class="metric-value" id="docentes-activos-value">—</span>
+        <span class="metric-trend" id="docentes-activos-caption">Activos en la semana</span>
       </article>
       <article class="metric-card">
-        <span class="metric-label">Cobertura semanal</span>
-        <span class="metric-value" id="cobertura-semanal-value">92%</span>
-        <span class="metric-trend" id="cobertura-semanal-trend">↑ 5 pts vs semana anterior</span>
+        <span class="metric-label">Salas utilizadas</span>
+        <span class="metric-value" id="salas-uso-value">—</span>
+        <span class="metric-trend" id="salas-uso-caption">En uso mensual</span>
       </article>
       <article class="metric-card">
-        <span class="metric-label">Horas por docente</span>
-        <span class="metric-value" id="horas-docente-value">18.4</span>
-        <span class="metric-trend" id="horas-docente-trend">Objetivo: 20 h promedio</span>
-      </article>
-      <article class="metric-card">
-        <span class="metric-label">Bloques críticos</span>
-        <span class="metric-value" id="bloques-criticos-value">7</span>
-        <span class="metric-trend" id="bloques-criticos-trend" style="color:#ef4444;">Prioridad alta</span>
+        <span class="metric-label">Conflictos detectados</span>
+        <span class="metric-value" id="conflictos-value">—</span>
+        <span class="metric-trend" id="conflictos-caption">Bloques afectados</span>
       </article>
     </section>
 
-    <section class="panel-section" aria-labelledby="distribucion-title">
-      <h2 id="distribucion-title" class="section-title">Distribución de carga</h2>
-      <p class="section-description">Resumen semanal por escuela. Los porcentajes indican la utilización de las horas asignables para cada equipo docente.</p>
-      <div id="distribucion-carga-list">
-        <div class="progress-row">
-          <span>Ingeniería &amp; Minería</span>
-          <span>87%</span>
+    <section class="panel-section chart-panel" aria-labelledby="horas-docentes-title">
+      <div class="section-header">
+        <div>
+          <h2 id="horas-docentes-title" class="section-title">Horas semanales por docente</h2>
+          <p class="section-description">Comparativa de la semana en curso. Sirve para reasignar módulos y equilibrar la carga.</p>
         </div>
-        <div class="progress-bar" aria-hidden="true">
-          <div class="progress-value" style="width:87%"></div>
+        <div class="highlight-chip" id="horas-docentes-highlight">Sin datos</div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="horas-docentes-chart" aria-label="Gráfico de barras con horas semanales por docente"></canvas>
+      </div>
+    </section>
+
+    <section class="panel-section salas-panel" aria-labelledby="salas-title">
+      <h2 id="salas-title" class="section-title">Salas más y menos utilizadas</h2>
+      <p class="section-description">Identifica espacios tensionados y ambientes subutilizados para mejorar la rotación.</p>
+      <div class="salas-grid">
+        <div>
+          <h3 class="subheading">Top de uso</h3>
+          <ul id="salas-mas-list" class="simple-list">
+            <li><span>—</span><span class="chip">0 usos</span></li>
+          </ul>
         </div>
-        <div class="progress-row">
-          <span>Negocios &amp; Logística</span>
-          <span>94%</span>
-        </div>
-        <div class="progress-bar" aria-hidden="true">
-          <div class="progress-value" style="width:94%"></div>
-        </div>
-        <div class="progress-row">
-          <span>Salud</span>
-          <span>78%</span>
-        </div>
-        <div class="progress-bar" aria-hidden="true">
-          <div class="progress-value" style="width:78%"></div>
-        </div>
-        <div class="progress-row">
-          <span>Tecnologías de la Información</span>
-          <span>101%</span>
-        </div>
-        <div class="progress-bar" aria-hidden="true">
-          <div class="progress-value" style="width:100%"></div>
+        <div>
+          <h3 class="subheading">Baja utilización</h3>
+          <ul id="salas-menos-list" class="simple-list">
+            <li><span>—</span><span class="chip">0 usos</span></li>
+          </ul>
         </div>
       </div>
     </section>
 
-    <section class="list-grid" aria-label="Detalle de focos prioritarios">
-      <article class="panel-section list-card">
-        <h2 class="section-title">Docentes con mayor carga</h2>
-        <ul id="docentes-mayor-carga-list">
-          <li><span>Camila Rivas</span><span class="chip">24 h</span></li>
-          <li><span>Javier Lazo</span><span class="chip">22 h</span></li>
-          <li><span>Pamela Olivares</span><span class="chip">21 h</span></li>
-          <li><span>Ignacio Romero</span><span class="chip">21 h</span></li>
-        </ul>
+    <section class="panel-section tiempos-panel" aria-labelledby="tiempos-muertos-title">
+      <h2 id="tiempos-muertos-title" class="section-title">Identificación de tiempos muertos</h2>
+      <p class="section-description">Franjas horarias con menor asignación de clases en las últimas tres semanas.</p>
+      <ul id="tiempos-muertos-list" class="badge-list">
+        <li><span>Sin datos</span><span class="chip">0 clases</span></li>
+      </ul>
+    </section>
+
+    <section class="panel-section general-panel" aria-labelledby="estadisticas-generales-title">
+      <h2 id="estadisticas-generales-title" class="section-title">Estadísticas generales del horario</h2>
+      <div class="stat-grid">
+        <div class="stat-item">
+          <span class="stat-label">Clases creadas</span>
+          <span class="stat-value" id="stat-total-clases">—</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Profesores activos</span>
+          <span class="stat-value" id="stat-docentes">—</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Salas usadas / disponibles</span>
+          <span class="stat-value" id="stat-salas">—</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Horarios con conflictos</span>
+          <span class="stat-value" id="stat-conflictos">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel-section carreras-panel" aria-labelledby="carreras-title">
+      <h2 id="carreras-title" class="section-title">Carreras con más carga académica</h2>
+      <p class="section-description">Horas totales programadas durante el semestre activo.</p>
+      <div id="carreras-carga-list"></div>
+    </section>
+
+    <section class="insight-cards">
+      <article class="panel-section insight-card" aria-labelledby="dia-carga-title">
+        <h2 id="dia-carga-title" class="section-title">Día con mayor carga</h2>
+        <p class="insight-value" id="insight-dia-carga-value">—</p>
+        <p class="insight-caption" id="insight-dia-carga-caption">Horas programadas</p>
       </article>
-      <article class="panel-section list-card">
-        <h2 class="section-title">Alertas de reemplazo</h2>
-        <ul id="alertas-reemplazo-list">
-          <li><span>Programación I · Vespertino</span><span class="chip" style="background:rgba(239,68,68,0.15);color:#ef4444;">3 faltas</span></li>
-          <li><span>Metalurgia · Taller M2</span><span class="chip" style="background:rgba(251,191,36,0.2);color:#b45309;">Seguimiento</span></li>
-          <li><span>Higiene y Seguridad</span><span class="chip">Cubierto</span></li>
-          <li><span>Logística Aplicada</span><span class="chip">Cubierto</span></li>
-        </ul>
-      </article>
-      <article class="panel-section list-card">
-        <h2 class="section-title">Bloques en riesgo</h2>
-        <ul id="bloques-riesgo-list">
-          <li><span>Lunes · 08:00-09:40</span><span class="chip" style="background:rgba(59,130,246,0.15);color:#2563eb;">Sobrecarga</span></li>
-          <li><span>Martes · 19:00-21:00</span><span class="chip" style="background:rgba(239,68,68,0.15);color:#ef4444;">Sin docente</span></li>
-          <li><span>Jueves · 15:00-18:00</span><span class="chip">Estable</span></li>
-          <li><span>Viernes · 09:40-11:20</span><span class="chip">Estable</span></li>
-        </ul>
+      <article class="panel-section insight-card" aria-labelledby="peak-title">
+        <h2 id="peak-title" class="section-title">Horas peak del campus</h2>
+        <p class="insight-value" id="insight-peak-hora-value">—</p>
+        <p class="insight-caption" id="insight-peak-hora-caption">Mayor concurrencia</p>
       </article>
     </section>
 
     <footer class="page-footer">
-      Datos referenciales para exploración visual. Integra tus API o reportes reales conectando este panel al backend de Conexia.
+      Datos calculados en tiempo real desde el backend de Conexia. Exporta este panel o conecta nuevos indicadores según tus necesidades.
     </footer>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-YcsIP0GLKlTnmpNqm7ujwZuMYhyoF30w8L3yXLX0nL9pOEHtkobaN6D+PfYZ7R6POjISiFDUFxIr05o2NqXSPA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <script>
     (function(){
       function downloadPdf(){
@@ -401,122 +427,275 @@
   <script>
     (function() {
       const DASHBOARD_ENDPOINT = '/api/dashboard/estadisticas';
+      const numberFormatter = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
+      const decimalFormatter = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
       const fallbackData = {
-        docentesActivos: { value: '46', trend: '+3 incorporados este mes' },
-        coberturaSemanal: { value: '92%', trend: '↑ 5 pts vs semana anterior' },
-        horasPorDocente: { value: '18.4', trend: 'Objetivo: 20 h promedio' },
-        bloquesCriticos: { value: '7', trend: 'Prioridad alta' },
-        distribucion: [
-          { label: 'Ingeniería & Minería', percent: 87 },
-          { label: 'Negocios & Logística', percent: 94 },
-          { label: 'Salud', percent: 78 },
-          { label: 'Tecnologías de la Información', percent: 101 }
+        resumenGeneral: {
+          totalClases: 128,
+          docentesActivos: 42,
+          salasUsadas: 18,
+          salasTotales: 26,
+          conflictos: 4,
+          porcentajeConflictos: 3.1
+        },
+        horasDocentes: [
+          { nombre: 'Camila González', horas: 26.5 },
+          { nombre: 'Marcelo Oporto', horas: 24.0 },
+          { nombre: 'Scarlette Muñoz', horas: 22.5 },
+          { nombre: 'Nelson Salazar', horas: 21.0 },
+          { nombre: 'Victor Curinao', horas: 20.5 }
         ],
-        docentesCarga: [
-          { label: 'Camila Rivas', badge: '24 h' },
-          { label: 'Javier Lazo', badge: '22 h' },
-          { label: 'Pamela Olivares', badge: '21 h' },
-          { label: 'Ignacio Romero', badge: '21 h' }
+        salasMasUsadas: [
+          { nombre: 'Laboratorio 302', usos: 34 },
+          { nombre: 'Sala Magna', usos: 28 },
+          { nombre: 'Taller M2', usos: 24 }
         ],
-        alertasReemplazo: [
-          { label: 'Programación I · Vespertino', badge: '3 faltas', badgeStyle: { background: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
-          { label: 'Metalurgia · Taller M2', badge: 'Seguimiento', badgeStyle: { background: 'rgba(251,191,36,0.2)', color: '#b45309' } },
-          { label: 'Higiene y Seguridad', badge: 'Cubierto' },
-          { label: 'Logística Aplicada', badge: 'Cubierto' }
+        salasMenosUsadas: [
+          { nombre: 'Sala 101', usos: 6 },
+          { nombre: 'Laboratorio Biomed', usos: 4 },
+          { nombre: 'Módulo Flexible', usos: 1 }
         ],
-        bloquesRiesgo: [
-          { label: 'Lunes · 08:00-09:40', badge: 'Sobrecarga', badgeStyle: { background: 'rgba(59,130,246,0.15)', color: '#2563eb' } },
-          { label: 'Martes · 19:00-21:00', badge: 'Sin docente', badgeStyle: { background: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
-          { label: 'Jueves · 15:00-18:00', badge: 'Estable' },
-          { label: 'Viernes · 09:40-11:20', badge: 'Estable' }
-        ]
+        tiemposMuertos: [
+          { label: '13:00 - 14:00', clases: 2 },
+          { label: '16:00 - 17:00', clases: 3 },
+          { label: '21:00 - 22:00', clases: 1 }
+        ],
+        estadisticasHorario: {
+          carrerasMasCarga: [
+            { label: 'Enfermería', horas: 186 },
+            { label: 'Ingeniería en Minas', horas: 165 },
+            { label: 'Prevención de Riesgos', horas: 142 },
+            { label: 'Psicopedagogía', horas: 120 },
+            { label: 'Informática Biomédica', horas: 104 }
+          ],
+          diaMayorCarga: { label: 'Martes 12', horas: 212 },
+          horasPeak: { label: '19:00 - 20:00', clases: 28 }
+        }
       };
 
-      function updateMetric(target, payload, fallback) {
-        const el = document.getElementById(target.valueId);
-        if (!el) return;
-        const metric = payload ?? fallback;
-        if (metric == null) return;
-        const display = metric.display ?? metric.value ?? String(metric);
-        el.textContent = display;
-        const trendEl = document.getElementById(target.trendId);
-        if (trendEl && (metric.trend || fallback?.trend)) {
-          trendEl.textContent = metric.trend || fallback.trend || '';
+      let horasDocentesChart = null;
+
+      function setText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+      }
+
+      function formatNumber(value) {
+        const num = Number(value || 0);
+        if (!Number.isFinite(num)) return '0';
+        return numberFormatter.format(num);
+      }
+
+      function formatDecimal(value) {
+        const num = Number(value || 0);
+        if (!Number.isFinite(num)) return '0,0';
+        return decimalFormatter.format(num);
+      }
+
+      function ensureList(source, fallback) {
+        return Array.isArray(source) && source.length ? source : fallback;
+      }
+
+      function updateMetricCards(resumen) {
+        setText('total-clases-value', formatNumber(resumen.totalClases));
+        setText('total-clases-caption', 'Bloques publicados');
+        setText('docentes-activos-value', formatNumber(resumen.docentesActivos));
+        setText('docentes-activos-caption', 'Activos en la semana');
+        setText('salas-uso-value', `${formatNumber(resumen.salasUsadas)} / ${formatNumber(resumen.salasTotales)}`);
+        setText('salas-uso-caption', 'En uso mensual');
+        setText('conflictos-value', `${formatDecimal(resumen.porcentajeConflictos)}%`);
+        setText('conflictos-caption', `${formatNumber(resumen.conflictos)} bloques afectados`);
+
+        setText('stat-total-clases', formatNumber(resumen.totalClases));
+        setText('stat-docentes', formatNumber(resumen.docentesActivos));
+        setText('stat-salas', `${formatNumber(resumen.salasUsadas)} / ${formatNumber(resumen.salasTotales)}`);
+        setText('stat-conflictos', `${formatDecimal(resumen.porcentajeConflictos)}%`);
+      }
+
+      function renderHorasDocentesChart(items) {
+        const canvas = document.getElementById('horas-docentes-chart');
+        const highlight = document.getElementById('horas-docentes-highlight');
+        if (!canvas || !highlight) return;
+
+        if (!items.length) {
+          highlight.textContent = 'Sin datos';
+          if (horasDocentesChart) {
+            horasDocentesChart.destroy();
+            horasDocentesChart = null;
+          }
+          return;
+        }
+
+        highlight.textContent = `${items[0].nombre}: ${formatDecimal(items[0].horas)} h`;
+
+        if (!window.Chart) {
+          return;
+        }
+
+        const labels = items.map((item) => item.nombre);
+        const data = items.map((item) => Number(item.horas || 0));
+
+        if (!horasDocentesChart) {
+          horasDocentesChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: 'Horas semana',
+                  data,
+                  backgroundColor: 'rgba(31, 78, 168, 0.7)',
+                  borderRadius: 14,
+                  borderSkipped: false
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => `${formatDecimal(ctx.raw)} h`
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  ticks: { color: '#475569' },
+                  grid: { display: false }
+                },
+                y: {
+                  beginAtZero: true,
+                  ticks: { color: '#475569' },
+                  grid: { color: 'rgba(148, 163, 184, 0.35)' }
+                }
+              }
+            }
+          });
+        } else {
+          horasDocentesChart.data.labels = labels;
+          horasDocentesChart.data.datasets[0].data = data;
+          horasDocentesChart.update();
         }
       }
 
-      function createProgressItem(item) {
-        const percentRaw = Number(item.percent ?? item.value ?? 0);
-        const percent = Number.isFinite(percentRaw) ? percentRaw : 0;
-        const badgeText = item.badgeText ?? item.display ?? `${Math.round(percent)}%`;
+      function renderSalasList(containerId, items) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        if (!items.length) {
+          const li = document.createElement('li');
+          li.innerHTML = '<span>Sin datos</span><span class="chip">0 usos</span>';
+          container.appendChild(li);
+          return;
+        }
+        items.forEach((item) => {
+          const li = document.createElement('li');
+          const label = document.createElement('span');
+          label.textContent = item.nombre || 'Sin nombre';
+          const badge = document.createElement('span');
+          badge.className = 'chip';
+          const usos = formatNumber(item.usos || 0);
+          badge.textContent = `${usos} uso${Number(item.usos || 0) === 1 ? '' : 's'}`;
+          li.append(label, badge);
+          container.appendChild(li);
+        });
+      }
+
+      function renderTiemposMuertos(items) {
+        const container = document.getElementById('tiempos-muertos-list');
+        if (!container) return;
+        container.innerHTML = '';
+        if (!items.length) {
+          const li = document.createElement('li');
+          li.innerHTML = '<span>Sin datos</span><span class="chip">0 clases</span>';
+          container.appendChild(li);
+          return;
+        }
+        items.forEach((item) => {
+          const li = document.createElement('li');
+          const label = document.createElement('span');
+          label.textContent = item.label || '—';
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          const valor = formatNumber(item.clases || 0);
+          chip.textContent = `${valor} clase${Number(item.clases || 0) === 1 ? '' : 's'}`;
+          li.append(label, chip);
+          container.appendChild(li);
+        });
+      }
+
+      function createProgressItem(label, percent, badgeText) {
         const row = document.createElement('div');
         row.className = 'progress-row';
-        const label = document.createElement('span');
-        label.textContent = item.label || '—';
-        const badge = document.createElement('span');
-        badge.textContent = badgeText;
-        row.append(label, badge);
+        row.innerHTML = `<span>${label}</span><span>${badgeText}</span>`;
         const bar = document.createElement('div');
         bar.className = 'progress-bar';
         bar.setAttribute('aria-hidden', 'true');
         const fill = document.createElement('div');
         fill.className = 'progress-value';
         fill.style.width = `${Math.min(100, Math.max(0, percent))}%`;
-        bar.append(fill);
+        bar.appendChild(fill);
         return [row, bar];
       }
 
-      function renderDistribucion(list) {
-        const container = document.getElementById('distribucion-carga-list');
+      function renderCarreras(items) {
+        const container = document.getElementById('carreras-carga-list');
         if (!container) return;
         container.innerHTML = '';
-        (list || []).forEach(item => {
-          const [row, bar] = createProgressItem(item);
+        if (!items.length) {
+          const empty = document.createElement('p');
+          empty.textContent = 'Sin datos disponibles.';
+          container.appendChild(empty);
+          return;
+        }
+        const maxHoras = Math.max(...items.map((i) => Number(i.horas || 0)));
+        items.forEach((item) => {
+          const percent = maxHoras > 0 ? (Number(item.horas || 0) / maxHoras) * 100 : 0;
+          const badgeText = `${formatDecimal(item.horas || 0)} h`;
+          const [row, bar] = createProgressItem(item.label || 'Carrera', percent, badgeText);
           container.append(row, bar);
         });
       }
 
-      function renderList(containerId, items) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        container.innerHTML = '';
-        if (!items || !items.length) {
-          const empty = document.createElement('li');
-          empty.textContent = 'Sin datos disponibles';
-          container.appendChild(empty);
-          return;
+      function updateInsights(estadisticas) {
+        const dia = estadisticas?.diaMayorCarga || null;
+        const peak = estadisticas?.horasPeak || null;
+        if (dia) {
+          setText('insight-dia-carga-value', dia.label || 'Sin datos');
+          setText('insight-dia-carga-caption', `${formatDecimal(dia.horas || 0)} h programadas`);
+        } else {
+          setText('insight-dia-carga-value', 'Sin datos');
+          setText('insight-dia-carga-caption', 'Horas programadas');
         }
-        items.forEach(item => {
-          const li = document.createElement('li');
-          const label = document.createElement('span');
-          label.textContent = item.label || item.title || '—';
-          li.appendChild(label);
-          const badgeText = item.badge ?? item.value ?? item.display;
-          if (badgeText) {
-            const chip = document.createElement('span');
-            chip.className = 'chip';
-            chip.textContent = badgeText;
-            if (item.badgeStyle) {
-              Object.assign(chip.style, item.badgeStyle);
-            }
-            li.appendChild(chip);
-          }
-          container.appendChild(li);
-        });
+        if (peak) {
+          setText('insight-peak-hora-value', peak.label || 'Sin datos');
+          setText('insight-peak-hora-caption', `${formatNumber(peak.clases || 0)} clases simultáneas`);
+        } else {
+          setText('insight-peak-hora-value', 'Sin datos');
+          setText('insight-peak-hora-caption', 'Mayor concurrencia');
+        }
       }
 
-      function renderDashboard(data) {
-        const metrics = [
-          { valueId: 'docentes-activos-value', trendId: 'docentes-activos-trend', payload: data.docentesActivos, fallback: fallbackData.docentesActivos },
-          { valueId: 'cobertura-semanal-value', trendId: 'cobertura-semanal-trend', payload: data.coberturaSemanal, fallback: fallbackData.coberturaSemanal },
-          { valueId: 'horas-docente-value', trendId: 'horas-docente-trend', payload: data.horasPorDocente, fallback: fallbackData.horasPorDocente },
-          { valueId: 'bloques-criticos-value', trendId: 'bloques-criticos-trend', payload: data.bloquesCriticos, fallback: fallbackData.bloquesCriticos }
-        ];
-        metrics.forEach(metric => updateMetric(metric, metric.payload, metric.fallback));
-        renderDistribucion(data.distribucion || fallbackData.distribucion);
-        renderList('docentes-mayor-carga-list', data.docentesCarga || fallbackData.docentesCarga);
-        renderList('alertas-reemplazo-list', data.alertasReemplazo || fallbackData.alertasReemplazo);
-        renderList('bloques-riesgo-list', data.bloquesRiesgo || fallbackData.bloquesRiesgo);
+      function renderDashboard(payload) {
+        const resumen = payload.resumenGeneral && typeof payload.resumenGeneral.totalClases !== 'undefined'
+          ? payload.resumenGeneral
+          : fallbackData.resumenGeneral;
+        updateMetricCards(resumen);
+
+        const horasDocentes = ensureList(payload.horasDocentes, fallbackData.horasDocentes);
+        renderHorasDocentesChart(horasDocentes);
+
+        renderSalasList('salas-mas-list', ensureList(payload.salasMasUsadas, fallbackData.salasMasUsadas));
+        renderSalasList('salas-menos-list', ensureList(payload.salasMenosUsadas, fallbackData.salasMenosUsadas));
+        renderTiemposMuertos(ensureList(payload.tiemposMuertos, fallbackData.tiemposMuertos));
+
+        const estadisticasHorario = payload.estadisticasHorario || fallbackData.estadisticasHorario;
+        renderCarreras(ensureList(estadisticasHorario?.carrerasMasCarga, fallbackData.estadisticasHorario.carrerasMasCarga));
+        updateInsights(estadisticasHorario);
       }
 
       async function fetchDashboard() {
@@ -531,7 +710,7 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
-        renderDashboard({});
+        renderDashboard(fallbackData);
         fetchDashboard();
       });
     })();

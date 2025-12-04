@@ -1252,7 +1252,6 @@
     // Mejorar el área de usuario tras cargar el DOM
     document.addEventListener('DOMContentLoaded', function() {
       try {
-        document.body.classList.add('sidebar-hidden');
         const openBtn = document.getElementById('open-sidebar-window');
         if (openBtn) {
           openBtn.addEventListener('click', function(){
@@ -4014,36 +4013,31 @@
           const STORAGE_KEY = 'sidebar_collapsed_v1';
           const toggleBtn = document.getElementById('sidebar-toggle');
           const sidebar = document.getElementById('sidebar');
-          if (!toggleBtn) return;
+          if (!toggleBtn || !sidebar) return;
 
           let storedValue = null;
           try { storedValue = localStorage.getItem(STORAGE_KEY); } catch (_) { storedValue = null; }
           const prefersCollapsed = window.matchMedia('(max-width: 980px)').matches;
-          const initialCollapsed = storedValue === null ? prefersCollapsed : storedValue === 'true';
+          let collapsed = storedValue === null ? prefersCollapsed : storedValue === 'true';
 
-          const applyState = (collapsed) => {
-            document.body.classList.toggle('sidebar-hidden', collapsed);
-            toggleBtn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
-            toggleBtn.setAttribute('aria-label', collapsed ? 'Mostrar panel lateral' : 'Ocultar panel lateral');
-            toggleBtn.title = collapsed ? 'Mostrar panel lateral' : 'Ocultar panel lateral';
-            sidebar.setAttribute('aria-hidden', collapsed ? 'true' : 'false');
-            if (collapsed) sidebar.setAttribute('inert', ''); else sidebar.removeAttribute('inert');
-            try { localStorage.setItem(STORAGE_KEY, collapsed ? 'true' : 'false'); } catch (_) { }
+          const applyState = (isCollapsed) => {
+            document.body.classList.toggle('sidebar-hidden', isCollapsed);
+            toggleBtn.setAttribute('aria-pressed', isCollapsed ? 'true' : 'false');
+            toggleBtn.setAttribute('aria-label', isCollapsed ? 'Mostrar panel lateral' : 'Ocultar panel lateral');
+            toggleBtn.title = isCollapsed ? 'Mostrar panel lateral' : 'Ocultar panel lateral';
+            sidebar.setAttribute('aria-hidden', isCollapsed ? 'true' : 'false');
+            if (isCollapsed) sidebar.setAttribute('inert', ''); else sidebar.removeAttribute('inert');
+            try { localStorage.setItem(STORAGE_KEY, isCollapsed ? 'true' : 'false'); } catch (_) { }
+            collapsed = isCollapsed;
           };
 
-          // Instead of toggling embedded sidebar, open external sidebar window
-          applyState(true);
+          applyState(collapsed);
           toggleBtn.addEventListener('click', () => {
-            try {
-              const url = new URL('sidebar.html', window.location.href).toString();
-              window.open(url, 'ceducSidebar');
-            } catch (_) {
-              window.open('sidebar.html', 'ceducSidebar');
-            }
+            applyState(!collapsed);
           });
 
           window.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && document.body.classList.contains('sidebar-hidden')) {
+            if (event.key === 'Escape' && collapsed) {
               applyState(false);
               toggleBtn.focus();
             }
