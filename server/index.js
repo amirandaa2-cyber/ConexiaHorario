@@ -69,19 +69,63 @@ async function getCargaDocente(docenteId) {
 	return { bloques, contratoSemana };
 }
 
-async function asignarEvento({ moduloId, docenteId, start, end }) {
+async function asignarEvento({ moduloId, docenteId, salaId, start, end }) {
 	const id = uuidv4();
 	const titleRow = await db.query('SELECT nombre, carrera_id FROM modulos WHERE id=$1', [moduloId]);
 	const title = titleRow.rows[0]?.nombre || `Módulo ${moduloId}`;
 	const carreraId = titleRow.rows[0]?.carrera_id ? String(titleRow.rows[0].carrera_id) : null;
-	const extendedProps = mergeMetaIntoExtendedProps({}, { moduloId, docenteId, carreraId });
+	const extendedProps = mergeMetaIntoExtendedProps({}, { moduloId, docenteId, salaId, carreraId });
 	await db.query(
-		`INSERT INTO events (id, title, start, "end", modulo_id, docente_id, extendedProps)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`INSERT INTO events (id, title, start, "end", modulo_id, docente_id, sala_id, extendedProps)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 ON CONFLICT (title, start, "end") DO NOTHING`,
-		[id, title, start, end, moduloId, docenteId, JSON.stringify(extendedProps)]
+		[id, title, start, end, moduloId, docenteId, salaId, JSON.stringify(extendedProps)]
 	);
 	return { id };
+}
+
+// Funciones auxiliares para usar disponibilidad_horaria
+async function docenteDisponibleEnBloque(docenteId, diaSemana, bloque, fecha = null) {
+	const { rows } = await db.query(
+		`SELECT docente_disponible_en_bloque($1, $2, $3, $4) AS disponible`,
+		[docenteId, diaSemana, bloque, fecha]
+	);
+	return rows[0]?.disponible ?? true;
+}
+
+async function calcularScoreDisponibilidad(docenteId, salaId, moduloId, diaSemana, bloque, fecha = null) {
+	const { rows } = await db.query(
+		`SELECT calcular_score_disponibilidad($1, $2, $3, $4, $5, $6) AS score`,
+		[docenteId, salaId, moduloId, diaSemana, bloque, fecha]
+	);
+	return rows[0]?.score ?? 50;
+}
+
+async function obtenerSalasDisponibles(carreraId, diaSemana, bloqueInicio, bloqueFin) {
+	// Obtener salas sin restricción de carrera o permitidas para esta carrera
+	const { rows } = await db.query(
+		`SELECT DISTINCT s.id, s.nombre, s.capacidad
+		 FROM salas s
+		 LEFT JOIN sala_restriccion sr ON sr.sala_id = s.id
+		 WHERE sr.carrera_id IS NULL OR sr.carrera_id = $1
+		 ORDER BY s.capacidad DESC`,
+		[carreraId]
+	);
+	return rows;
+}
+
+async function validarConflictosSala(salaId, start, end, excludeEventId = null) {
+	const query = excludeEventId
+		? `SELECT COUNT(*) AS conflictos FROM events 
+		   WHERE sala_id = $1 
+		   AND id != $4
+		   AND NOT (start >= $3 OR "end" <= $2)`
+		: `SELECT COUNT(*) AS conflictos FROM events 
+		   WHERE sala_id = $1 
+		   AND NOT (start >= $3 OR "end" <= $2)`;
+	const params = excludeEventId ? [salaId, start, end, excludeEventId] : [salaId, start, end];
+	const { rows } = await db.query(query, params);
+	return Number(rows[0]?.conflictos || 0) === 0;
 }
 
 function handleDbError(res, err){
