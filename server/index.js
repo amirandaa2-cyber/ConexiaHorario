@@ -1303,8 +1303,10 @@ if(dbReady){
 	app.post('/api/auto-organizar', async (req, res) => {
 		try {
 			const { carreraId, semanas = 1, fechaInicio } = req.body;
+			console.log('[AUTO-ORGANIZAR] Request recibido:', { carreraId, semanas, fechaInicio });
 
 			if (!carreraId) {
+				console.warn('[AUTO-ORGANIZAR] Error: carreraId faltante');
 				return res.status(400).json({ error: 'carreraId es obligatorio' });
 			}
 
@@ -1322,7 +1324,9 @@ if(dbReady){
 				[carreraId]
 			);
 
+			console.log(`[AUTO-ORGANIZAR] Módulos pendientes encontrados: ${modulos.length}`);
 			if (!modulos.length) {
+				console.log('[AUTO-ORGANIZAR] Sin módulos pendientes, finalizando');
 				return res.json({ 
 					ok: true, 
 					mensaje: 'No hay módulos pendientes de asignar', 
@@ -1332,8 +1336,10 @@ if(dbReady){
 
 			// 2. Obtener docentes disponibles para esta carrera (ordenados por prioridad)
 			const docentes = await getDocentesPorCarrera(carreraId);
+			console.log(`[AUTO-ORGANIZAR] Docentes elegibles: ${docentes.length}`);
 
 			if (!docentes.length) {
+				console.warn('[AUTO-ORGANIZAR] Error: sin docentes para carrera', carreraId);
 				return res.status(400).json({ 
 					error: 'No hay docentes asignados a esta carrera' 
 				});
@@ -1484,7 +1490,7 @@ if(dbReady){
 				}
 			}
 
-			res.json({
+			const resultado = {
 				ok: true,
 				asignaciones,
 				errores: errores.length > 0 ? errores : undefined,
@@ -1493,10 +1499,12 @@ if(dbReady){
 					modulosProcesados: modulos.length,
 					errores: errores.length
 				}
-			});
+			};
+			console.log('[AUTO-ORGANIZAR] Resultado final con resumen:', JSON.stringify(resultado, null, 2));
+			res.json(resultado);
 
 		} catch (error) {
-			console.error('Error en auto-organizar:', error);
+			console.error('[AUTO-ORGANIZAR] Error crítico:', error);
 			res.status(500).json({ 
 				error: 'Error al auto-organizar', 
 				details: error.message 
