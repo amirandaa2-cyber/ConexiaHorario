@@ -6740,6 +6740,12 @@
         try {
           console.log('runRealtimeValidation: iniciando validación de', storedEvents.length, 'eventos');
 
+          // Limit validation to avoid freezing on large datasets
+          if (storedEvents.length > 200) {
+            console.warn('runRealtimeValidation: skipping heavy validation (>200 events)');
+            return;
+          }
+
           // check all docentes for over-contract
           const conflictsByDocente = new Map();
           const conflictsBySala = new Map();
@@ -6750,78 +6756,64 @@
             const contrato = Number.isFinite(parseFloat(contratoRaw)) && parseFloat(contratoRaw) > 0 ? parseFloat(contratoRaw) : 24;
             if (assigned > contrato) {
               showValidationMessage(`Docente ${d.nombre} supera contrato: asignadas ${assigned.toFixed(2)}h / contrato ${contrato}h`, 'error');
-              // Open richer conflict modal with options to inspect and reschedule
-              try { openConflictModal(d.id); } catch (e) { console.error('openConflictModal error', e); showValidationMessage(`Docente ${d.nombre} supera contrato: asignadas ${assigned.toFixed(2)}h / contrato ${contrato}h`, 'error'); }
+              console.warn('Docente contract exceeded:', d.nombre, assigned, contrato);
               return;
             }
           }
 
-          // Revisar conflictos de profesores con mejor algoritmo
+          // Revisar conflictos de profesores - optimizado para evitar bloqueo
+          const MAX_CHECKS = 5000;
+          let checksCount = 0;
           for (let i = 0; i < storedEvents.length; i++) {
             for (let j = i + 1; j < storedEvents.length; j++) {
+              checksCount++;
+              if (checksCount > MAX_CHECKS) {
+                console.warn('runRealtimeValidation: stopped early to avoid freeze');
+                return;
+              }
               const a = storedEvents[i];
               const b = storedEvents[j];
               const ma = (a.extendedProps && a.extendedProps.__meta) || {};
               const mb = (b.extendedProps && b.extendedProps.__meta) || {};
 
-              // Verificar fechas válidas antes de comparar
               const as = new Date(a.start), ae = new Date(a.end);
               const bs = new Date(b.start), be = new Date(b.end);
 
               if (isNaN(as.getTime()) || isNaN(ae.getTime()) || isNaN(bs.getTime()) || isNaN(be.getTime())) {
-                console.warn('runRealtimeValidation: fechas inválidas detectadas', { a: a.title, b: b.title });
                 continue;
               }
 
-              // Verificar solapamiento temporal usando milisegundos para mayor precisión
               const asMs = as.getTime(), aeMs = ae.getTime();
               const bsMs = bs.getTime(), beMs = be.getTime();
               const overlap = !(aeMs <= bsMs || asMs >= beMs);
 
               if (!overlap) continue;
 
-              // Conflicto de sala
               if (ma.salaId && mb.salaId && String(ma.salaId) === String(mb.salaId)) {
                 const conflictKey = `sala_${ma.salaId}`;
                 if (!conflictsBySala.has(conflictKey)) {
                   conflictsBySala.set(conflictKey, []);
                 }
                 conflictsBySala.get(conflictKey).push({ eventA: a, eventB: b });
-
-                showValidationMessage(`Conflicto de sala ${ma.salaId} entre '${a.title}' y '${b.title}'`, 'error');
-                console.error('Conflicto de sala detectado:', {
-                  sala: ma.salaId,
-                  evento1: { title: a.title, start: a.start, end: a.end },
-                  evento2: { title: b.title, start: b.start, end: b.end }
-                });
-                return;
+                console.warn('Conflicto de sala detectado:', ma.salaId, a.title, b.title);
               }
 
-              // Conflicto de docente - MÁS IMPORTANTE
               if (ma.docenteId && mb.docenteId && String(ma.docenteId) === String(mb.docenteId)) {
                 const conflictKey = `docente_${ma.docenteId}`;
                 if (!conflictsByDocente.has(conflictKey)) {
                   conflictsByDocente.set(conflictKey, []);
                 }
                 conflictsByDocente.get(conflictKey).push({ eventA: a, eventB: b });
-
                 const docente = docentes.find(d => d.id === ma.docenteId);
                 const docenteName = docente ? docente.nombre : ma.docenteId;
-
-                showValidationMessage(`CONFLICTO CRÍTICO: Profesor ${docenteName} tiene eventos simultáneos: '${a.title}' y '${b.title}'`, 'error');
-                console.error('CONFLICTO DE PROFESOR DETECTADO:', {
-                  docenteId: ma.docenteId,
-                  docenteName: docenteName,
-                  evento1: { title: a.title, start: a.start, end: a.end },
-                  evento2: { title: b.title, start: b.start, end: b.end },
-                  solapamiento: {
-                    inicioConflicto: new Date(Math.max(asMs, bsMs)).toISOString(),
-                    finConflicto: new Date(Math.min(aeMs, beMs)).toISOString()
-                  }
-                });
-                return;
+                console.warn('CONFLICTO DE PROFESOR:', docenteName, a.title, b.title);
               }
             }
+          }
+
+          if (conflictsByDocente.size > 0 || conflictsBySala.size > 0) {
+            const totalConflicts = conflictsByDocente.size + conflictsBySala.size;
+            showValidationMessage(`Se detectaron ${totalConflicts} conflicto(s) de asignación. Revisa la consola para detalles.`, 'error');
           }
 
           // Si llegamos aquí, no hay conflictos críticos
@@ -6837,27 +6829,19 @@
 
       // Attach to calendar lifecycle: when storedEvents changes we call runRealtimeValidation and refreshCalendarEvents
       const originalSaveEvents = save;
+      let validationTimeout = null;
       function persistEventsAndValidate() {
         save(KEY_EVENTS, storedEvents);
-        runRealtimeValidation();
-        try {
-          if (calendar && typeof calendar.refetchEvents === 'function') {
-            // calendar.refetchEvents(); // Simplified: avoid redundant refetch
-          } else {
-            refreshCalendarEvents();
-          }
-        } catch (e) { try { refreshCalendarEvents(); } catch (err) { } }
-        // delayed retry to avoid render races after DnD/resizes
-        setTimeout(() => {
+        // Run validation asynchronously to avoid blocking UI
+        if (validationTimeout) clearTimeout(validationTimeout);
+        validationTimeout = setTimeout(() => {
           try {
-            if (calendar && typeof calendar.refetchEvents === 'function') {
-              // calendar.refetchEvents(); // Simplified: avoid redundant refetch
-              if (typeof calendar.render === 'function') calendar.render();
-            } else {
-              refreshCalendarEvents();
-            }
-          } catch (err) { console.error('delayed refresh error', err); }
-        }, 250);
+            runRealtimeValidation();
+          } catch (err) {
+            console.error('Deferred validation error', err);
+          }
+        }, 300);
+        // Skip redundant refreshes - FullCalendar already updated the UI
       }
 
       // --- Auto-organizer (simple greedy scheduler) ---
