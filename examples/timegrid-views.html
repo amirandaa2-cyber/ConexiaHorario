@@ -1262,19 +1262,29 @@
         }
       } catch(_) {}
     });
-          const cal = window.calendar || window.fcCalendar; if (!cal) return false;
-          const ev = cal.getEventById(eventId); if (!ev) return false;
-          try { if (window.releaseIndependentBlock) window.releaseIndependentBlock(ev); } catch(_) {}
-          ev.remove();
-          try {
-            await fetch('/api/events/' + encodeURIComponent(eventId), { method: 'DELETE' });
-          } catch(_) {}
-          return true;
-        ;
+
+    window.deleteCalendarEventById = async function(eventId) {
+      const cal = window.calendar || window.fcCalendar;
+      if (!cal) return false;
+      const ev = cal.getEventById(eventId);
+      if (!ev) return false;
+      try {
+        if (typeof window.releaseIndependentBlock === 'function') {
+          window.releaseIndependentBlock(ev);
+        }
+      } catch (_) {}
+      ev.remove();
+      try {
+        await fetch('/api/events/' + encodeURIComponent(eventId), { method: 'DELETE' });
+      } catch (_) {}
+      return true;
+    };
       
     </script>
   <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.19/index.global.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.19/locales-all.global.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@6.1.19/index.global.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/interaction@6.1.19/index.global.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     // Mejorar el área de usuario tras cargar el DOM
@@ -2971,8 +2981,16 @@
             }
           } catch (err) { console.warn('No se pudo leer estado de calendario guardado', err); }
 
+          // Detectar plugins disponibles para habilitar vistas y drag & drop solo si cargaron correctamente
+          const calendarPlugins = [];
+          if (window.FullCalendar) {
+            if (window.FullCalendar.TimeGrid) calendarPlugins.push(window.FullCalendar.TimeGrid);
+            if (window.FullCalendar.Interaction) calendarPlugins.push(window.FullCalendar.Interaction);
+          }
+
           // Revertimos a la configuración original del calendario (sin sistema de 22 bloques)
           calendar = new FullCalendar.Calendar(calendarEl, {
+            plugins: calendarPlugins.length ? calendarPlugins : undefined,
             locale: 'es',
             initialDate: _initialDate,
             initialView: _initialView,
@@ -3038,7 +3056,6 @@
             // Etiquetas en cada inicio de bloque (08:30, 09:05, 09:40, ...)
             slotLabelInterval: '00:35:00',
             slotLabelFormat: { hour: '2-digit', minute: '2-digit' },
-            slotHeight: 60,
             dayMaxEvents: false,
             eventTimeFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
             dateClick: function(info) {
