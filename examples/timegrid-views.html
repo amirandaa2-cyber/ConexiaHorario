@@ -1119,7 +1119,179 @@
       }
     }
 
-    /* --- Modal asignar módulo (#assign-modal eliminado, se usa #modal-asignacion) --- */
+    /* --- Modal asignar módulo --- */
+    #assign-modal {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--bg-page);
+      color: var(--text-color);
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 20px 22px 22px;
+      width: min(420px, 94vw);
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      box-shadow: 0 22px 60px rgba(15, 23, 42, 0.35);
+      z-index: 11000;
+    }
+
+    .assign-form label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.92rem;
+      gap: 4px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .assign-form select,
+    .assign-form input {
+      font-family: inherit;
+      font-size: 0.95rem;
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      padding: 10px 12px;
+      background: #fff;
+      color: #0f172a;
+    }
+
+    .assign-legend {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: #475569;
+      margin: 2px 0 8px;
+      transition: color 0.2s ease;
+    }
+
+    .assign-legend-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px solid #cbd5f5;
+      background: #cbd5f5;
+      box-shadow: 0 0 0 2px rgba(203, 213, 225, 0.4);
+      flex: none;
+    }
+
+    .assign-legend[data-state="ok"] .assign-legend-dot {
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+    }
+
+    .assign-legend[data-state="idle"] {
+      color: #64748b;
+    }
+
+    .assign-legend[data-state="warn"] {
+      color: #b45309;
+    }
+
+    .assign-legend[data-state="warn"] .assign-legend-dot {
+      box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
+    }
+
+    .assign-legend[data-state="alert"] {
+      color: #b91c1c;
+    }
+
+    .assign-legend[data-state="alert"] .assign-legend-dot {
+      box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.45);
+    }
+
+    .assign-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .assign-repeat-section {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      background: #f8fafc;
+      margin-bottom: 14px;
+    }
+
+    .assign-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .assign-checkbox input {
+      width: auto;
+      padding: 0;
+    }
+
+    .assign-repeat-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .assign-repeat-controls label {
+      margin-bottom: 0;
+      font-weight: 500;
+    }
+
+    .assign-repeat-controls button {
+      border: 1px dashed #0ea5e9;
+      background: transparent;
+      color: #0ea5e9;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+
+    .assign-note {
+      font-size: 0.8rem;
+      color: #475569;
+      margin: 6px 0 0;
+    }
+
+    .assign-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .assign-actions button {
+      flex: 1;
+      border: none;
+      border-radius: 12px;
+      padding: 11px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .assign-primary {
+      background: linear-gradient(120deg, #0ea5e9, #10b981);
+      color: #fff;
+      box-shadow: 0 12px 24px rgba(14, 165, 233, 0.35);
+    }
+
+    .assign-secondary {
+      background: #fff;
+      color: #ef4444;
+      border: 1px solid #fecaca;
+    }
+
+    @media (max-width: 520px) {
+      .assign-row {
+        flex-direction: column;
+      }
+
+      .assign-actions {
+        flex-direction: column;
+      }
+    }
 
     /* Sidebar brand logo styles */
     .sidebar-brand {
@@ -9269,7 +9441,7 @@
             </label>
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
               <input type="radio" name="asig-turno" value="Vespertino" />
-              <span>Vespertino (18:25 - 23:00)</span>
+              <span>Vespertino (18:00 - 22:00)</span>
             </label>
           </div>
         </div>
