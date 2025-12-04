@@ -14,6 +14,7 @@
       width: 100%;
       overflow: hidden;
     }
+
     .sidebar {
       flex: 0 0 250px;
       width: 250px;
@@ -22,6 +23,7 @@
       overflow-y: auto;
       box-sizing: border-box;
     }
+
     .schedule-container {
       flex: 1 1 auto;
       min-width: 0;
@@ -29,6 +31,7 @@
       overflow: auto;
       box-sizing: border-box;
     }
+
     /* Make custom dialog modals vertically scrollable when content exceeds viewport */
     [role="dialog"] {
       max-height: calc(100vh - 40px) !important;
@@ -46,6 +49,7 @@
       padding: 12px 16px !important;
       border: 1px solid #e2e8f0 !important;
     }
+
     /* TÍTULO DEL CALENDARIO MÁS SUTIL */
     .fc-toolbar-title {
       font-size: 18px !important;
@@ -53,6 +57,7 @@
       color: #1e293b !important;
       margin: 0 !important;
     }
+
     .fc-header-toolbar .fc-toolbar-center {
       display: flex !important;
       align-items: center !important;
@@ -60,6 +65,7 @@
       gap: 16px !important;
       flex-wrap: wrap !important;
     }
+
     .toolbar-filter-carrera {
       display: grid;
       grid-template-columns: auto auto;
@@ -70,6 +76,7 @@
       flex: 0 0 auto;
       min-width: 0;
     }
+
     .toolbar-filter-carrera .toolbar-filter-select {
       display: inline-block;
       width: 160px !important;
@@ -88,6 +95,7 @@
       box-sizing: border-box;
       box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
     }
+
     .toolbar-filter-carrera .toolbar-filter-clear {
       padding: 6px 10px;
       font-size: 12px;
@@ -96,11 +104,13 @@
       text-align: center;
       transition: opacity 0.2s ease;
     }
+
     .toolbar-filter-carrera .toolbar-filter-clear.is-hidden {
       visibility: hidden;
       opacity: 0;
       pointer-events: none;
     }
+
     .toolbar-filter-carrera .toolbar-filter-active {
       grid-column: 1 / -1;
       display: block;
@@ -112,6 +122,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
     @media (max-width: 1024px) {
       .toolbar-filter-carrera .toolbar-filter-select {
         width: 130px !important;
@@ -120,28 +131,33 @@
         font-size: 12px;
       }
     }
+
     @media (max-width: 768px) {
       .toolbar-filter-carrera {
         grid-template-columns: minmax(0, 1fr) auto;
         width: 100%;
         justify-items: start;
       }
+
       .toolbar-filter-carrera .toolbar-filter-select {
         width: 100% !important;
         max-width: 100% !important;
         padding: 6px 10px;
         font-size: 13px;
       }
+
       .toolbar-filter-carrera .toolbar-filter-active {
         text-align: center;
       }
     }
+
     @media (max-width: 480px) {
       .toolbar-filter-carrera .toolbar-filter-select {
         padding: 5px 8px;
         font-size: 12px;
       }
     }
+
     /* BOTONES DE NAVEGACIÓN MEJORADOS */
     .fc-button {
       background: #ffffff !important;
@@ -153,19 +169,23 @@
       margin: 0 2px !important;
       transition: all 0.2s ease !important;
     }
+
     .fc-button:hover {
       background: #f3f4f6 !important;
       border-color: #9ca3af !important;
       transform: translateY(-1px) !important;
     }
+
     .fc-button-primary {
       background: #4f46e5 !important;
       border-color: #4f46e5 !important;
     }
+
     .fc-button-primary:hover {
       background: #4338ca !important;
       border-color: #4338ca !important;
     }
+
     /* BOTÓN TODAY ESPECIAL */
     .fc-today-button {
       background: #10b981 !important;
@@ -173,12 +193,14 @@
       color: white !important;
       font-weight: 600 !important;
     }
+
     .fc-today-button:hover {
       background: #059669 !important;
       border-color: #059669 !important;
     }
+
     /* SEPARACIÓN ENTRE GRUPOS DE BOTONES */
-    .fc-toolbar-chunk + .fc-toolbar-chunk {
+    .fc-toolbar-chunk+.fc-toolbar-chunk {
       margin-left: 16px !important;
     }
 
@@ -199,6 +221,7 @@
       align-items: center;
       gap: 10px;
     }
+
     .user-info-area .session-info,
     .user-info-area .roles-info {
       margin-bottom: 0;
@@ -208,15 +231,40 @@
 
     /* RESPONSIVIDAD MEJORADA */
     @media (max-width: 768px) {
-      .fc-header-toolbar { flex-direction: column !important; gap: 12px !important; align-items: center !important; }
-      .fc-toolbar-chunk { width: 100% !important; text-align: center !important; }
-      .fc-toolbar-chunk + .fc-toolbar-chunk { margin-left: 0 !important; margin-top: 8px !important; }
-      .user-info-area { position: relative !important; top: auto !important; right: auto !important; margin-bottom: 16px !important; width: fit-content !important; }
+      .fc-header-toolbar {
+        flex-direction: column !important;
+        gap: 12px !important;
+        align-items: center !important;
+      }
+
+      .fc-toolbar-chunk {
+        width: 100% !important;
+        text-align: center !important;
+      }
+
+      .fc-toolbar-chunk+.fc-toolbar-chunk {
+        margin-left: 0 !important;
+        margin-top: 8px !important;
+      }
+
+      .user-info-area {
+        position: relative !important;
+        top: auto !important;
+        right: auto !important;
+        margin-bottom: 16px !important;
+        width: fit-content !important;
+      }
     }
+
     /* MEJORAR TOOLTIPS EN MÓVIL */
     @media (hover: none) {
-      .fc-timegrid-event:hover { transform: none !important; }
-      .fc-timegrid-event:active { transform: scale(0.98) !important; }
+      .fc-timegrid-event:hover {
+        transform: none !important;
+      }
+
+      .fc-timegrid-event:active {
+        transform: scale(0.98) !important;
+      }
     }
 
     /* INDICADORES DE VISTA ACTIVA */
@@ -226,69 +274,401 @@
       border-color: #4f46e5 !important;
       box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
     }
+
     /* ANIMACIONES SUAVES PARA CAMBIOS DE VISTA */
-    .fc-view { transition: opacity 0.3s ease !important; }
+    .fc-view {
+      transition: opacity 0.3s ease !important;
+    }
+
     .fc-view.fc-timeGridWeek-view,
-    .fc-view.fc-timeGridDay-view { opacity: 1 !important; }
+    .fc-view.fc-timeGridDay-view {
+      opacity: 1 !important;
+    }
 
     /* CONSISTENCIA EN EVENTOS */
-    .fc-timegrid-event { font-family: 'Inter', sans-serif !important; text-rendering: optimizeLegibility !important; -webkit-font-smoothing: antialiased !important; }
-    .fc-timegrid-event-title { display: flex !important; flex-direction: column !important; align-items: flex-start !important; }
-    .evento-nombre { font-weight: 600 !important; line-height: 1.2 !important; margin-bottom: 1px !important; }
-    .evento-codigo { font-size: 10px !important; font-weight: 400 !important; opacity: 0.8 !important; letter-spacing: 0.5px !important; }
+    .fc-timegrid-event {
+      font-family: 'Inter', sans-serif !important;
+      text-rendering: optimizeLegibility !important;
+      -webkit-font-smoothing: antialiased !important;
+    }
+
+    .fc-timegrid-event-title {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+    }
+
+    .evento-nombre {
+      font-weight: 600 !important;
+      line-height: 1.2 !important;
+      margin-bottom: 1px !important;
+    }
+
+    .evento-codigo {
+      font-size: 10px !important;
+      font-weight: 400 !important;
+      opacity: 0.8 !important;
+      letter-spacing: 0.5px !important;
+    }
 
     /* ESTILOS PARA TOOLTIPS */
-    .evento-tooltip { font-family: 'Inter', sans-serif; line-height: 1.4; }
-    .tooltip-header { font-weight: 600; font-size: 12px; color: #93c5fd; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .tooltip-titulo { font-weight: 600; font-size: 14px; margin-bottom: 6px; color: #f8fafc; }
-    .tooltip-horario { font-size: 12px; color: #cbd5e1; margin-bottom: 6px; font-weight: 500; }
-    .tooltip-info { font-size: 12px; color: #9ca3af; border-top: 1px solid #374151; padding-top: 6px; }
+    .evento-tooltip {
+      font-family: 'Inter', sans-serif;
+      line-height: 1.4;
+    }
+
+    .tooltip-header {
+      font-weight: 600;
+      font-size: 12px;
+      color: #93c5fd;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tooltip-titulo {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 6px;
+      color: #f8fafc;
+    }
+
+    .tooltip-horario {
+      font-size: 12px;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .tooltip-info {
+      font-size: 12px;
+      color: #9ca3af;
+      border-top: 1px solid #374151;
+      padding-top: 6px;
+    }
 
     /* Estilos para el Modal de Edición */
-    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); display: none; z-index: 10000; justify-content: center; align-items: center; }
-    .modal-overlay.show { display: flex; }
-    .modal-edicion { background: white; border-radius: 12px; padding: 24px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); transform: scale(0.8); transition: transform 0.3s ease; }
-    .modal-overlay.show .modal-edicion { transform: scale(1); }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #f0f0f0; }
-    .modal-title { font-size: 1.5em; font-weight: 600; color: #2d3748; margin: 0; }
-    .modal-close { background: none; border: none; font-size: 24px; color: #718096; cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.2s; }
-    .modal-close:hover { background: #f7fafc; color: #2d3748; }
-    .modal-form { display: grid; gap: 20px; }
-    .form-group { display: flex; flex-direction: column; gap: 8px; }
-    .form-label { font-weight: 600; color: #2d3748; font-size: 0.95em; }
-    .form-input, .form-select, .form-textarea { padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: border-color 0.2s; font-family: inherit; }
-    .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
-    .form-textarea { min-height: 80px; resize: vertical; }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .form-buttons { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
-    .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
-    .btn-primary { background: #4F46E5; color: white; }
-    .btn-primary:hover { background: #4338CA; transform: translateY(-1px); }
-    .btn-secondary { background: #f7fafc; color: #4a5568; border: 2px solid #e2e8f0; }
-    .btn-secondary:hover { background: #edf2f7; border-color: #cbd5e0; }
-    .btn-danger { background: #e53e3e; color: white; }
-    .btn-danger:hover { background: #c53030; }
-    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-    .form-error { color: #e53e3e; font-size: 0.875em; margin-top: 4px; min-height: 1em; }
-    .success-message { background: #c6f6d5; border: 1px solid #9ae6b4; color: #22543d; padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none; }
-    .success-message.show { display: block; }
-    @media (max-width: 768px) { .modal-edicion { width: 95%; padding: 20px; margin: 20px; } .form-row { grid-template-columns: 1fr; } .form-buttons { flex-direction: column; } }
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      z-index: 10000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-edicion {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      transform: scale(0.8);
+      transition: transform 0.3s ease;
+    }
+
+    .modal-overlay.show .modal-edicion {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .modal-title {
+      font-size: 1.5em;
+      font-weight: 600;
+      color: #2d3748;
+      margin: 0;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #718096;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .modal-close:hover {
+      background: #f7fafc;
+      color: #2d3748;
+    }
+
+    .modal-form {
+      display: grid;
+      gap: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-label {
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 0.95em;
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus {
+      outline: none;
+      border-color: #4F46E5;
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .form-textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .form-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: #4F46E5;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4338CA;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #f7fafc;
+      color: #4a5568;
+      border: 2px solid #e2e8f0;
+    }
+
+    .btn-secondary:hover {
+      background: #edf2f7;
+      border-color: #cbd5e0;
+    }
+
+    .btn-danger {
+      background: #e53e3e;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c53030;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .form-error {
+      color: #e53e3e;
+      font-size: 0.875em;
+      margin-top: 4px;
+      min-height: 1em;
+    }
+
+    .success-message {
+      background: #c6f6d5;
+      border: 1px solid #9ae6b4;
+      color: #22543d;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .success-message.show {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      .modal-edicion {
+        width: 95%;
+        padding: 20px;
+        margin: 20px;
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+
+      .form-buttons {
+        flex-direction: column;
+      }
+    }
+
     /* Estilos para el Modal de Asignación */
-    .modal-asignacion-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); display: none; z-index: 10001; justify-content: center; align-items: center; }
-    .modal-asignacion-overlay.show { display: flex; }
-    .modal-asignacion { background: white; border-radius: 12px; padding: 24px; max-width: 700px; width: 95%; max-height: 95vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); transform: scale(0.8); transition: transform 0.3s ease; }
-    .modal-asignacion-overlay.show .modal-asignacion { transform: scale(1); }
-    .modal-asignacion-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #f0f0f0; }
-    .modal-asignacion-title { font-size: 1.4em; font-weight: 600; color: #2d3748; margin: 0; }
-    .modal-asignacion-close { background: none; border: none; font-size: 24px; color: #718096; cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.2s; }
-    .modal-asignacion-close:hover { background: #f7fafc; color: #2d3748; }
-    .asignacion-form { display: grid; gap: 18px; }
-    .asignacion-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .asignacion-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
-    @media (max-width: 768px) { .asignacion-row { grid-template-columns: 1fr; } }
-    #modal-asignacion-manual .modal-asignacion { max-width: 540px; width: min(92vw, 540px); max-height: 82vh; padding: 20px; }
-    #modal-asignacion-manual .asignacion-form { max-height: calc(82vh - 130px); overflow-y: auto; padding-right: 4px; }
-    #modal-asignacion-manual .asignacion-actions { position: sticky; bottom: 0; background: #fff; padding-top: 12px; }
+    .modal-asignacion-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      z-index: 10001;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-asignacion-overlay.show {
+      display: flex;
+    }
+
+    .modal-asignacion {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 700px;
+      width: 95%;
+      max-height: 95vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      transform: scale(0.8);
+      transition: transform 0.3s ease;
+    }
+
+    .modal-asignacion-overlay.show .modal-asignacion {
+      transform: scale(1);
+    }
+
+    .modal-asignacion-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .modal-asignacion-title {
+      font-size: 1.4em;
+      font-weight: 600;
+      color: #2d3748;
+      margin: 0;
+    }
+
+    .modal-asignacion-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #718096;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .modal-asignacion-close:hover {
+      background: #f7fafc;
+      color: #2d3748;
+    }
+
+    .asignacion-form {
+      display: grid;
+      gap: 18px;
+    }
+
+    .asignacion-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .asignacion-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 20px;
+      padding-top: 14px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    @media (max-width: 768px) {
+      .asignacion-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    #modal-asignacion-manual .modal-asignacion {
+      max-width: 540px;
+      width: min(92vw, 540px);
+      max-height: 82vh;
+      padding: 20px;
+    }
+
+    #modal-asignacion-manual .asignacion-form {
+      max-height: calc(82vh - 130px);
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    #modal-asignacion-manual .asignacion-actions {
+      position: sticky;
+      bottom: 0;
+      background: #fff;
+      padding-top: 12px;
+    }
+
     #modal-asignacion-manual .modal-asignacion-header {
       border-bottom: none;
       margin-bottom: 16px;
@@ -296,21 +676,25 @@
       cursor: move;
       user-select: none;
     }
+
     #modal-asignacion-manual .modal-asignacion-title {
       color: #fff;
       margin: 0;
       font-weight: 600;
     }
+
     #modal-asignacion-manual .modal-asignacion-close {
       color: #fff;
       background: transparent;
       border: none;
       padding: 4px 8px;
     }
+
     #modal-asignacion-manual .modal-asignacion-close:hover {
       background: rgba(255, 255, 255, 0.18);
       color: #fff;
     }
+
     [role="dialog"] .modal-drag-handle {
       position: sticky;
       top: 0;
@@ -602,31 +986,32 @@
       color: #b91c1c;
       margin-top: 4px;
     }
-      .auth-divider {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        text-transform: uppercase;
-        font-size: 11px;
-        letter-spacing: 0.2em;
-        margin: 18px 0 12px;
-        color: rgba(17, 24, 39, 0.5);
-      }
 
-      .auth-divider::before,
-      .auth-divider::after {
-        content: '';
-        flex: 1;
-        height: 1px;
-        background: rgba(17, 24, 39, 0.2);
-      }
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      margin: 18px 0 12px;
+      color: rgba(17, 24, 39, 0.5);
+    }
 
-      .google-login {
-        display: flex;
-        justify-content: center;
-        min-height: 48px;
-        margin-bottom: 12px;
-      }
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(17, 24, 39, 0.2);
+    }
+
+    .google-login {
+      display: flex;
+      justify-content: center;
+      min-height: 48px;
+      margin-bottom: 12px;
+    }
 
     .auth-hint {
       font-size: 0.8rem;
@@ -706,9 +1091,11 @@
       .auth-wrapper {
         padding: 28px;
       }
+
       .auth-hero {
         text-align: center;
       }
+
       .auth-badge {
         margin-inline: auto;
       }
@@ -882,10 +1269,12 @@
       .assign-row {
         flex-direction: column;
       }
+
       .assign-actions {
         flex-direction: column;
       }
     }
+
     /* Sidebar brand logo styles */
     .sidebar-brand {
       display: flex;
@@ -909,80 +1298,171 @@
       border-radius: 50%;
       display: block;
     }
+
     /* Header logo (rectangular) */
     .header-logo-container {
       display: flex;
       align-items: center;
       justify-content: flex-start;
-      height: 56px; /* header height - increase for a more prominent logo */
+      height: 56px;
+      /* header height - increase for a more prominent logo */
       flex: 1 1 auto;
       gap: 12px;
       padding-left: 4px;
     }
 
     .ceduc-header-logo {
-      max-height: 56px; /* match container height */
-      width: 100%; /* allow the image to expand horizontally to the available space */
-      height: auto; /* keep aspect ratio */
-      object-fit: contain; /* fit while maintaining proportions */
-      border-radius: 0; /* ensure rectangular */
+      max-height: 56px;
+      /* match container height */
+      width: 100%;
+      /* allow the image to expand horizontally to the available space */
+      height: auto;
+      /* keep aspect ratio */
+      object-fit: contain;
+      /* fit while maintaining proportions */
+      border-radius: 0;
+      /* ensure rectangular */
       display: block;
     }
+
     /* Conflict modal styles (centered, responsive, with controlled scroll) */
     /* Support both class-based and id-based overlay names */
     .modal-overlay,
-      .legacy-conflict-modal-overlay {
+    .legacy-conflict-modal-overlay {
       position: fixed;
-      inset: 0; /* top:0; right:0; bottom:0; left:0; */
-      display: none; /* toggle to 'flex' to show */
-      align-items: center;    /* vertical centering */
-      justify-content: center;/* horizontal centering */
-      background: rgba(0,0,0,0.45);
-      z-index: 20000;         /* high so it sits above other UI */
-      padding: 16px;          /* safe padding so modal never touches edges on small screens */
+      inset: 0;
+      /* top:0; right:0; bottom:0; left:0; */
+      display: none;
+      /* toggle to 'flex' to show */
+      align-items: center;
+      /* vertical centering */
+      justify-content: center;
+      /* horizontal centering */
+      background: rgba(0, 0, 0, 0.45);
+      z-index: 20000;
+      /* high so it sits above other UI */
+      padding: 16px;
+      /* safe padding so modal never touches edges on small screens */
       box-sizing: border-box;
     }
 
     .modal-box,
-      .legacy-conflict-modal {
+    .legacy-conflict-modal {
       background: #ffffff;
       border-radius: 8px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
       width: 100%;
-      max-width: 450px;                       /* Max width requested */
-      max-height: calc(100vh - 48px);         /* Keep some gap from viewport edges */
-      overflow-y: auto;                       /* Vertical scroll only when content exceeds max-height */
-      overflow-x: hidden;                     /* Prevent horizontal scrolling/overflow */
-      -webkit-overflow-scrolling: touch;      /* Smooth scrolling on mobile Safari */
+      max-width: 450px;
+      /* Max width requested */
+      max-height: calc(100vh - 48px);
+      /* Keep some gap from viewport edges */
+      overflow-y: auto;
+      /* Vertical scroll only when content exceeds max-height */
+      overflow-x: hidden;
+      /* Prevent horizontal scrolling/overflow */
+      -webkit-overflow-scrolling: touch;
+      /* Smooth scrolling on mobile Safari */
       padding: 18px;
       box-sizing: border-box;
       position: relative;
-      z-index: 20001;                         /* ensure modal content is above overlay contents */
+      z-index: 20001;
+      /* ensure modal content is above overlay contents */
     }
 
-    .modal-box h3, .legacy-conflict-modal h3 { margin: 0 0 8px 0; font-size: 16px; }
+    .modal-box h3,
+    .legacy-conflict-modal h3 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
 
-    .conflict-prof-data { background:#f3f4f6; padding:8px; border-radius:6px; margin-bottom:10px; font-size:13px; }
+    .conflict-prof-data {
+      background: #f3f4f6;
+      padding: 8px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
 
-    .conflict-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+    .conflict-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
 
-    .btn-conflict { padding:8px 10px; border-radius:6px; border: none; cursor:pointer; font-weight:600 }
-    .btn-view { background:#10b981; color:#fff }
-    .btn-reschedule { background:#f59e0b; color:#fff }
-    .btn-close { background:#e5e7eb; color:#111 }
+    .btn-conflict {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600
+    }
 
-    .conflict-week-list { max-height:200px; overflow:auto; border:1px solid #e6e6e9; padding:8px; border-radius:6px; font-size:13px }
+    .btn-view {
+      background: #10b981;
+      color: #fff
+    }
+
+    .btn-reschedule {
+      background: #f59e0b;
+      color: #fff
+    }
+
+    .btn-close {
+      background: #e5e7eb;
+      color: #111
+    }
+
+    .conflict-week-list {
+      max-height: 200px;
+      overflow: auto;
+      border: 1px solid #e6e6e9;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 13px
+    }
 
     /* Result modal (success / error) */
-    .result-header { display:flex; align-items:center; gap:10px; margin-bottom:8px }
-    .result-icon { width:36px; height:36px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; color:#fff; font-weight:700 }
-    .result-icon.success { background:#10b981 }
-    .result-icon.warn { background:#f59e0b }
-    .result-icon.error { background:#ef4444 }
-    .result-message { font-size:15px; color:#111 }
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px
+    }
+
+    .result-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700
+    }
+
+    .result-icon.success {
+      background: #10b981
+    }
+
+    .result-icon.warn {
+      background: #f59e0b
+    }
+
+    .result-icon.error {
+      background: #ef4444
+    }
+
+    .result-message {
+      font-size: 15px;
+      color: #111
+    }
+
     /* Small-screen friendly tweaks */
     @media (max-width: 520px) {
-      .modal-box, .legacy-conflict-modal {
+
+      .modal-box,
+      .legacy-conflict-modal {
         max-width: calc(100% - 32px);
         max-height: calc(100vh - 32px);
         padding: 12px;
@@ -993,9 +1473,9 @@
 
   <script>
     // ===== Re-implementación Modal Asignación (versión bloques CEDUC 22) =====
-    (function(){
+    (function () {
       const modalAsignacion = document.getElementById('modal-asignacion');
-      if(!modalAsignacion) return; // seguridad
+      if (!modalAsignacion) return; // seguridad
       const form = document.getElementById('form-asignacion');
       const selCarrera = document.getElementById('asig-carrera');
       const selModulo = document.getElementById('asig-modulo');
@@ -1013,102 +1493,102 @@
       const docenteLegendText = document.getElementById('assign-docente-legend-text');
       let horasWarnLogged = false;
 
-      function abrirModalAsignacion(context={}) {
+      function abrirModalAsignacion(context = {}) {
         try {
           cargarOpciones();
           precargarContexto(context);
-          modalAsignacion.style.display='flex';
-          modalAsignacion.setAttribute('aria-hidden','false');
+          modalAsignacion.style.display = 'flex';
+          modalAsignacion.setAttribute('aria-hidden', 'false');
           selCarrera && selCarrera.focus();
-        } catch(e){ console.error('abrirModalAsignacion', e); }
+        } catch (e) { console.error('abrirModalAsignacion', e); }
       }
-      function cerrarModalAsignacion(){
-        modalAsignacion.style.display='none';
-        modalAsignacion.setAttribute('aria-hidden','true');
+      function cerrarModalAsignacion() {
+        modalAsignacion.style.display = 'none';
+        modalAsignacion.setAttribute('aria-hidden', 'true');
         form && form.reset();
       }
-      function cargarOpciones(){
+      function cargarOpciones() {
         try {
           // Carreras
-          selCarrera.innerHTML='';
-          (window.carreras||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.nombre; selCarrera.appendChild(o); });
+          selCarrera.innerHTML = '';
+          (window.carreras || []).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nombre; selCarrera.appendChild(o); });
           // Modulos
-          selModulo.innerHTML='';
-          (window.modulos||[]).forEach(m=>{
-          const codigo = m.codigoAsignatura || m.codigo || m.id;
-          const o=document.createElement('option');
-          o.value=m.id;
-          o.textContent=`${codigo} - ${m.nombre}`;
-          selModulo.appendChild(o);
+          selModulo.innerHTML = '';
+          (window.modulos || []).forEach(m => {
+            const codigo = m.codigoAsignatura || m.codigo || m.id;
+            const o = document.createElement('option');
+            o.value = m.id;
+            o.textContent = `${codigo} - ${m.nombre}`;
+            selModulo.appendChild(o);
           });
           // Docentes
-          selDocente.innerHTML='';
-          (window.docentes||[]).filter(d=>d.activo!==false).forEach(d=>{
-            const o=document.createElement('option');
+          selDocente.innerHTML = '';
+          (window.docentes || []).filter(d => d.activo !== false).forEach(d => {
+            const o = document.createElement('option');
             o.value = d.id;
             o.textContent = d.nombre;
-            if(d.carreraId != null) o.dataset.carreraId = d.carreraId;
-            if(d.turno) o.dataset.turno = d.turno;
+            if (d.carreraId != null) o.dataset.carreraId = d.carreraId;
+            if (d.turno) o.dataset.turno = d.turno;
             const contratoHoras = d.contratoHoras ?? d.contrato;
-            if(contratoHoras != null) o.dataset.contrato = contratoHoras;
+            if (contratoHoras != null) o.dataset.contrato = contratoHoras;
             selDocente.appendChild(o);
           });
           // Salas
-          selSala.innerHTML='';
-          (window.salas||[]).forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=s.nombre; selSala.appendChild(o); });
+          selSala.innerHTML = '';
+          (window.salas || []).forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.nombre; selSala.appendChild(o); });
           // Bloques
-          selBloque.innerHTML='';
-          (window.CEDUC_BLOQUES||[]).forEach(b=>{ const o=document.createElement('option'); o.value=b.numero; o.textContent=`Bloque ${b.numero} (${b.inicio}-${b.fin})`; selBloque.appendChild(o); });
+          selBloque.innerHTML = '';
+          (window.CEDUC_BLOQUES || []).forEach(b => { const o = document.createElement('option'); o.value = b.numero; o.textContent = `Bloque ${b.numero} (${b.inicio}-${b.fin})`; selBloque.appendChild(o); });
           actualizarLeyendaDocente();
-        } catch(e){ console.error('cargarOpciones asignación', e); }
+        } catch (e) { console.error('cargarOpciones asignación', e); }
       }
-      selCarrera && selCarrera.addEventListener('change', ()=>{
+      selCarrera && selCarrera.addEventListener('change', () => {
         const cid = selCarrera.value;
         // Filtrar módulos por carrera
-        selModulo.innerHTML='';
-        (window.modulos||[]).filter(m=> String(m.carreraId)===String(cid)).forEach(m=>{
+        selModulo.innerHTML = '';
+        (window.modulos || []).filter(m => String(m.carreraId) === String(cid)).forEach(m => {
           const codigo = m.codigoAsignatura || m.codigo || m.id;
-          const o=document.createElement('option');
-          o.value=m.id;
-          o.textContent=`${codigo} - ${m.nombre}`;
+          const o = document.createElement('option');
+          o.value = m.id;
+          o.textContent = `${codigo} - ${m.nombre}`;
           selModulo.appendChild(o);
         });
         actualizarLeyendaDocente();
       });
 
-      selDocente && selDocente.addEventListener('change', ()=>{
+      selDocente && selDocente.addEventListener('change', () => {
         actualizarLeyendaDocente(selDocente.value);
       });
 
-      function colorDocente(docente){
-        if(!docente) return '#cbd5f5';
-        try{
+      function colorDocente(docente) {
+        if (!docente) return '#cbd5f5';
+        try {
           const carrerasSrc = Array.isArray(window.carreras) ? window.carreras : [];
-          const carrera = carrerasSrc.find(c=>String(c.id)===String(docente.carreraId));
-          if(carrera){
+          const carrera = carrerasSrc.find(c => String(c.id) === String(docente.carreraId));
+          if (carrera) {
             const prefer = docente.turno === 'Vespertino' ? (carrera.colorVespertino || carrera.colorDiurno) : (carrera.colorDiurno || carrera.colorVespertino);
-            if(prefer) return prefer;
+            if (prefer) return prefer;
           }
-        }catch(err){ console.warn('colorDocente', err); }
+        } catch (err) { console.warn('colorDocente', err); }
         return docente.turno === 'Vespertino' ? '#6366f1' : '#0ea5e9';
       }
 
-      function actualizarLeyendaDocente(docenteId = (selDocente ? selDocente.value : '')){
-        if(!docenteLegend || !docenteLegendText) return;
+      function actualizarLeyendaDocente(docenteId = (selDocente ? selDocente.value : '')) {
+        if (!docenteLegend || !docenteLegendText) return;
         const autores = Array.isArray(window.docentes) ? window.docentes : [];
         const targetId = docenteId || '';
-        if(!targetId){
+        if (!targetId) {
           docenteLegend.dataset.state = 'idle';
           docenteLegendText.textContent = 'Selecciona un docente disponible';
-          if(docenteLegendDot){
+          if (docenteLegendDot) {
             docenteLegendDot.style.backgroundColor = '#cbd5f5';
             docenteLegendDot.style.borderColor = '#cbd5f5';
           }
           return;
         }
         const selectedOption = selDocente && selDocente.selectedOptions && selDocente.selectedOptions[0] ? selDocente.selectedOptions[0] : null;
-        let docente = autores.find(d=>String(d.id)===String(targetId));
-        if(!docente && selectedOption){
+        let docente = autores.find(d => String(d.id) === String(targetId));
+        if (!docente && selectedOption) {
           const contratoFallbackRaw = selectedOption.dataset && selectedOption.dataset.contrato ? parseFloat(selectedOption.dataset.contrato) : null;
           const contratoFallback = Number.isFinite(contratoFallbackRaw) ? contratoFallbackRaw : null;
           docente = {
@@ -1120,11 +1600,11 @@
             turno: selectedOption.dataset ? selectedOption.dataset.turno || '' : ''
           };
         }
-        if(!docente){
+        if (!docente) {
           const hasOptions = !!(selDocente && selDocente.options && selDocente.options.length);
           docenteLegend.dataset.state = hasOptions ? 'warn' : 'alert';
           docenteLegendText.textContent = hasOptions ? 'Docente sin ficha cargada' : 'No hay docentes disponibles';
-          if(docenteLegendDot){
+          if (docenteLegendDot) {
             const tone = hasOptions ? '#f97316' : '#ef4444';
             docenteLegendDot.style.backgroundColor = tone;
             docenteLegendDot.style.borderColor = tone;
@@ -1133,178 +1613,178 @@
         }
         const contrato = parseFloat(docente.contratoHoras || docente.contrato || 0) || 0;
         let horasAsignadas = 0;
-        try{
-          if(typeof computeAssignedHoursForDocente === 'function'){
+        try {
+          if (typeof computeAssignedHoursForDocente === 'function') {
             horasAsignadas = computeAssignedHoursForDocente(docente.id);
           }
-        }catch(err){
-          if(!horasWarnLogged){
+        } catch (err) {
+          if (!horasWarnLogged) {
             console.warn('computeAssignedHoursForDocente unavailable', err);
             horasWarnLogged = true;
           }
         }
         const horasLibres = contrato ? Math.max(0, contrato - horasAsignadas) : null;
-        const carrera = (()=>{
-          try{ return (Array.isArray(window.carreras) ? window.carreras : []).find(c=>String(c.id)===String(docente.carreraId)); }catch(_){ return null; }
+        const carrera = (() => {
+          try { return (Array.isArray(window.carreras) ? window.carreras : []).find(c => String(c.id) === String(docente.carreraId)); } catch (_) { return null; }
         })();
         const partes = [];
-        if(docente.nombre) partes.push(docente.nombre);
-        if(carrera && carrera.nombre) partes.push(carrera.nombre);
+        if (docente.nombre) partes.push(docente.nombre);
+        if (carrera && carrera.nombre) partes.push(carrera.nombre);
         const asignadasTexto = horasAsignadas.toFixed(1);
         const contratoTexto = Number.isFinite(contrato) ? Number(contrato).toFixed(1) : '0.0';
-        if(contrato){
+        if (contrato) {
           partes.push(`${asignadasTexto}h de ${contratoTexto}h`);
-          if(horasLibres !== null) partes.push(`Libre ${horasLibres.toFixed(1)}h`);
-        }else{
+          if (horasLibres !== null) partes.push(`Libre ${horasLibres.toFixed(1)}h`);
+        } else {
           partes.push(`${asignadasTexto}h asignadas`);
         }
-        if(docente.turno) partes.push(docente.turno);
+        if (docente.turno) partes.push(docente.turno);
         docenteLegendText.textContent = partes.join(' | ');
-        if(docenteLegendDot){
+        if (docenteLegendDot) {
           const tone = colorDocente(docente);
           docenteLegendDot.style.backgroundColor = tone;
           docenteLegendDot.style.borderColor = tone;
         }
         let estado = 'ok';
-        if(contrato){
+        if (contrato) {
           const ratio = contrato ? (horasAsignadas / contrato) : 0;
-          if(ratio >= 0.99) estado = 'alert';
-          else if(ratio >= 0.8) estado = 'warn';
+          if (ratio >= 0.99) estado = 'alert';
+          else if (ratio >= 0.8) estado = 'warn';
         }
         docenteLegend.dataset.state = estado;
       }
 
-      function precargarContexto(ctx){
+      function precargarContexto(ctx) {
         const hoy = new Date();
-        inputFecha.value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
-        if(ctx.carreraId){ selCarrera.value = ctx.carreraId; selCarrera.dispatchEvent(new Event('change')); }
-        if(ctx.moduloId){
-          const modulo = (window.modulos||[]).find(m=>String(m.id)===String(ctx.moduloId));
-          if(modulo && !ctx.carreraId){ selCarrera.value = modulo.carreraId; selCarrera.dispatchEvent(new Event('change')); }
+        inputFecha.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+        if (ctx.carreraId) { selCarrera.value = ctx.carreraId; selCarrera.dispatchEvent(new Event('change')); }
+        if (ctx.moduloId) {
+          const modulo = (window.modulos || []).find(m => String(m.id) === String(ctx.moduloId));
+          if (modulo && !ctx.carreraId) { selCarrera.value = modulo.carreraId; selCarrera.dispatchEvent(new Event('change')); }
           selModulo.value = ctx.moduloId;
         }
-        if(ctx.docenteId){ selDocente.value = ctx.docenteId; }
-        if(ctx.salaId){ selSala.value = ctx.salaId; }
-        if(ctx.bloqueNumero){ selBloque.value = ctx.bloqueNumero; }
+        if (ctx.docenteId) { selDocente.value = ctx.docenteId; }
+        if (ctx.salaId) { selSala.value = ctx.salaId; }
+        if (ctx.bloqueNumero) { selBloque.value = ctx.bloqueNumero; }
         actualizarLeyendaDocente();
       }
 
-      function validar(){
-        const errs=[];
-        if(!selCarrera.value) errs.push('Carrera');
-        if(!selModulo.value) errs.push('Módulo');
-        if(!selDocente.value) errs.push('Docente');
-        if(!selSala.value) errs.push('Sala');
-        if(!inputFecha.value) errs.push('Fecha');
-        if(!selBloque.value) errs.push('Bloque');
-        const dur = parseInt(inputDuracion.value||'1',10);
-        if(isNaN(dur)||dur<1) errs.push('Duración');
+      function validar() {
+        const errs = [];
+        if (!selCarrera.value) errs.push('Carrera');
+        if (!selModulo.value) errs.push('Módulo');
+        if (!selDocente.value) errs.push('Docente');
+        if (!selSala.value) errs.push('Sala');
+        if (!inputFecha.value) errs.push('Fecha');
+        if (!selBloque.value) errs.push('Bloque');
+        const dur = parseInt(inputDuracion.value || '1', 10);
+        if (isNaN(dur) || dur < 1) errs.push('Duración');
         return errs;
       }
 
-      function construirEvento(semanaOffset){
-        const bloqueNum = parseInt(selBloque.value,10);
-        const durBloques = parseInt(inputDuracion.value||'1',10);
-        const bloque = (window.CEDUC_BLOQUES||[]).find(b=>b.numero===bloqueNum);
-        if(!bloque) throw new Error('Bloque inválido');
-        const base = new Date(inputFecha.value+'T00:00:00');
-        if(semanaOffset) base.setDate(base.getDate()+7*semanaOffset);
-        const yyyy=base.getFullYear(); const mm=String(base.getMonth()+1).padStart(2,'0'); const dd=String(base.getDate()).padStart(2,'0');
-        const startStr=`${yyyy}-${mm}-${dd}T${bloque.inicio}:00`;
-        const startDate=new Date(startStr); const endDate=new Date(startDate); endDate.setMinutes(endDate.getMinutes()+35*durBloques);
-        const endStr=`${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}T${String(endDate.getHours()).padStart(2,'0')}:${String(endDate.getMinutes()).padStart(2,'0')}:00`;
-        const modulo=(window.modulos||[]).find(m=>String(m.id)===String(selModulo.value));
-        const carrera=(window.carreras||[]).find(c=>String(c.id)===String(selCarrera.value));
+      function construirEvento(semanaOffset) {
+        const bloqueNum = parseInt(selBloque.value, 10);
+        const durBloques = parseInt(inputDuracion.value || '1', 10);
+        const bloque = (window.CEDUC_BLOQUES || []).find(b => b.numero === bloqueNum);
+        if (!bloque) throw new Error('Bloque inválido');
+        const base = new Date(inputFecha.value + 'T00:00:00');
+        if (semanaOffset) base.setDate(base.getDate() + 7 * semanaOffset);
+        const yyyy = base.getFullYear(); const mm = String(base.getMonth() + 1).padStart(2, '0'); const dd = String(base.getDate()).padStart(2, '0');
+        const startStr = `${yyyy}-${mm}-${dd}T${bloque.inicio}:00`;
+        const startDate = new Date(startStr); const endDate = new Date(startDate); endDate.setMinutes(endDate.getMinutes() + 35 * durBloques);
+        const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}T${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}:00`;
+        const modulo = (window.modulos || []).find(m => String(m.id) === String(selModulo.value));
+        const carrera = (window.carreras || []).find(c => String(c.id) === String(selCarrera.value));
         const color = modulo && modulo.color ? modulo.color : '#3788d8';
-        const ev={
-          id:`evt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-          title: modulo? modulo.nombre : 'Módulo',
-          start:startStr,
-          end:endStr,
-          backgroundColor:color,
-          borderColor:color,
-          textColor:'#fff',
-          extendedProps:{
+        const ev = {
+          id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          title: modulo ? modulo.nombre : 'Módulo',
+          start: startStr,
+          end: endStr,
+          backgroundColor: color,
+          borderColor: color,
+          textColor: '#fff',
+          extendedProps: {
             carreraId: carrera ? carrera.id : null,
             descripcion: txtDescripcion.value || '',
-            __meta:{ moduloId:modulo?modulo.id:null, docenteId:selDocente.value||null, salaId:selSala.value||null }
+            __meta: { moduloId: modulo ? modulo.id : null, docenteId: selDocente.value || null, salaId: selSala.value || null }
           }
         };
         return ajustarEventoABloque(ev);
       }
 
-      async function submitAsignacion(e){
+      async function submitAsignacion(e) {
         e.preventDefault();
         const errs = validar();
-        if(errs.length){ alert('Faltan: '+errs.join(', ')); return; }
-        const semanas = parseInt(selRepetir.value||'0',10);
-        const crear=[]; crear.push(construirEvento(0));
-        for(let i=1;i<=semanas;i++) crear.push(construirEvento(i));
+        if (errs.length) { alert('Faltan: ' + errs.join(', ')); return; }
+        const semanas = parseInt(selRepetir.value || '0', 10);
+        const crear = []; crear.push(construirEvento(0));
+        for (let i = 1; i <= semanas; i++) crear.push(construirEvento(i));
         try {
           // Unificar flujo de creación: agregar al calendario para que `eventAdd` persista en `storedEvents`
-          for(const ev of crear){ try { calendar.addEvent(ev); } catch(addErr){ console.error('calendar.addEvent failed', addErr); } }
+          for (const ev of crear) { try { calendar.addEvent(ev); } catch (addErr) { console.error('calendar.addEvent failed', addErr); } }
           // Forzar persistencia inmediata y refresco
-          try { persistEventsAndValidate(); } catch(_) {}
+          try { persistEventsAndValidate(); } catch (_) { }
           cerrarModalAsignacion();
-                // Evitar refetch redundante: confiar en successCallback y en cambios explícitos
-                // window.calendar && calendar.refetchEvents();
-        } catch(err){ console.error('submitAsignacion', err); alert('Error creando asignación'); }
+          // Evitar refetch redundante: confiar en successCallback y en cambios explícitos
+          // window.calendar && calendar.refetchEvents();
+        } catch (err) { console.error('submitAsignacion', err); alert('Error creando asignación'); }
       }
 
       // Sustituye la versión antigua si existe
-      window.openAssignModalForModule = function(moduloId){
-        const modulo=(window.modulos||[]).find(m=>m.id===moduloId);
-        if(!modulo){ alert('Módulo no encontrado'); return; }
+      window.openAssignModalForModule = function (moduloId) {
+        const modulo = (window.modulos || []).find(m => m.id === moduloId);
+        if (!modulo) { alert('Módulo no encontrado'); return; }
         abrirModalAsignacion({ moduloId: modulo.id, carreraId: modulo.carreraId });
       };
 
       // Exponer apertura manual desde el calendario (dateClick)
-      window.openManualAssignModal = function(context){
-        abrirModalAsignacion(context||{});
+      window.openManualAssignModal = function (context) {
+        abrirModalAsignacion(context || {});
       };
 
       btnCerrar && btnCerrar.addEventListener('click', cerrarModalAsignacion);
       btnCancelar && btnCancelar.addEventListener('click', cerrarModalAsignacion);
       form && form.addEventListener('submit', submitAsignacion);
-      modalAsignacion.addEventListener('click', (ev)=>{ if(ev.target===modalAsignacion) cerrarModalAsignacion(); });
-      document.addEventListener('keydown', (ev)=>{ if(ev.key==='Escape' && modalAsignacion.getAttribute('aria-hidden')==='false') cerrarModalAsignacion(); });
+      modalAsignacion.addEventListener('click', (ev) => { if (ev.target === modalAsignacion) cerrarModalAsignacion(); });
+      document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && modalAsignacion.getAttribute('aria-hidden') === 'false') cerrarModalAsignacion(); });
     })();
   </script>
-    <script>
+  <script>
     // Mejorar el área de usuario tras cargar el DOM
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
       try {
         const openBtn = document.getElementById('open-sidebar-window');
         if (openBtn) {
-          openBtn.addEventListener('click', function(){
+          openBtn.addEventListener('click', function () {
             // Open sidebar in a separate window/tab
             const url = new URL('sidebar.html', window.location.href).toString();
             window.open(url, 'ceducSidebar');
           });
         }
-      } catch(_) {}
+      } catch (_) { }
     });
 
-    window.deleteCalendarEvent = async function(eventId) {
+    window.deleteCalendarEvent = async function (eventId) {
       const cal = window.calendar || window.fcCalendar;
       if (!cal) return false;
       const ev = cal.getEventById(eventId);
       if (!ev) return false;
-      try { if (window.releaseIndependentBlock) window.releaseIndependentBlock(ev); } catch(_) {}
+      try { if (window.releaseIndependentBlock) window.releaseIndependentBlock(ev); } catch (_) { }
       ev.remove();
       try {
         await fetch('/api/events/' + encodeURIComponent(eventId), { method: 'DELETE' });
-      } catch(_) {}
+      } catch (_) { }
       return true;
     };
-  
-    </script>
+
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.19/locales-all.global.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     // Mejorar el área de usuario tras cargar el DOM
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
       const panel = document.getElementById('session-panel');
       if (panel) {
         panel.classList.add('user-info-area');
@@ -1376,228 +1856,251 @@
       }
       const opts = [];
       for (let h = 8; h <= 22; h++) {
-        for (let m of [0,30]) {
-          const hh = String(h).padStart(2,'0');
-          const mm = String(m).padStart(2,'0');
+        for (let m of [0, 30]) {
+          const hh = String(h).padStart(2, '0');
+          const mm = String(m).padStart(2, '0');
           opts.push(`<option value="${hh}:${mm}">${hh}:${mm}</option>`);
         }
       }
       selectEl.innerHTML = opts.join('');
     }
 
-  function getAvailableBlocks() {
-    if (typeof window === 'undefined') return [];
-    if (Array.isArray(window.CEDUC_BLOCKS) && window.CEDUC_BLOCKS.length) {
-      return window.CEDUC_BLOCKS;
-    }
-    if (Array.isArray(window.CEDUC_BLOQUES) && window.CEDUC_BLOQUES.length) {
-      return window.CEDUC_BLOQUES.map(b => ({ number: b.numero, start: b.inicio, end: b.fin, durationMinutes: b.duracion }));
-    }
-    return [];
-  }
-
-  function normalizeBlockTime(value) {
-    return normalizeTimeStr(value);
-  }
-
-  function getBlockIndexByStart(timeStr) {
-    const normalized = normalizeBlockTime(timeStr);
-    if (!normalized) return -1;
-    const blocks = getAvailableBlocks();
-    return blocks.findIndex((b) => normalizeBlockTime(b.start) === normalized);
-  }
-
-  function getBlockIndexByEnd(timeStr) {
-    const normalized = normalizeBlockTime(timeStr);
-    if (!normalized) return -1;
-    const blocks = getAvailableBlocks();
-    return blocks.findIndex((b) => normalizeBlockTime(b.end) === normalized);
-  }
-
-  function getBlockByStart(timeStr) {
-    const idx = getBlockIndexByStart(timeStr);
-    const blocks = getAvailableBlocks();
-    return idx >= 0 ? blocks[idx] : null;
-  }
-
-  function getBlockForTime(timeStr) {
-    const normalized = normalizeBlockTime(timeStr);
-    if (!normalized) return null;
-    const [hh, mm] = normalized.split(':').map(Number);
-    const minutes = hh * 60 + mm;
-    const blocks = getAvailableBlocks();
-    for (const block of blocks) {
-      const [sh, sm] = block.start.split(':').map(Number);
-      const [eh, em] = block.end.split(':').map(Number);
-      const startMinutes = sh * 60 + sm;
-      const endMinutes = eh * 60 + em;
-      if (minutes >= startMinutes && minutes < endMinutes) {
-        return block;
+    function getAvailableBlocks() {
+      if (typeof window === 'undefined') return [];
+      if (Array.isArray(window.CEDUC_BLOCKS) && window.CEDUC_BLOCKS.length) {
+        return window.CEDUC_BLOCKS;
       }
-    }
-    return getBlockByStart(normalized);
-  }
-
-  function isValidBlockRange(startTimeStr, blockCount) {
-    const normalized = normalizeBlockTime(startTimeStr);
-    if (!normalized) return false;
-    const startIdx = getBlockIndexByStart(normalized);
-    if (startIdx === -1) return false;
-    const count = Math.max(1, parseInt(blockCount, 10) || 1);
-    const blocks = getAvailableBlocks();
-    const endIdx = startIdx + count - 1;
-    return endIdx < blocks.length;
-  }
-
-  function computeEndDateFromBlocks(dateInput, timeStr, blockCount) {
-    const normalized = normalizeBlockTime(timeStr);
-    if (!normalized) return null;
-    const startIdx = getBlockIndexByStart(normalized);
-    if (startIdx === -1) return null;
-    const count = Math.max(1, parseInt(blockCount, 10) || 1);
-    const blocks = getAvailableBlocks();
-    const endIdx = startIdx + count - 1;
-    if (endIdx >= blocks.length) return null;
-    const baseDate = dateInput instanceof Date ? new Date(dateInput) : new Date(`${dateInput}T00:00:00`);
-    if (Number.isNaN(baseDate.getTime())) return null;
-    const startDate = new Date(baseDate);
-    const [sh, sm] = normalized.split(':').map(Number);
-    startDate.setHours(sh, sm, 0, 0);
-    const endDate = new Date(baseDate);
-    const [eh, em] = blocks[endIdx].end.split(':').map(Number);
-    endDate.setHours(eh, em, 0, 0);
-    return { startDate, endDate, startIdx, endIdx };
-  }
-
-  function computeBlocksBetweenDates(startDate, endDate) {
-    if (!(startDate instanceof Date) || !(endDate instanceof Date)) return 0;
-    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
-    const startIdx = getBlockIndexByStart(timeStrFromDate(startDate));
-    const endIdx = getBlockIndexByEnd(timeStrFromDate(endDate));
-    if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
-      return (endIdx - startIdx) + 1;
-    }
-    const diff = Math.max(0, (endDate.getTime() - startDate.getTime()) / 60000);
-    return Math.max(1, Math.round(diff / BLOCK_DURATION_MINUTES));
-  }
-
-  function coerceDate(value) {
-    if (!value) return null;
-    try {
-      if (value instanceof Date) {
-        const clone = new Date(value.getTime());
-        return Number.isNaN(clone.getTime()) ? null : clone;
+      if (Array.isArray(window.CEDUC_BLOQUES) && window.CEDUC_BLOQUES.length) {
+        return window.CEDUC_BLOQUES.map(b => ({ number: b.numero, start: b.inicio, end: b.fin, durationMinutes: b.duracion }));
       }
-      if (typeof value === 'string') {
-        const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? null : date;
-      }
-      if (typeof value === 'number') {
-        const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? null : date;
-      }
-      return null;
-    } catch (_) {
-      return null;
+      return [];
     }
-  }
 
-  function realignToBlockRange(ev) {
-    try {
-      if (!ev) return null;
-      const startDate = coerceDate(ev.start);
-      if (!startDate) return null;
-      const declaredEnd = coerceDate(ev.end);
+    function normalizeBlockTime(value) {
+      return normalizeTimeStr(value);
+    }
+
+    function getBlockIndexByStart(timeStr) {
+      const normalized = normalizeBlockTime(timeStr);
+      if (!normalized) return -1;
       const blocks = getAvailableBlocks();
-      const fallbackEnd = declaredEnd || new Date(startDate.getTime() + BLOCK_DURATION_MINUTES * 60000);
+      return blocks.findIndex((b) => normalizeBlockTime(b.start) === normalized);
+    }
 
-      if (!blocks.length) return null; // sin definición de bloques no se hace snap
+    function getBlockIndexByEnd(timeStr) {
+      const normalized = normalizeBlockTime(timeStr);
+      if (!normalized) return -1;
+      const blocks = getAvailableBlocks();
+      return blocks.findIndex((b) => normalizeBlockTime(b.end) === normalized);
+    }
 
-      // Siempre recalcular el número de bloques a partir del rango actual
-      const desiredBlocks = computeBlocksBetweenDates(startDate, fallbackEnd) || 1;
+    function getBlockByStart(timeStr) {
+      const idx = getBlockIndexByStart(timeStr);
+      const blocks = getAvailableBlocks();
+      return idx >= 0 ? blocks[idx] : null;
+    }
 
-      const startTimeStr = normalizeTimeStr(timeStrFromDate(startDate));
-      let startIdx = getBlockIndexByStart(startTimeStr);
-      if (startIdx === -1) {
-        const targetMinutes = startDate.getHours() * 60 + startDate.getMinutes();
-        let bestIdx = -1;
-        let bestDelta = Infinity;
-        for (let i = 0; i < blocks.length; i++) {
-          const normalizedStart = normalizeBlockTime(blocks[i].start);
-          if (!normalizedStart) continue;
-          const [h, m] = normalizedStart.split(':').map(Number);
-          const minutes = h * 60 + m;
-          const delta = Math.abs(minutes - targetMinutes);
-          if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
+    function getBlockForTime(timeStr) {
+      const normalized = normalizeBlockTime(timeStr);
+      if (!normalized) return null;
+      const [hh, mm] = normalized.split(':').map(Number);
+      const minutes = hh * 60 + mm;
+      const blocks = getAvailableBlocks();
+      for (const block of blocks) {
+        const [sh, sm] = block.start.split(':').map(Number);
+        const [eh, em] = block.end.split(':').map(Number);
+        const startMinutes = sh * 60 + sm;
+        const endMinutes = eh * 60 + em;
+        if (minutes >= startMinutes && minutes < endMinutes) {
+          return block;
         }
-        startIdx = bestIdx;
       }
-      if (startIdx === -1) return null;
-
-      const maxBlocks = blocks.length - startIdx;
-      const usableBlocks = Math.max(1, Math.min(desiredBlocks, maxBlocks));
-      const blockStartStr = normalizeBlockTime(blocks[startIdx].start);
-      if (!blockStartStr) return null;
-      const range = computeEndDateFromBlocks(startDate, blockStartStr, usableBlocks);
-      if (!range) return null;
-
-      const blocksUsed = (range.endIdx >= range.startIdx)
-        ? ((range.endIdx - range.startIdx) + 1)
-        : usableBlocks;
-
-      if (typeof ev.setStart === 'function') {
-        ev.setStart(range.startDate);
-        if (range.endDate) ev.setEnd(range.endDate); else ev.setEnd(null);
-      } else {
-        ev.start = range.startDate.toISOString();
-        ev.end = range.endDate ? range.endDate.toISOString() : null;
-      }
-
-      ev.extendedProps = ev.extendedProps || {};
-      ev.extendedProps.__meta = ev.extendedProps.__meta || {};
-      ev.extendedProps.__meta.horas = blocksUsed * BLOCK_DURATION_HOURS;
-      ev.extendedProps.__meta.bloques = blocksUsed;
-      ev.extendedProps.__meta.bloqueInicio = range.startIdx + 1;
-      ev.extendedProps.__meta.bloqueFin = range.endIdx + 1;
-
-      return {
-        startDate: range.startDate,
-        endDate: range.endDate,
-        startIdx: range.startIdx,
-        endIdx: range.endIdx,
-        blocksUsed
-      };
-    } catch (err) {
-      console.warn('realignToBlockRange', err);
-      return null;
+      return getBlockByStart(normalized);
     }
-  }
 
-  function canSnapEventToBlocks(ev) {
-    try {
-      if (!ev) return false;
-      const startDate = coerceDate(ev.start);
-      if (!startDate) return false;
-      const blocks = getAvailableBlocks();
-      if (!blocks.length) return false;
-
-      const startBlock = getBlockForTime(timeStrFromDate(startDate));
-      if (!startBlock) return false;
-      const blockStartStr = normalizeBlockTime(startBlock.start);
-      if (!blockStartStr) return false;
-      const startIdx = getBlockIndexByStart(blockStartStr);
+    function isValidBlockRange(startTimeStr, blockCount) {
+      const normalized = normalizeBlockTime(startTimeStr);
+      if (!normalized) return false;
+      const startIdx = getBlockIndexByStart(normalized);
       if (startIdx === -1) return false;
-
-      const endDate = coerceDate(ev.end);
-      const desiredBlocks = endDate ? (computeBlocksBetweenDates(startDate, endDate) || 1) : 1;
-
-      const endIdx = startIdx + Math.max(1, desiredBlocks) - 1;
+      const count = Math.max(1, parseInt(blockCount, 10) || 1);
+      const blocks = getAvailableBlocks();
+      const endIdx = startIdx + count - 1;
       return endIdx < blocks.length;
-    } catch (err) {
-      console.warn('canSnapEventToBlocks', err);
-      return false;
     }
-  }
+
+    function computeEndDateFromBlocks(dateInput, timeStr, blockCount) {
+      const normalized = normalizeBlockTime(timeStr);
+      if (!normalized) return null;
+      const startIdx = getBlockIndexByStart(normalized);
+      if (startIdx === -1) return null;
+      const count = Math.max(1, parseInt(blockCount, 10) || 1);
+      const blocks = getAvailableBlocks();
+      const endIdx = startIdx + count - 1;
+      if (endIdx >= blocks.length) return null;
+      const baseDate = dateInput instanceof Date ? new Date(dateInput) : new Date(`${dateInput}T00:00:00`);
+      if (Number.isNaN(baseDate.getTime())) return null;
+      const startDate = new Date(baseDate);
+      const [sh, sm] = normalized.split(':').map(Number);
+      startDate.setHours(sh, sm, 0, 0);
+      const endDate = new Date(baseDate);
+      const [eh, em] = blocks[endIdx].end.split(':').map(Number);
+      endDate.setHours(eh, em, 0, 0);
+      return { startDate, endDate, startIdx, endIdx };
+    }
+
+    function computeBlocksBetweenDates(startDate, endDate) {
+      if (!(startDate instanceof Date) || !(endDate instanceof Date)) return 0;
+      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
+      const startIdx = getBlockIndexByStart(timeStrFromDate(startDate));
+      const endIdx = getBlockIndexByEnd(timeStrFromDate(endDate));
+      if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
+        return (endIdx - startIdx) + 1;
+      }
+      const diff = Math.max(0, (endDate.getTime() - startDate.getTime()) / 60000);
+      return Math.max(1, Math.round(diff / BLOCK_DURATION_MINUTES));
+    }
+
+    function coerceDate(value) {
+      if (!value) return null;
+      try {
+        if (value instanceof Date) {
+          const clone = new Date(value.getTime());
+          return Number.isNaN(clone.getTime()) ? null : clone;
+        }
+        if (typeof value === 'string') {
+          const date = new Date(value);
+          return Number.isNaN(date.getTime()) ? null : date;
+        }
+        if (typeof value === 'number') {
+          const date = new Date(value);
+          return Number.isNaN(date.getTime()) ? null : date;
+        }
+        return null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function realignToBlockRange(ev) {
+      try {
+        if (!ev) return null;
+        const startDate = coerceDate(ev.start);
+        if (!startDate) return null;
+        const declaredEnd = coerceDate(ev.end);
+        const blocks = getAvailableBlocks();
+        const fallbackEnd = declaredEnd || new Date(startDate.getTime() + BLOCK_DURATION_MINUTES * 60000);
+
+        if (!blocks.length) return null; // sin definición de bloques no se hace snap
+
+        // Siempre recalcular el número de bloques a partir del rango actual
+        const desiredBlocks = computeBlocksBetweenDates(startDate, fallbackEnd) || 1;
+
+        const startTimeStr = normalizeTimeStr(timeStrFromDate(startDate));
+        let startIdx = getBlockIndexByStart(startTimeStr);
+        if (startIdx === -1) {
+          const targetMinutes = startDate.getHours() * 60 + startDate.getMinutes();
+          let bestIdx = -1;
+          let bestDelta = Infinity;
+          for (let i = 0; i < blocks.length; i++) {
+            const normalizedStart = normalizeBlockTime(blocks[i].start);
+            if (!normalizedStart) continue;
+            const [h, m] = normalizedStart.split(':').map(Number);
+            const minutes = h * 60 + m;
+            const delta = Math.abs(minutes - targetMinutes);
+            if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
+          }
+          startIdx = bestIdx;
+        }
+        if (startIdx === -1) return null;
+
+        const maxBlocks = blocks.length - startIdx;
+        const usableBlocks = Math.max(1, Math.min(desiredBlocks, maxBlocks));
+        const blockStartStr = normalizeBlockTime(blocks[startIdx].start);
+        if (!blockStartStr) return null;
+        const range = computeEndDateFromBlocks(startDate, blockStartStr, usableBlocks);
+        if (!range) return null;
+
+        const blocksUsed = (range.endIdx >= range.startIdx)
+          ? ((range.endIdx - range.startIdx) + 1)
+          : usableBlocks;
+
+        if (typeof ev.setStart === 'function') {
+          ev.setStart(range.startDate);
+          if (range.endDate) ev.setEnd(range.endDate); else ev.setEnd(null);
+        } else {
+          ev.start = range.startDate.toISOString();
+          ev.end = range.endDate ? range.endDate.toISOString() : null;
+        }
+
+        ev.extendedProps = ev.extendedProps || {};
+        ev.extendedProps.__meta = ev.extendedProps.__meta || {};
+        ev.extendedProps.__meta.horas = blocksUsed * BLOCK_DURATION_HOURS;
+        ev.extendedProps.__meta.bloques = blocksUsed;
+        ev.extendedProps.__meta.bloqueInicio = range.startIdx + 1;
+        ev.extendedProps.__meta.bloqueFin = range.endIdx + 1;
+
+        return {
+          startDate: range.startDate,
+          endDate: range.endDate,
+          startIdx: range.startIdx,
+          endIdx: range.endIdx,
+          blocksUsed
+        };
+      } catch (err) {
+        console.warn('realignToBlockRange', err);
+        return null;
+      }
+    }
+
+    function snapshotEventMeta(ev, blocksHint) {
+      try {
+        const metaSource = (ev && ev.extendedProps && ev.extendedProps.__meta) || {};
+        const meta = JSON.parse(JSON.stringify(metaSource));
+        const startDate = coerceDate(ev && ev.start);
+        let endDate = coerceDate(ev && ev.end);
+        if (!startDate) return meta;
+        if (!endDate) {
+          endDate = new Date(startDate.getTime() + BLOCK_DURATION_MINUTES * 60000);
+        }
+        const durationMinutes = Math.max(BLOCK_DURATION_MINUTES, Math.round((endDate - startDate) / 60000));
+        const blocks = blocksHint || Math.max(1, Math.round(durationMinutes / BLOCK_DURATION_MINUTES));
+        meta.bloques = blocks;
+        meta.horas = blocks * BLOCK_DURATION_HOURS;
+        meta.fechaInicioIso = startDate.toISOString();
+        meta.fechaFinIso = endDate ? endDate.toISOString() : null;
+        return meta;
+      } catch (err) {
+        console.warn('snapshotEventMeta error', err);
+        return ((ev && ev.extendedProps && ev.extendedProps.__meta) || {});
+      }
+    }
+
+    function canSnapEventToBlocks(ev) {
+      try {
+        if (!ev) return false;
+        const startDate = coerceDate(ev.start);
+        if (!startDate) return false;
+        const blocks = getAvailableBlocks();
+        if (!blocks.length) return false;
+
+        const startBlock = getBlockForTime(timeStrFromDate(startDate));
+        if (!startBlock) return false;
+        const blockStartStr = normalizeBlockTime(startBlock.start);
+        if (!blockStartStr) return false;
+        const startIdx = getBlockIndexByStart(blockStartStr);
+        if (startIdx === -1) return false;
+
+        const endDate = coerceDate(ev.end);
+        const desiredBlocks = endDate ? (computeBlocksBetweenDates(startDate, endDate) || 1) : 1;
+
+        const endIdx = startIdx + Math.max(1, desiredBlocks) - 1;
+        return endIdx < blocks.length;
+      } catch (err) {
+        console.warn('canSnapEventToBlocks', err);
+        return false;
+      }
+    }
 
     function normalizeApiBase(url) {
       if (!url) return '';
@@ -2045,22 +2548,31 @@
       if (channel) {
         channel.addEventListener('message', (ev) => {
           const msg = ev.data || {};
+          console.log('[Calendar] BroadcastChannel mensaje recibido:', msg);
           try {
             if (msg.type === 'filter-carrera') {
               const sel = document.getElementById('filter-carrera');
               if (sel) {
                 sel.value = msg.carreraId || '';
-                if (calendar) calendar.refetchEvents();
+                if (calendar) {
+                  console.log('[Calendar] Refrescando eventos (filter-carrera)');
+                  calendar.refetchEvents();
+                }
               }
             } else if (msg.type === 'refresh-events') {
-              if (calendar) calendar.refetchEvents();
+              if (calendar) {
+                console.log('[Calendar] Refrescando eventos (refresh-events)');
+                calendar.refetchEvents();
+              } else {
+                console.warn('[Calendar] BroadcastChannel: calendar no inicializado aún');
+              }
             }
           } catch (err) { console.warn('Broadcast msg error', err); }
         });
       }
       let salas = []; // {id, nombre, capacidad}
       let openManualBlockModal = () => { console.warn('Modal manual no inicializado aún.'); };
-      let closeManualBlockModal = () => {};
+      let closeManualBlockModal = () => { };
       // If running with API mode, fetch initial data from the server so the app uses PostgreSQL
       if (USE_API) {
         try {
@@ -2078,10 +2590,10 @@
         try { docentes = load(KEY_DOCENTES, []); carreras = load(KEY_CARRERAS, []); modulos = load(KEY_MODULOS, []); storedEvents = load(KEY_EVENTS, []); templates = load(KEY_TEMPLATES, []); salas = load(KEY_SALAS, []); } catch (e) { console.warn('local load failed', e); }
       }
 
-          carreras = (carreras || []).map(normalizeCarreraRecord);
-          modulos = (modulos || []).map(m => normalizeModuloRecord(m, carreras));
-          docentes = (docentes || []).map(normalizeDocenteRecord);
-          templates = (templates || []).map(normalizeTemplateRecord);
+      carreras = (carreras || []).map(normalizeCarreraRecord);
+      modulos = (modulos || []).map(m => normalizeModuloRecord(m, carreras));
+      docentes = (docentes || []).map(normalizeDocenteRecord);
+      templates = (templates || []).map(normalizeTemplateRecord);
 
       storedEvents = (storedEvents || []).map(ev => {
         try {
@@ -2176,7 +2688,7 @@
         const overlay = document.getElementById('modal-asignacion-manual');
         const form = document.getElementById('manual-assign-form');
         if (!overlay || !form) {
-          return { open: () => {}, close: () => {} };
+          return { open: () => { }, close: () => { } };
         }
 
         const fechaInput = document.getElementById('manual-fecha');
@@ -3010,10 +3522,10 @@
             customButtons: {
               today: {
                 text: 'Hoy',
-                click: function() { if (calendar && typeof calendar.today === 'function') calendar.today(); }
+                click: function () { if (calendar && typeof calendar.today === 'function') calendar.today(); }
               }
             },
-            eventDidMount: function(info) {
+            eventDidMount: function (info) {
               try {
                 // Ensure elements are clearly clickable and carry ID
                 if (info.event && info.event.id) {
@@ -3027,7 +3539,7 @@
                 // Attach our tooltip behavior
                 attachTooltipToEventEl(info.el, info.event);
                 // Also support direct click on element
-                info.el.addEventListener('click', function(ev) {
+                info.el.addEventListener('click', function (ev) {
                   ev.preventDefault(); ev.stopPropagation();
                   if (typeof openEventManagementModal === 'function') {
                     openEventManagementModal(info.event);
@@ -3039,7 +3551,7 @@
                 });
               } catch (e) { /* noop */ }
             },
-            eventContent: function(arg) {
+            eventContent: function (arg) {
               try {
                 const parts = buildEventTitleParts(arg.event);
                 const codigoHtml = parts.codigo ? `<div class="evento-codigo">${parts.codigo}</div>` : '';
@@ -3067,7 +3579,7 @@
             slotHeight: 60,
             dayMaxEvents: false,
             eventTimeFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
-            dateClick: function(info) {
+            dateClick: function (info) {
               try {
                 if (info && info.allDay) return;
                 let bloqueNumero = null;
@@ -3078,7 +3590,7 @@
                 }
               } catch (e) { console.error('dateClick -> abrir modal asignación', e); }
             },
-            select: function(selectionInfo) {
+            select: function (selectionInfo) {
               try {
                 // DESACTIVADO: modal manual de bloques genéricos sin módulo
                 // Solo permitir eventos con módulos asignados desde el modal de asignación
@@ -3109,11 +3621,14 @@
             },
             events: async function (fetchInfo, successCallback, failureCallback) {
               try {
+                console.log('[Calendar] events() - Fetching eventos...');
                 let freshEvents = [];
                 if (USE_API) {
                   freshEvents = await fetchEvents();
+                  console.log('[Calendar] events() - Eventos desde API:', freshEvents.length);
                 } else {
                   freshEvents = load(KEY_EVENTS, []);
+                  console.log('[Calendar] events() - Eventos desde localStorage:', freshEvents.length);
                 }
                 // Incluir todos los eventos; el filtro por carrera sólo aplica si existe moduloId
                 storedEvents = dedupeEvents(freshEvents || []);
@@ -3121,7 +3636,8 @@
                 storedEvents = dedupeEvents(storedEvents);
 
                 const filterCarrera = document.getElementById('filter-carrera')?.value || '';
-                
+                console.log('[Calendar] events() - Filtro carrera activo:', filterCarrera || 'NINGUNO');
+
                 let bloquesEvents = storedEvents.map(event => {
                   try {
                     const bloqueAjustado = ajustarEventoABloque(event);
@@ -3155,6 +3671,7 @@
                 });
                 // Garantizar unicidad también en la salida final
                 filteredEvents = dedupeEvents(filteredEvents);
+                console.log('[Calendar] events() - Eventos filtrados:', filteredEvents.length);
                 successCallback(filteredEvents);
               } catch (err) {
                 console.error('Error cargando eventos para el calendario', err);
@@ -3305,7 +3822,7 @@
                 // persist using event id (dedupe safeguard)
                 const existingIdx = storedEvents.findIndex(se => se.id === ev.id);
                 if (existingIdx === -1) {
-                  const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+                  const meta = snapshotEventMeta(ev);
                   const toStore = {
                     id: ev.id || ('evt_' + Date.now()),
                     title: ev.title,
@@ -3325,6 +3842,8 @@
                   // update existing record
                   storedEvents[existingIdx].start = startIso;
                   storedEvents[existingIdx].end = endIso;
+                  storedEvents[existingIdx].extendedProps = storedEvents[existingIdx].extendedProps || {};
+                  storedEvents[existingIdx].extendedProps.__meta = snapshotEventMeta(ev);
                   console.log('Evento existente actualizado:', storedEvents[existingIdx].title);
                   debouncedPersistEvents();
                 }
@@ -3357,10 +3876,14 @@
                 const endIso = ev.end ? ev.end.toISOString() : null;
                 const idx = storedEvents.findIndex(se => se.id === ev.id);
                 if (idx !== -1) {
+                  const updatedMeta = snapshotEventMeta(ev);
                   storedEvents[idx].start = startIso;
                   storedEvents[idx].end = endIso;
                   storedEvents[idx].extendedProps = storedEvents[idx].extendedProps || {};
-                  storedEvents[idx].extendedProps.__meta = (ev.extendedProps && ev.extendedProps.__meta) || storedEvents[idx].extendedProps.__meta;
+                  storedEvents[idx].extendedProps.__meta = updatedMeta;
+                  if (typeof ev.setExtendedProp === 'function') {
+                    ev.setExtendedProp('__meta', updatedMeta);
+                  }
                   persistEventsAndValidate();
                 }
               } catch (e) { console.error('eventChange sync error', e); }
@@ -3502,9 +4025,7 @@
 
                 const idx = storedEvents.findIndex(se => se.id === ev.id);
                 if (idx !== -1) {
-                  const incomingMeta = (ev.extendedProps && ev.extendedProps.__meta)
-                    ? JSON.parse(JSON.stringify(ev.extendedProps.__meta))
-                    : null;
+                  const metaSnapshot = snapshotEventMeta(ev, snapResult ? snapResult.blocksUsed : undefined);
                   const prevExtendedProps = storedEvents[idx].extendedProps || {};
                   storedEvents[idx] = {
                     ...storedEvents[idx],
@@ -3512,11 +4033,11 @@
                     end: endIso,
                     extendedProps: {
                       ...prevExtendedProps,
-                      __meta: incomingMeta || prevExtendedProps.__meta || {}
+                      __meta: metaSnapshot
                     }
                   };
-                  if (storedEvents[idx].extendedProps.__meta) {
-                    ev.setExtendedProp('__meta', storedEvents[idx].extendedProps.__meta);
+                  if (typeof ev.setExtendedProp === 'function') {
+                    ev.setExtendedProp('__meta', metaSnapshot);
                   }
                   persistEventsAndValidate();
                   console.debug('Event updated in storedEvents:', storedEvents[idx]);
@@ -3652,14 +4173,14 @@
 
                 const idx = storedEvents.findIndex(se => se.id === ev.id);
                 if (idx !== -1) {
-                  const incomingMeta = (ev.extendedProps && ev.extendedProps.__meta)
-                    ? JSON.parse(JSON.stringify(ev.extendedProps.__meta))
-                    : null;
+                  const metaSnapshot = snapshotEventMeta(ev, snapResult ? snapResult.blocksUsed : undefined);
                   storedEvents[idx].start = startIso;
                   storedEvents[idx].end = endIso;
                   storedEvents[idx].extendedProps = storedEvents[idx].extendedProps || {};
-                  storedEvents[idx].extendedProps.__meta = incomingMeta || storedEvents[idx].extendedProps.__meta || {};
-                  ev.setExtendedProp('__meta', storedEvents[idx].extendedProps.__meta);
+                  storedEvents[idx].extendedProps.__meta = metaSnapshot;
+                  if (typeof ev.setExtendedProp === 'function') {
+                    ev.setExtendedProp('__meta', metaSnapshot);
+                  }
                   persistEventsAndValidate();
                   console.log('Evento redimensionado exitosamente:', storedEvents[idx].title);
                 }
@@ -3677,7 +4198,7 @@
           window.calendar = calendar;
           window.fcCalendar = calendar;
           // Bind hooks once to rebuild occupancy and attach single handlers
-          try { if (typeof bindCalendar === 'function') bindCalendar(calendar); } catch (_) {}
+          try { if (typeof bindCalendar === 'function') bindCalendar(calendar); } catch (_) { }
           try {
             if (calendar) {
               calendar.render();
@@ -3690,15 +4211,15 @@
           }
           // SISTEMA DE BLOQUES CEDUC - NO VALORES DECIMALES
           const CEDUC_BLOQUES = [
-            { numero: 1,  inicio: '08:30', fin: '09:05', duracion: 35 },
-            { numero: 2,  inicio: '09:05', fin: '09:40', duracion: 35 },
-            { numero: 3,  inicio: '09:50', fin: '10:25', duracion: 35 },
-            { numero: 4,  inicio: '10:25', fin: '11:00', duracion: 35 },
-            { numero: 5,  inicio: '11:10', fin: '11:45', duracion: 35 },
-            { numero: 6,  inicio: '11:45', fin: '12:20', duracion: 35 },
-            { numero: 7,  inicio: '12:30', fin: '13:05', duracion: 35 },
-            { numero: 8,  inicio: '13:05', fin: '13:40', duracion: 35 },
-            { numero: 9,  inicio: '13:50', fin: '14:25', duracion: 35 },
+            { numero: 1, inicio: '08:30', fin: '09:05', duracion: 35 },
+            { numero: 2, inicio: '09:05', fin: '09:40', duracion: 35 },
+            { numero: 3, inicio: '09:50', fin: '10:25', duracion: 35 },
+            { numero: 4, inicio: '10:25', fin: '11:00', duracion: 35 },
+            { numero: 5, inicio: '11:10', fin: '11:45', duracion: 35 },
+            { numero: 6, inicio: '11:45', fin: '12:20', duracion: 35 },
+            { numero: 7, inicio: '12:30', fin: '13:05', duracion: 35 },
+            { numero: 8, inicio: '13:05', fin: '13:40', duracion: 35 },
+            { numero: 9, inicio: '13:50', fin: '14:25', duracion: 35 },
             { numero: 10, inicio: '14:25', fin: '15:00', duracion: 35 },
             { numero: 11, inicio: '15:10', fin: '15:45', duracion: 35 },
             { numero: 12, inicio: '15:45', fin: '16:20', duracion: 35 },
@@ -3764,18 +4285,18 @@
           // Mantener colores originales al agregar número de bloque
           function preservarColoresEvento(eventoOriginal, eventoConBloque) {
             // Derivar color desde la carrera si el evento no trae colores propios
-            function colorDesdeCarrera(ev){
+            function colorDesdeCarrera(ev) {
               try {
                 const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
-                const mod = (window.modulos||[]).find(m => String(m.id) === String(meta.moduloId));
-                const carr = mod ? (window.carreras||[]).find(c => String(c.id) === String(mod.carreraId)) : null;
-                const doc = (window.docentes||[]).find(d => String(d.id) === String(meta.docenteId));
+                const mod = (window.modulos || []).find(m => String(m.id) === String(meta.moduloId));
+                const carr = mod ? (window.carreras || []).find(c => String(c.id) === String(mod.carreraId)) : null;
+                const doc = (window.docentes || []).find(d => String(d.id) === String(meta.docenteId));
                 if (carr) {
                   if (doc && doc.turno === 'Vespertino' && carr.colorVespertino) return carr.colorVespertino;
                   if (carr.colorDiurno) return carr.colorDiurno;
                   if (carr.color) return carr.color;
                 }
-              } catch(_) {}
+              } catch (_) { }
               return '#3788d8';
             }
             const derived = colorDesdeCarrera(eventoOriginal);
@@ -3975,9 +4496,9 @@
           }
 
           if (calendar && typeof calendar.on === 'function') {
-            calendar.on('datesSet', function() {
+            calendar.on('datesSet', function () {
               setTimeout(() => {
-                try { const conflictos = detectarYMostrarConflictos(); mostrarConflictos(conflictos); } catch (_) {}
+                try { const conflictos = detectarYMostrarConflictos(); mostrarConflictos(conflictos); } catch (_) { }
               }, 500);
             });
           }
@@ -4016,120 +4537,130 @@
         return evt;
       }
 
-        function setupSidebarAccordion() {
-          const STORAGE_KEY = 'sidebar_groups_state_v1';
-          let state = {};
-          try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (_) { state = {}; }
-          const groups = document.querySelectorAll('#sidebar .sidebar-group');
-          groups.forEach(group => {
-            const toggle = group.querySelector('.sidebar-group-toggle');
-            if (!toggle) return;
-            const groupId = group.getAttribute('data-group') || toggle.textContent.trim();
-            const contentId = toggle.getAttribute('aria-controls');
-            const content = contentId ? document.getElementById(contentId) : null;
-            if (state[groupId] === 'collapsed') {
-              group.classList.add('collapsed');
-            }
-            const expanded = !group.classList.contains('collapsed');
-            toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      function setupSidebarAccordion() {
+        const STORAGE_KEY = 'sidebar_groups_state_v1';
+        let state = {};
+        try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (_) { state = {}; }
+        const groups = document.querySelectorAll('#sidebar .sidebar-group');
+        groups.forEach(group => {
+          const toggle = group.querySelector('.sidebar-group-toggle');
+          if (!toggle) return;
+          const groupId = group.getAttribute('data-group') || toggle.textContent.trim();
+          const contentId = toggle.getAttribute('aria-controls');
+          const content = contentId ? document.getElementById(contentId) : null;
+          if (state[groupId] === 'collapsed') {
+            group.classList.add('collapsed');
+          }
+          const expanded = !group.classList.contains('collapsed');
+          toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+          if (content) {
+            if (expanded) content.removeAttribute('hidden'); else content.setAttribute('hidden', '');
+          }
+          toggle.addEventListener('click', () => {
+            const isCollapsed = group.classList.toggle('collapsed');
+            toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
             if (content) {
-              if (expanded) content.removeAttribute('hidden'); else content.setAttribute('hidden', '');
+              if (isCollapsed) content.setAttribute('hidden', ''); else content.removeAttribute('hidden');
             }
-            toggle.addEventListener('click', () => {
-              const isCollapsed = group.classList.toggle('collapsed');
-              toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-              if (content) {
-                if (isCollapsed) content.setAttribute('hidden', ''); else content.removeAttribute('hidden');
-              }
-              state[groupId] = isCollapsed ? 'collapsed' : 'expanded';
-              try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) { }
-            });
+            state[groupId] = isCollapsed ? 'collapsed' : 'expanded';
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) { }
           });
+        });
+      }
+
+      function setupSidebarCollapseToggle() {
+        const toggleBtn = document.getElementById('sidebar-toggle');
+        if (!toggleBtn) return;
+
+        toggleBtn.setAttribute('aria-pressed', 'false');
+        toggleBtn.setAttribute('aria-label', 'Abrir vista lateral');
+        toggleBtn.title = 'Abrir vista lateral';
+
+        toggleBtn.addEventListener('click', () => {
+          window.location.href = 'sidebar.html';
+        });
+      }
+
+      function setupHeaderLogoRedirect() {
+        const logo = document.querySelector('.ceduc-header-logo');
+        if (!logo) return;
+        logo.style.cursor = 'pointer';
+        logo.addEventListener('click', () => {
+          window.location.href = 'al-abraham.html';
+        });
+      }
+
+      function setupSidebarResizeHandle() {
+        const STORAGE_KEY = 'sidebar_width_v1';
+        const MIN_WIDTH = 180;
+        const MAX_WIDTH = 450;
+        const root = document.documentElement;
+        const sidebar = document.getElementById('sidebar');
+        const handle = document.getElementById('sidebar-resize-handle');
+        if (!sidebar || !handle) return;
+
+        const clampWidth = (value) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, value));
+        const applyWidth = (value) => {
+          const clamped = clampWidth(Math.round(value));
+          root.style.setProperty('--sidebar-width', clamped + 'px');
+          return clamped;
+        };
+
+        let storedWidth = null;
+        try {
+          const parsed = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+          if (!Number.isNaN(parsed)) storedWidth = clampWidth(parsed);
+        } catch (_) {
+          storedWidth = null;
         }
 
-        function setupSidebarCollapseToggle() {
-          const toggleBtn = document.getElementById('sidebar-toggle');
-          if (!toggleBtn) return;
-
-          toggleBtn.setAttribute('aria-pressed', 'false');
-          toggleBtn.setAttribute('aria-label', 'Abrir vista lateral');
-          toggleBtn.title = 'Abrir vista lateral';
-
-          toggleBtn.addEventListener('click', () => {
-            window.location.href = 'sidebar.html';
-          });
+        if (storedWidth !== null) {
+          applyWidth(storedWidth);
         }
 
-        function setupSidebarResizeHandle() {
-          const STORAGE_KEY = 'sidebar_width_v1';
-          const MIN_WIDTH = 180;
-          const MAX_WIDTH = 450;
-          const root = document.documentElement;
-          const sidebar = document.getElementById('sidebar');
-          const handle = document.getElementById('sidebar-resize-handle');
-          if (!sidebar || !handle) return;
+        let isDragging = false;
+        let startX = 0;
+        let startWidth = storedWidth !== null ? storedWidth : sidebar.getBoundingClientRect().width;
 
-          const clampWidth = (value) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, value));
-          const applyWidth = (value) => {
-            const clamped = clampWidth(Math.round(value));
-            root.style.setProperty('--sidebar-width', clamped + 'px');
-            return clamped;
-          };
+        const onMouseMove = (event) => {
+          if (!isDragging) return;
+          event.preventDefault();
+          const delta = event.clientX - startX;
+          applyWidth(startWidth + delta);
+        };
 
-          let storedWidth = null;
-          try {
-            const parsed = parseInt(localStorage.getItem(STORAGE_KEY), 10);
-            if (!Number.isNaN(parsed)) storedWidth = clampWidth(parsed);
-          } catch (_) {
-            storedWidth = null;
-          }
+        const stopDragging = () => {
+          if (!isDragging) return;
+          isDragging = false;
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', stopDragging);
+          window.removeEventListener('mouseup', stopDragging);
+          handle.classList.remove('is-dragging');
+          document.body.classList.remove('sidebar-resizing');
+          const finalRectWidth = sidebar.getBoundingClientRect().width;
+          const finalWidth = applyWidth(finalRectWidth || startWidth || MIN_WIDTH);
+          try { localStorage.setItem(STORAGE_KEY, String(finalWidth)); } catch (_) { }
+        };
 
-          if (storedWidth !== null) {
-            applyWidth(storedWidth);
-          }
+        handle.addEventListener('mousedown', (event) => {
+          if (event.button !== 0 || document.body.classList.contains('sidebar-hidden')) return;
+          isDragging = true;
+          startX = event.clientX;
+          const rectWidth = sidebar.getBoundingClientRect().width;
+          startWidth = rectWidth || startWidth || MIN_WIDTH;
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', stopDragging);
+          window.addEventListener('mouseup', stopDragging);
+          handle.classList.add('is-dragging');
+          document.body.classList.add('sidebar-resizing');
+          event.preventDefault();
+        });
+      }
 
-          let isDragging = false;
-          let startX = 0;
-          let startWidth = storedWidth !== null ? storedWidth : sidebar.getBoundingClientRect().width;
-
-          const onMouseMove = (event) => {
-            if (!isDragging) return;
-            event.preventDefault();
-            const delta = event.clientX - startX;
-            applyWidth(startWidth + delta);
-          };
-
-          const stopDragging = () => {
-            if (!isDragging) return;
-            isDragging = false;
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', stopDragging);
-            window.removeEventListener('mouseup', stopDragging);
-            handle.classList.remove('is-dragging');
-            document.body.classList.remove('sidebar-resizing');
-            const finalRectWidth = sidebar.getBoundingClientRect().width;
-            const finalWidth = applyWidth(finalRectWidth || startWidth || MIN_WIDTH);
-            try { localStorage.setItem(STORAGE_KEY, String(finalWidth)); } catch (_) { }
-          };
-
-          handle.addEventListener('mousedown', (event) => {
-            if (event.button !== 0 || document.body.classList.contains('sidebar-hidden')) return;
-            isDragging = true;
-            startX = event.clientX;
-            const rectWidth = sidebar.getBoundingClientRect().width;
-            startWidth = rectWidth || startWidth || MIN_WIDTH;
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', stopDragging);
-            window.addEventListener('mouseup', stopDragging);
-            handle.classList.add('is-dragging');
-            document.body.classList.add('sidebar-resizing');
-            event.preventDefault();
-          });
-        }
-
-        setupSidebarAccordion();
-        setupSidebarCollapseToggle();
-        setupSidebarResizeHandle();
+      setupSidebarAccordion();
+      setupSidebarCollapseToggle();
+      setupSidebarResizeHandle();
+      setupHeaderLogoRedirect();
 
 
       // Auto-acople toggle wiring (persist preference)
@@ -4762,7 +5293,7 @@
                 closeBtn.style.position = 'absolute';
                 closeBtn.style.top = '10px';
                 closeBtn.style.right = '14px';
-                closeBtn.addEventListener('click', () => { try { document.body.removeChild(modal); } catch (_) {} });
+                closeBtn.addEventListener('click', () => { try { document.body.removeChild(modal); } catch (_) { } });
                 const fields = Object.entries(detail).map(([k, v]) => `<tr><td style='font-weight:600;padding:6px 10px;border-bottom:1px solid #eef;'>${k}</td><td style='padding:6px 10px;border-bottom:1px solid #eef;'>${v == null ? '' : v}</td></tr>`).join('');
                 modal.innerHTML = `<h3 style='margin:0 0 12px;font-size:20px;'>Datos del Docente</h3><table style='width:100%;border-collapse:collapse;font-size:13px;'>${fields}</table>`;
                 modal.appendChild(closeBtn);
@@ -4927,7 +5458,7 @@
       let docentesSearch = '';
       let docentesShowActive = true;
       let docentesShowInactive = true;
-      function setupDocentesTools(){
+      function setupDocentesTools() {
         if (!docentesTools) return;
         docentesTools.innerHTML = '';
         const wrap = document.createElement('div');
@@ -4935,16 +5466,16 @@
         const search = document.createElement('input');
         search.type = 'search'; search.placeholder = 'Buscar por nombre o RUT';
         search.style.flex = '1'; search.style.padding = '8px 10px'; search.style.border = '1px solid #d1d5db'; search.style.borderRadius = '10px';
-        search.addEventListener('input', ()=>{ docentesSearch = search.value.trim().toLowerCase(); renderDocentes(); });
+        search.addEventListener('input', () => { docentesSearch = search.value.trim().toLowerCase(); renderDocentes(); });
         const chkAct = document.createElement('label');
-        chkAct.style.display='flex'; chkAct.style.alignItems='center'; chkAct.style.gap='6px';
-        const actInput = document.createElement('input'); actInput.type='checkbox'; actInput.checked = true;
-        actInput.addEventListener('change', ()=>{ docentesShowActive = actInput.checked; renderDocentes(); });
+        chkAct.style.display = 'flex'; chkAct.style.alignItems = 'center'; chkAct.style.gap = '6px';
+        const actInput = document.createElement('input'); actInput.type = 'checkbox'; actInput.checked = true;
+        actInput.addEventListener('change', () => { docentesShowActive = actInput.checked; renderDocentes(); });
         chkAct.appendChild(actInput); chkAct.appendChild(document.createTextNode('Activos'));
         const chkInact = document.createElement('label');
-        chkInact.style.display='flex'; chkInact.style.alignItems='center'; chkInact.style.gap='6px';
-        const inactInput = document.createElement('input'); inactInput.type='checkbox'; inactInput.checked = true;
-        inactInput.addEventListener('change', ()=>{ docentesShowInactive = inactInput.checked; renderDocentes(); });
+        chkInact.style.display = 'flex'; chkInact.style.alignItems = 'center'; chkInact.style.gap = '6px';
+        const inactInput = document.createElement('input'); inactInput.type = 'checkbox'; inactInput.checked = true;
+        inactInput.addEventListener('change', () => { docentesShowInactive = inactInput.checked; renderDocentes(); });
         chkInact.appendChild(inactInput); chkInact.appendChild(document.createTextNode('Inactivos'));
         wrap.appendChild(search); wrap.appendChild(chkAct); wrap.appendChild(chkInact);
         docentesTools.appendChild(wrap);
@@ -4952,11 +5483,11 @@
 
       function renderDocentes() {
         listDocentes.innerHTML = '';
-        const filtered = (docentes||[]).filter(d => {
+        const filtered = (docentes || []).filter(d => {
           const byState = (d.activo !== false ? docentesShowActive : docentesShowInactive);
           if (!byState) return false;
           if (!docentesSearch) return true;
-          const txt = `${d.nombre||''} ${d.rut||''}`.toLowerCase();
+          const txt = `${d.nombre || ''} ${d.rut || ''}`.toLowerCase();
           return txt.includes(docentesSearch);
         });
         filtered.forEach(d => {
@@ -4979,12 +5510,12 @@
               const modal = document.createElement('div');
               modal.style.position = 'fixed'; modal.style.left = '50%'; modal.style.top = '50%'; modal.style.transform = 'translate(-50%, -50%)';
               modal.style.background = '#fff'; modal.style.color = '#0f172a'; modal.style.padding = '20px'; modal.style.borderRadius = '16px'; modal.style.boxShadow = '0 20px 50px rgba(0,0,0,0.35)'; modal.style.width = 'min(520px,94vw)'; modal.style.maxHeight = '80vh'; modal.style.overflowY = 'auto'; modal.style.zIndex = '13000';
-              const cerrar = document.createElement('button'); cerrar.textContent = 'Cerrar'; cerrar.style.position = 'absolute'; cerrar.style.top = '10px'; cerrar.style.right = '14px'; cerrar.addEventListener('click', ()=>{ document.body.removeChild(modal); });
-              const fields = Object.entries(detail).map(([k,v]) => `<tr><td style='font-weight:600;padding:6px 10px;border-bottom:1px solid #eef;'>${k}</td><td style='padding:6px 10px;border-bottom:1px solid #eef;'>${v==null?'':v}</td></tr>`).join('');
+              const cerrar = document.createElement('button'); cerrar.textContent = 'Cerrar'; cerrar.style.position = 'absolute'; cerrar.style.top = '10px'; cerrar.style.right = '14px'; cerrar.addEventListener('click', () => { document.body.removeChild(modal); });
+              const fields = Object.entries(detail).map(([k, v]) => `<tr><td style='font-weight:600;padding:6px 10px;border-bottom:1px solid #eef;'>${k}</td><td style='padding:6px 10px;border-bottom:1px solid #eef;'>${v == null ? '' : v}</td></tr>`).join('');
               modal.innerHTML = `<h3 style='margin:0 0 12px;font-size:20px;'>Datos del Docente</h3><table style='width:100%;border-collapse:collapse;font-size:13px;'>${fields}</table>`;
               modal.appendChild(cerrar);
               document.body.appendChild(modal);
-            } catch(err){ console.error('ver datos docente error', err); alert('No se pudo cargar el detalle del docente.'); }
+            } catch (err) { console.error('ver datos docente error', err); alert('No se pudo cargar el detalle del docente.'); }
           });
           li.appendChild(viewBtn);
 
@@ -5016,7 +5547,7 @@
           menu.style.boxShadow = '0 10px 24px rgba(15,23,42,0.18)';
           menu.style.display = 'none';
 
-          function addMenuItem(label, handler, danger = false){
+          function addMenuItem(label, handler, danger = false) {
             const item = document.createElement('button');
             item.textContent = label;
             item.style.display = 'block';
@@ -5028,9 +5559,9 @@
             item.style.borderRadius = '8px';
             item.style.cursor = 'pointer';
             item.style.color = danger ? '#b91c1c' : '#0f172a';
-            item.addEventListener('click', ()=>{ handler(); menu.style.display='none'; });
-            item.addEventListener('mouseover', ()=>{ item.style.background = '#f8fafc'; });
-            item.addEventListener('mouseout', ()=>{ item.style.background = 'transparent'; });
+            item.addEventListener('click', () => { handler(); menu.style.display = 'none'; });
+            item.addEventListener('mouseover', () => { item.style.background = '#f8fafc'; });
+            item.addEventListener('mouseout', () => { item.style.background = 'transparent'; });
             menu.appendChild(item);
           }
 
@@ -5071,10 +5602,10 @@
           // Acción: Ver datos (también en menú)
           addMenuItem('Ver datos', () => { viewBtn.click(); });
 
-          menuButton.addEventListener('click', ()=>{
+          menuButton.addEventListener('click', () => {
             menu.style.display = (menu.style.display === 'none' ? 'block' : 'none');
           });
-          document.addEventListener('click', (ev)=>{
+          document.addEventListener('click', (ev) => {
             if (!menuWrapper.contains(ev.target)) menu.style.display = 'none';
           });
 
@@ -5844,15 +6375,15 @@
         try {
           const prof = docentes.find(d => d.id === docenteId) || { nombre: 'Desconocido', rut: '-', contratoHoras: 0 };
           const assigned = computeAssignedHoursForDocente(docenteId);
-          simpleProfEl.innerHTML = `<strong>${prof.nombre}</strong> (RUT: ${prof.rut || '-'})<br>Contrato semanal: ${parseFloat(prof.contratoHoras||0)}h<br>Asignadas (semana): ${assigned.toFixed(2)}h`;
+          simpleProfEl.innerHTML = `<strong>${prof.nombre}</strong> (RUT: ${prof.rut || '-'})<br>Contrato semanal: ${parseFloat(prof.contratoHoras || 0)}h<br>Asignadas (semana): ${assigned.toFixed(2)}h`;
           // populate list
-          const evs = storedEvents.filter(e => (e.extendedProps && e.extendedProps.__meta && String(e.extendedProps.__meta.docenteId) === String(docenteId)) );
+          const evs = storedEvents.filter(e => (e.extendedProps && e.extendedProps.__meta && String(e.extendedProps.__meta.docenteId) === String(docenteId)));
           if (!evs.length) { simpleListEl.textContent = 'No se encontraron clases asignadas.'; } else {
             simpleListEl.innerHTML = '';
-            evs.sort((a,b) => new Date(a.start) - new Date(b.start));
+            evs.sort((a, b) => new Date(a.start) - new Date(b.start));
             for (const e of evs) {
               const s = new Date(e.start); const en = new Date(e.end);
-              const div = document.createElement('div'); div.style.marginBottom='6px'; div.innerHTML = `<strong>${e.title}</strong><br><small>${s.toLocaleString()} — ${en.toLocaleTimeString()}</small>`;
+              const div = document.createElement('div'); div.style.marginBottom = '6px'; div.innerHTML = `<strong>${e.title}</strong><br><small>${s.toLocaleString()} — ${en.toLocaleTimeString()}</small>`;
               simpleListEl.appendChild(div);
             }
           }
@@ -5865,22 +6396,23 @@
 
       simpleCloseBtn.addEventListener('click', closeConflictModal);
       simpleViewBtn.addEventListener('click', function () { const did = simpleOverlay.__did; if (did) { /* already showing list */ } });
-      simpleMoveBtn.addEventListener('click', function () { const did = simpleOverlay.__did; if (!did) { alert('No hay docente seleccionado'); return; } 
+      simpleMoveBtn.addEventListener('click', function () {
+        const did = simpleOverlay.__did; if (!did) { alert('No hay docente seleccionado'); return; }
         // move last event +7d
-        const evs = storedEvents.filter(e => (e.extendedProps && e.extendedProps.__meta && String(e.extendedProps.__meta.docenteId) === String(did)) );
+        const evs = storedEvents.filter(e => (e.extendedProps && e.extendedProps.__meta && String(e.extendedProps.__meta.docenteId) === String(did)));
         if (!evs.length) { alert('No se encontraron eventos a reagendar.'); return; }
-        evs.sort((a,b) => new Date(b.start) - new Date(a.start));
+        evs.sort((a, b) => new Date(b.start) - new Date(a.start));
         const last = evs[0];
         try {
-          const start = new Date(last.start); const end = new Date(last.end); const dayMs = 24*60*60*1000;
-          const newStart = new Date(start.getTime() + 7*dayMs); const newEnd = new Date(end.getTime() + 7*dayMs);
+          const start = new Date(last.start); const end = new Date(last.end); const dayMs = 24 * 60 * 60 * 1000;
+          const newStart = new Date(start.getTime() + 7 * dayMs); const newEnd = new Date(end.getTime() + 7 * dayMs);
           const idx = storedEvents.findIndex(se => se.id === last.id);
           if (idx === -1) { alert('No se pudo localizar el evento en el almacenamiento.'); return; }
           storedEvents[idx].start = newStart.toISOString(); storedEvents[idx].end = newEnd.toISOString();
           persistEventsAndValidate();
           closeConflictModal();
           showValidationMessage('Se movió la última clase del docente a la semana siguiente.', 'warn');
-        } catch (e) { console.error('move error', e); alert('Error al mover evento: '+e.message); }
+        } catch (e) { console.error('move error', e); alert('Error al mover evento: ' + e.message); }
       });
 
       // Helper: find conflicts (returns array of storedEvents that overlap by docente or sala)
@@ -5959,59 +6491,59 @@
         return conflicts;
       }
 
-          function removeConflictsFromStorage(conflicts) {
-            if (!Array.isArray(conflicts) || conflicts.length === 0) return;
-            const byRef = new Set();
-            const byId = new Set();
-            const bySignature = new Set();
+      function removeConflictsFromStorage(conflicts) {
+        if (!Array.isArray(conflicts) || conflicts.length === 0) return;
+        const byRef = new Set();
+        const byId = new Set();
+        const bySignature = new Set();
 
-            conflicts.forEach(c => {
-              const ev = c && c.event;
-              if (!ev) return;
-              byRef.add(ev);
-              if (ev.id !== undefined && ev.id !== null) {
-                byId.add(String(ev.id));
-              }
-              const sig = `${ev.title || ''}__${ev.start || ''}__${ev.end || ''}`;
-              bySignature.add(sig);
-            });
-
-            storedEvents = storedEvents.filter(se => {
-              if (byRef.has(se)) return false;
-              if (se && se.id !== undefined && se.id !== null && byId.has(String(se.id))) return false;
-              const sig = `${se.title || ''}__${se.start || ''}__${se.end || ''}`;
-              if (bySignature.has(sig)) return false;
-              return true;
-            });
+        conflicts.forEach(c => {
+          const ev = c && c.event;
+          if (!ev) return;
+          byRef.add(ev);
+          if (ev.id !== undefined && ev.id !== null) {
+            byId.add(String(ev.id));
           }
+          const sig = `${ev.title || ''}__${ev.start || ''}__${ev.end || ''}`;
+          bySignature.add(sig);
+        });
 
-          function removeConflictsFromCalendar(conflicts) {
-            if (!calendar || typeof calendar.getEvents !== 'function' || !Array.isArray(conflicts) || conflicts.length === 0) return;
-            conflicts.forEach(c => {
-              const ev = c && c.event;
-              if (!ev) return;
-              if (ev.id) {
-                const calEvent = calendar.getEventById(ev.id);
-                if (calEvent) {
-                  try { calEvent.remove(); } catch (err) { console.warn('No se pudo eliminar evento en conflicto del calendario', err); }
-                  return;
-                }
-              }
-              const expectedStart = (() => { try { return ev.start ? new Date(ev.start).toISOString() : null; } catch (_) { return null; } })();
-              const expectedEnd = (() => { try { return ev.end ? new Date(ev.end).toISOString() : null; } catch (_) { return null; } })();
-              calendar.getEvents().forEach(calEv => {
-                if (!calEv) return;
-                const calStartIso = calEv.start ? calEv.start.toISOString() : null;
-                const calEndIso = calEv.end ? calEv.end.toISOString() : null;
-                const titleMatches = ev.title === calEv.title;
-                const startMatches = !expectedStart || expectedStart === calStartIso;
-                const endMatches = !expectedEnd || expectedEnd === calEndIso;
-                if (titleMatches && startMatches && endMatches) {
-                  try { calEv.remove(); } catch (err) { console.warn('No se pudo eliminar evento en conflicto del calendario', err); }
-                }
-              });
-            });
+        storedEvents = storedEvents.filter(se => {
+          if (byRef.has(se)) return false;
+          if (se && se.id !== undefined && se.id !== null && byId.has(String(se.id))) return false;
+          const sig = `${se.title || ''}__${se.start || ''}__${se.end || ''}`;
+          if (bySignature.has(sig)) return false;
+          return true;
+        });
+      }
+
+      function removeConflictsFromCalendar(conflicts) {
+        if (!calendar || typeof calendar.getEvents !== 'function' || !Array.isArray(conflicts) || conflicts.length === 0) return;
+        conflicts.forEach(c => {
+          const ev = c && c.event;
+          if (!ev) return;
+          if (ev.id) {
+            const calEvent = calendar.getEventById(ev.id);
+            if (calEvent) {
+              try { calEvent.remove(); } catch (err) { console.warn('No se pudo eliminar evento en conflicto del calendario', err); }
+              return;
+            }
           }
+          const expectedStart = (() => { try { return ev.start ? new Date(ev.start).toISOString() : null; } catch (_) { return null; } })();
+          const expectedEnd = (() => { try { return ev.end ? new Date(ev.end).toISOString() : null; } catch (_) { return null; } })();
+          calendar.getEvents().forEach(calEv => {
+            if (!calEv) return;
+            const calStartIso = calEv.start ? calEv.start.toISOString() : null;
+            const calEndIso = calEv.end ? calEv.end.toISOString() : null;
+            const titleMatches = ev.title === calEv.title;
+            const startMatches = !expectedStart || expectedStart === calStartIso;
+            const endMatches = !expectedEnd || expectedEnd === calEndIso;
+            if (titleMatches && startMatches && endMatches) {
+              try { calEv.remove(); } catch (err) { console.warn('No se pudo eliminar evento en conflicto del calendario', err); }
+            }
+          });
+        });
+      }
 
       // Find conflicts against a provided list of events (used when checking draft reservations)
       function findConflictsInList(candidate, eventsList) {
@@ -6144,7 +6676,7 @@
         setTimeout(() => { try { validationArea.style.display = 'none'; } catch (e) { } }, 6000);
       }
 
-      
+
 
       // Validate a candidate event for docente hours and room conflicts. Returns array of messages (empty if ok).
       function validateCandidateEvent(candidate) {
@@ -6218,9 +6750,9 @@
             const contrato = Number.isFinite(parseFloat(contratoRaw)) && parseFloat(contratoRaw) > 0 ? parseFloat(contratoRaw) : 24;
             if (assigned > contrato) {
               showValidationMessage(`Docente ${d.nombre} supera contrato: asignadas ${assigned.toFixed(2)}h / contrato ${contrato}h`, 'error');
-                      // Open richer conflict modal with options to inspect and reschedule
-                      try { openConflictModal(d.id); } catch (e) { console.error('openConflictModal error', e); showValidationMessage(`Docente ${d.nombre} supera contrato: asignadas ${assigned.toFixed(2)}h / contrato ${contrato}h`, 'error'); }
-                      return;
+              // Open richer conflict modal with options to inspect and reschedule
+              try { openConflictModal(d.id); } catch (e) { console.error('openConflictModal error', e); showValidationMessage(`Docente ${d.nombre} supera contrato: asignadas ${assigned.toFixed(2)}h / contrato ${contrato}h`, 'error'); }
+              return;
             }
           }
 
@@ -6936,7 +7468,7 @@
         try {
           const info = opts && opts.info;
           const ev = opts && opts.ev;
-          try { if (typeof decisionOverlay !== 'undefined' && decisionOverlay) decisionOverlay.style.display = 'none'; } catch (_) {}
+          try { if (typeof decisionOverlay !== 'undefined' && decisionOverlay) decisionOverlay.style.display = 'none'; } catch (_) { }
           if (info && typeof info.revert === 'function') {
             try { info.revert(); } catch (e) { console.warn('Revert falló', e); }
           } else if (ev && typeof ev.remove === 'function') {
@@ -6947,7 +7479,7 @@
             if (typeof window !== 'undefined' && typeof window.dispatchConflictAction === 'function') {
               window.dispatchConflictAction({ type: 'DISMISS_CONFLICT', payload: { eventId: ev && ev.id ? ev.id : null } });
             }
-          } catch (_) {}
+          } catch (_) { }
           return { ok: true };
         } catch (err) {
           console.warn('handleKeepExistingAction error', err);
@@ -6971,7 +7503,7 @@
       function buildConflictDetails(candidate, conflicts) {
         const parts = [];
         const candStart = candidate.start || 'Sin inicio';
-          docenteLegendText.textContent = partes.join(' | ');
+        docenteLegendText.textContent = partes.join(' | ');
         parts.push(`<div class="conflict-detail candidate"><strong>Intentando guardar:</strong><div>${candidate.title || 'Evento sin título'}</div><div>${candStart} → ${candEnd}</div></div>`);
         conflicts.forEach(c => {
           const ev = c.event;
@@ -6985,46 +7517,46 @@
         return parts.join('');
       }
 
-        function formatHours(value) {
-          if (typeof value !== 'number' || !isFinite(value)) return String(value || 'N/A');
-          return value.toFixed(2) + ' h';
-        }
+      function formatHours(value) {
+        if (typeof value !== 'number' || !isFinite(value)) return String(value || 'N/A');
+        return value.toFixed(2) + ' h';
+      }
 
-        function buildCapacityDetails(data) {
-          if (!data) return '';
-          const rows = [];
-          if (data.contractHours !== undefined) rows.push(`<div>Contrato semanal: ${formatHours(data.contractHours)}</div>`);
-          if (data.currentHours !== undefined) rows.push(`<div>Horas asignadas actualmente: ${formatHours(data.currentHours)}</div>`);
-          if (data.eventHours !== undefined) rows.push(`<div>Horas de este evento: ${formatHours(data.eventHours)}</div>`);
-          if (data.projectedHours !== undefined) rows.push(`<div>Total con el cambio: ${formatHours(data.projectedHours)}</div>`);
-          if (!rows.length) return '';
-          const title = data.docenteName ? `Detalle semanal de ${data.docenteName}` : 'Detalle semanal';
-          return `<div class="conflict-detail"><strong>${title}</strong>${rows.join('')}</div>`;
-        }
+      function buildCapacityDetails(data) {
+        if (!data) return '';
+        const rows = [];
+        if (data.contractHours !== undefined) rows.push(`<div>Contrato semanal: ${formatHours(data.contractHours)}</div>`);
+        if (data.currentHours !== undefined) rows.push(`<div>Horas asignadas actualmente: ${formatHours(data.currentHours)}</div>`);
+        if (data.eventHours !== undefined) rows.push(`<div>Horas de este evento: ${formatHours(data.eventHours)}</div>`);
+        if (data.projectedHours !== undefined) rows.push(`<div>Total con el cambio: ${formatHours(data.projectedHours)}</div>`);
+        if (!rows.length) return '';
+        const title = data.docenteName ? `Detalle semanal de ${data.docenteName}` : 'Detalle semanal';
+        return `<div class="conflict-detail"><strong>${title}</strong>${rows.join('')}</div>`;
+      }
 
-        function showCapacityLimitModal(candidate, data) {
-          const docenteName = data && data.docenteName ? data.docenteName : 'el docente seleccionado';
-          const contrato = data && data.contractHours !== undefined ? formatHours(data.contractHours) : 'su contrato semanal';
-          const projected = data && data.projectedHours !== undefined ? formatHours(data.projectedHours) : null;
-          const message = data && data.message ? data.message : `El docente ${docenteName} superaría ${contrato}${projected ? ` (quedaría en ${projected})` : ''}.`;
-          const explanation = data && data.explanation ? data.explanation : 'Reasigna esta sesión a otro docente o muévela a una semana con horas disponibles.';
-          const detailsHtml = data && data.detailsHtml !== undefined ? data.detailsHtml : buildCapacityDetails(data);
-          return resolveConflictModal(candidate, [], {
-            mode: 'capacity',
-            title: data && data.title ? data.title : 'Docente sin disponibilidad semanal',
-            message,
-            explanationTitle: data && data.explanationTitle ? data.explanationTitle : '¿Qué significa esto?',
-            explanation,
-            keepLabel: data && data.keepLabel ? data.keepLabel : 'Entendido',
-            keepAction: data && data.keepAction ? data.keepAction : 'omit',
-            showReplace: false,
-            showReschedule: data && data.showReschedule ? data.showReschedule : false,
-            allowRemember: false,
-            detailsHtml,
-            detailsToggleLabel: data && data.detailsToggleLabel ? data.detailsToggleLabel : 'Mostrar detalles técnicos (solo para desarrolladores)',
-            detailsToggleHideLabel: data && data.detailsToggleHideLabel ? data.detailsToggleHideLabel : 'Ocultar detalles técnicos'
-          });
-        }
+      function showCapacityLimitModal(candidate, data) {
+        const docenteName = data && data.docenteName ? data.docenteName : 'el docente seleccionado';
+        const contrato = data && data.contractHours !== undefined ? formatHours(data.contractHours) : 'su contrato semanal';
+        const projected = data && data.projectedHours !== undefined ? formatHours(data.projectedHours) : null;
+        const message = data && data.message ? data.message : `El docente ${docenteName} superaría ${contrato}${projected ? ` (quedaría en ${projected})` : ''}.`;
+        const explanation = data && data.explanation ? data.explanation : 'Reasigna esta sesión a otro docente o muévela a una semana con horas disponibles.';
+        const detailsHtml = data && data.detailsHtml !== undefined ? data.detailsHtml : buildCapacityDetails(data);
+        return resolveConflictModal(candidate, [], {
+          mode: 'capacity',
+          title: data && data.title ? data.title : 'Docente sin disponibilidad semanal',
+          message,
+          explanationTitle: data && data.explanationTitle ? data.explanationTitle : '¿Qué significa esto?',
+          explanation,
+          keepLabel: data && data.keepLabel ? data.keepLabel : 'Entendido',
+          keepAction: data && data.keepAction ? data.keepAction : 'omit',
+          showReplace: false,
+          showReschedule: data && data.showReschedule ? data.showReschedule : false,
+          allowRemember: false,
+          detailsHtml,
+          detailsToggleLabel: data && data.detailsToggleLabel ? data.detailsToggleLabel : 'Mostrar detalles técnicos (solo para desarrolladores)',
+          detailsToggleHideLabel: data && data.detailsToggleHideLabel ? data.detailsToggleHideLabel : 'Ocultar detalles técnicos'
+        });
+      }
 
       // Try to create event interactively if necessary. Returns Promise<boolean> whether event was created.
       async function tryCreateEvent(ev) {
@@ -7298,7 +7830,7 @@
           alert('No hay manejador de edición disponible.');
         } catch (e) { console.error('openEventManagementModal error', e); }
       }
-      try { window.openEventManagementModal = openEventManagementModal; } catch (_) {}
+      try { window.openEventManagementModal = openEventManagementModal; } catch (_) { }
 
       editForm.addEventListener('submit', async function (ev) {
         ev.preventDefault();
@@ -7685,7 +8217,7 @@
           await postMany(storedEvents, '/events', 'events');
 
           if (errors.length === 0) {
-            try { showResultModal('Los datos se migraron correctamente. Se migraron: ' + Object.entries(summary).map(([k,v])=>`${v} ${k}`).join(', ') + '.', 'success'); } catch (e) { alert('Los datos se migraron correctamente.'); }
+            try { showResultModal('Los datos se migraron correctamente. Se migraron: ' + Object.entries(summary).map(([k, v]) => `${v} ${k}`).join(', ') + '.', 'success'); } catch (e) { alert('Los datos se migraron correctamente.'); }
           } else {
             console.error('Errores al migrar:', errors);
             const errCount = errors.length;
@@ -7713,7 +8245,7 @@
 
         const btn = document.getElementById('clean-generic-events');
         if (!btn) return;
-        
+
         const origText = btn.textContent;
         btn.disabled = true;
         btn.textContent = '⏳ Limpiando...';
@@ -7724,16 +8256,16 @@
             const response = await authorizedFetch(API_BASE + '/events/cleanup/generic', {
               method: 'DELETE'
             });
-            
+
             if (!response.ok) {
               const errorData = await response.json().catch(() => ({}));
               throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
             }
-            
+
             const result = await response.json();
             console.log('✅ Limpieza completada:', result);
             alert(`✅ Se eliminaron ${result.deleted || 0} eventos genéricos de la base de datos.`);
-            
+
             // Recargar eventos desde el servidor
             if (calendar) {
               // calendar.refetchEvents(); // Simplified: avoid redundant refetch
@@ -7746,12 +8278,12 @@
               return meta.moduloId && String(meta.moduloId).trim() !== '';
             });
             const deleted = before - storedEvents.length;
-            
+
             save(KEY_EVENTS, storedEvents);
             if (calendar) {
               // calendar.refetchEvents(); // Simplified: avoid redundant refetch
             }
-            
+
             console.log(`✅ Eliminados ${deleted} eventos genéricos del localStorage`);
             alert(`✅ Se eliminaron ${deleted} eventos genéricos del almacenamiento local.`);
           }
@@ -7765,8 +8297,8 @@
       }
 
       const cleanGenericBtn = document.getElementById('clean-generic-events');
-      if (cleanGenericBtn) { 
-        cleanGenericBtn.addEventListener('click', () => { cleanGenericEvents(); }); 
+      if (cleanGenericBtn) {
+        cleanGenericBtn.addEventListener('click', () => { cleanGenericEvents(); });
       }
 
       // Ensure SheetJS is available, then export selected in-memory arrays to a multi-sheet .xlsx
@@ -8140,7 +8672,7 @@
     }
 
     // Listeners del modal
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
       const overlay = document.getElementById('modal-edicion');
       const btnCerrar = document.getElementById('btn-cerrar-modal');
       const btnCancelar = document.getElementById('btn-cancelar');
@@ -8150,21 +8682,21 @@
       if (btnCancelar) btnCancelar.addEventListener('click', cerrarModal);
       if (btnEliminar) btnEliminar.addEventListener('click', eliminarEvento);
       if (form) form.addEventListener('submit', guardarEvento);
-      if (overlay) overlay.addEventListener('click', function(e) { if (e.target === overlay) cerrarModal(); });
-      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') cerrarModal(); });
+      if (overlay) overlay.addEventListener('click', function (e) { if (e.target === overlay) cerrarModal(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cerrarModal(); });
       // Auto-ajuste por bloque seleccionado
       const selInicio = document.getElementById('evento-inicio');
       const selFin = document.getElementById('evento-fin');
       const selBloque = document.getElementById('evento-bloque');
       if (selInicio && selBloque && selFin) {
-        selInicio.addEventListener('change', function() {
+        selInicio.addEventListener('change', function () {
           const num = parseInt(selBloque.value, 10);
           if (num && Array.isArray(CEDUC_BLOQUES)) {
             const b = CEDUC_BLOQUES.find(x => x.numero === num);
             if (b) selFin.value = b.fin;
           }
         });
-        selBloque.addEventListener('change', function() {
+        selBloque.addEventListener('change', function () {
           const num = parseInt(selBloque.value, 10);
           if (num && Array.isArray(CEDUC_BLOQUES)) {
             const b = CEDUC_BLOQUES.find(x => x.numero === num);
@@ -8177,10 +8709,12 @@
 
   <!-- Modal de Asignación Manual -->
   <div id="modal-asignacion-manual" class="modal-asignacion-overlay" aria-hidden="true">
-    <div class="modal-asignacion" role="dialog" aria-modal="true" aria-labelledby="manual-modal-title" data-drag-handle=".modal-asignacion-header">
+    <div class="modal-asignacion" role="dialog" aria-modal="true" aria-labelledby="manual-modal-title"
+      data-drag-handle=".modal-asignacion-header">
       <div class="modal-asignacion-header modal-drag-handle">
         <h3 id="manual-modal-title" class="modal-asignacion-title modal-drag-title">Asignar Evento Manual</h3>
-        <button type="button" id="manual-close" class="modal-asignacion-close modal-close-btn" aria-label="Cerrar">×</button>
+        <button type="button" id="manual-close" class="modal-asignacion-close modal-close-btn"
+          aria-label="Cerrar">×</button>
       </div>
       <form id="manual-assign-form" class="asignacion-form">
         <div class="asignacion-row">
@@ -8305,7 +8839,8 @@
 
         <div class="form-group">
           <label for="evento-descripcion" class="form-label">Descripción</label>
-          <textarea id="evento-descripcion" class="form-textarea" placeholder="Notas o descripción adicional..."></textarea>
+          <textarea id="evento-descripcion" class="form-textarea"
+            placeholder="Notas o descripción adicional..."></textarea>
         </div>
 
         <div class="form-buttons">
@@ -8597,8 +9132,8 @@
     }
 
     #sidebar .entity-section .btn:last-child,
-    #sidebar .entity-section .d-grid > :last-child .btn,
-    #sidebar .entity-section .d-flex > :last-child .btn {
+    #sidebar .entity-section .d-grid> :last-child .btn,
+    #sidebar .entity-section .d-flex> :last-child .btn {
       margin-bottom: 0;
     }
 
@@ -8722,7 +9257,7 @@
       gap: 6px;
     }
 
-    .sidebar-section + .sidebar-section {
+    .sidebar-section+.sidebar-section {
       border-top: 1px solid var(--sidebar-border);
       padding-top: 12px;
       margin-top: 6px;
@@ -8755,12 +9290,12 @@
       background: rgba(255, 255, 255, 0.35);
     }
 
-    .sidebar-history > div {
+    .sidebar-history>div {
       padding: 6px 4px;
       border-bottom: 1px solid rgba(15, 23, 42, 0.08);
     }
 
-    .sidebar-history > div:last-child {
+    .sidebar-history>div:last-child {
       border-bottom: none;
     }
 
@@ -8769,7 +9304,7 @@
       border-color: rgba(255, 255, 255, 0.14);
     }
 
-    [data-turno="Vespertino"] .sidebar-history > div {
+    [data-turno="Vespertino"] .sidebar-history>div {
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
@@ -9048,8 +9583,9 @@
 
     #sidebar-toggle {
       position: relative;
-      width: 44px;
+      min-width: 44px;
       height: 44px;
+      padding: 0 18px;
       border-radius: 12px;
       border: 1px solid rgba(148, 163, 184, 0.35);
       background: var(--sidebar-card-bg);
@@ -9057,9 +9593,13 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 10px;
       cursor: pointer;
       box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
       transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
     #sidebar-toggle:hover {
@@ -9098,6 +9638,11 @@
       position: absolute;
       bottom: -6px;
       left: 0;
+    }
+
+    #sidebar-toggle .toggle-label {
+      font-size: 12px;
+      white-space: nowrap;
     }
 
     body.sidebar-hidden #sidebar-toggle .hamburger-icon {
@@ -9140,6 +9685,7 @@
       #sidebar-toggle-bar {
         padding: 12px;
       }
+
       body.sidebar-hidden #calendar-wrap {
         width: 100%;
       }
@@ -9352,17 +9898,26 @@
       border-radius: 6px !important;
       min-height: 45px !important;
     }
+
     /* SEPARACIÓN ENTRE EVENTOS APILADOS */
     .fc-timegrid-col-events {
       margin-bottom: 1px !important;
     }
+
     /* MEJORAR VISIBILIDAD DE LAS LÍNEAS DE TIEMPO */
     .fc-timegrid-slot {
       border-bottom: 1px solid #e2e8f0 !important;
       height: 60px !important;
     }
-    .fc-timegrid-slot:nth-child(odd) { background-color: #fafafa; }
-    .fc-timegrid-slot:nth-child(even) { background-color: #ffffff; }
+
+    .fc-timegrid-slot:nth-child(odd) {
+      background-color: #fafafa;
+    }
+
+    .fc-timegrid-slot:nth-child(even) {
+      background-color: #ffffff;
+    }
+
     /* ETIQUETAS DE TIEMPO MÁS CLARAS */
     .fc-timegrid-slot-label {
       font-weight: 600;
@@ -9380,25 +9935,30 @@
         <span class="auth-badge"><span aria-hidden="true">★</span> Inspirado en la bienvenida de inicioSesion</span>
         <h1>Bienvenido a</h1>
         <h2>Conexia · Gestión Horaria</h2>
-        <p>Conexia requiere credenciales de administrador para proteger la planificación horaria. Usa estos accesos provisionales y actualízalos más adelante.</p>
+        <p>Conexia requiere credenciales de administrador para proteger la planificación horaria. Usa estos accesos
+          provisionales y actualízalos más adelante.</p>
       </div>
       <div class="auth-card">
         <h3>Acceso administrador</h3>
         <p class="login-subtitle">Solo personal autorizado puede modificar el horario.</p>
         <form id="auth-form">
           <label for="auth-user">Usuario
-            <input id="auth-user" name="user" type="text" autocomplete="username" required placeholder="Ingresa el usuario" />
+            <input id="auth-user" name="user" type="text" autocomplete="username" required
+              placeholder="Ingresa el usuario" />
           </label>
           <label for="auth-pass">Contraseña
-            <input id="auth-pass" name="pass" type="password" autocomplete="current-password" required placeholder="Contraseña temporal" />
+            <input id="auth-pass" name="pass" type="password" autocomplete="current-password" required
+              placeholder="Contraseña temporal" />
           </label>
           <button type="submit">Ingresar</button>
           <div id="auth-error" class="login-error" role="status"></div>
           <div class="auth-divider" aria-hidden="true"><span>ó</span></div>
           <div class="google-login" id="google-login-container" aria-live="polite"></div>
           <div id="google-login-status" class="login-error" role="status"></div>
-          <div id="google-login-hint" class="auth-hint">También puedes ingresar con tu correo institucional a través de Google.</div>
-          <div class="auth-hint">Fallback temporal: usuario <strong>admin</strong> · clave <strong>ceduc123</strong>.</div>
+          <div id="google-login-hint" class="auth-hint">También puedes ingresar con tu correo institucional a través de
+            Google.</div>
+          <div class="auth-hint">Fallback temporal: usuario <strong>admin</strong> · clave <strong>ceduc123</strong>.
+          </div>
         </form>
       </div>
     </div>
@@ -9420,268 +9980,275 @@
     <header id="sidebar-toggle-bar">
       <button id="sidebar-toggle" type="button" aria-label="Abrir vista lateral" aria-pressed="false">
         <span class="hamburger-icon" aria-hidden="true"></span>
+        <span class="toggle-label">Herramientas</span>
       </button>
       <div class="topbar-spacer" aria-hidden="true"></div>
     </header>
 
     <div id="app" class="main-layout">
-    <div id="sidebar" class="sidebar">
-      <div class="sidebar-brand">
+      <div id="sidebar" class="sidebar">
+        <div class="sidebar-brand">
           <div class="header-logo-container">
             <picture>
               <source srcset="../img/CEDUCUCN.png" />
               <!-- Fallback: if first path fails, browser will try the img src; onerror provides a second fallback -->
-              <img src="../img/CEDUCUCN.png" alt="Logo CEDUC UCN" class="ceduc-header-logo" onerror="this.onerror=null;this.src='../img/CEDUCSINFONDO.png'">
+              <img src="../img/CEDUCUCN.png" alt="Logo CEDUC UCN" class="ceduc-header-logo"
+                onerror="this.onerror=null;this.src='../img/CEDUCSINFONDO.png'">
             </picture>
           </div>
-      </div>
-      <h2>Conexia · Gestión Académica</h2>
-      <p>Crear y administrar carreras, módulos y docentes. Los eventos se guardan en <em>localStorage</em>.</p>
+        </div>
+        <h2>Conexia · Gestión Académica</h2>
+        <p>Crear y administrar carreras, módulos y docentes. Los eventos se guardan en <em>localStorage</em>.</p>
 
-      <div class="sidebar-group" data-group="legend">
-        <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-legend">
-          <span>Resumen</span>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <div class="sidebar-group-content" id="sidebar-legend">
-          <div id="career-legend">
-            
-            <div id="legend-items"></div>
+        <div class="sidebar-group" data-group="legend">
+          <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-legend">
+            <span>Resumen</span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="sidebar-group-content" id="sidebar-legend">
+            <div id="career-legend">
+
+              <div id="legend-items"></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="sidebar-group" data-group="files">
-        <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-files">
-          <span>Archivos y guardado</span>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <div class="sidebar-group-content" id="sidebar-files">
-          <div class="entity-section">
-            <div class="entity-title">📁 Gestión de archivos</div>
-            <div class="d-flex flex-column gap-3 align-items-stretch">
-              <button id="export-excel" type="button" class="btn btn-primary btn-hover-lift" title="Descarga los datos en formato XLSX">
-                📊 Exportar en Excel
-              </button>
-              <button id="export-png" type="button" class="btn btn-primary btn-hover-lift" title="Genera una captura del calendario en PNG">
-                🖼️ Exportar horario (PNG)
-              </button>
+        <div class="sidebar-group" data-group="files">
+          <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-files">
+            <span>Archivos y guardado</span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="sidebar-group-content" id="sidebar-files">
+            <div class="entity-section">
+              <div class="entity-title">📁 Gestión de archivos</div>
+              <div class="d-flex flex-column gap-3 align-items-stretch">
+                <button id="export-excel" type="button" class="btn btn-primary btn-hover-lift"
+                  title="Descarga los datos en formato XLSX">
+                  📊 Exportar en Excel
+                </button>
+                <button id="export-png" type="button" class="btn btn-primary btn-hover-lift"
+                  title="Genera una captura del calendario en PNG">
+                  🖼️ Exportar horario (PNG)
+                </button>
 
-                <button id="export-pdf" type="button" class="btn btn-primary btn-hover-lift" title="Genera un PDF del calendario">
+                <button id="export-pdf" type="button" class="btn btn-primary btn-hover-lift"
+                  title="Genera un PDF del calendario">
                   📄 Exportar horario (PDF)
                 </button>
-              <button id="save-schedule" type="button" class="btn btn-secondary btn-hover-lift" title="Guardar cambios actuales del calendario">
-                💾 Guardar cambios
-              </button>
-              <button id="migrate-server" type="button" class="btn btn-outline-warning btn-hover-lift"
-                title="Envía los datos locales al servidor REST (requiere servidor corriendo)">
-                🔄 Migrar datos al servidor
-              </button>
-              <button id="clean-generic-events" type="button" class="btn btn-outline-danger btn-hover-lift"
-                title="Elimina eventos genéricos sin módulo asignado (bloques azules)">
-                🗑️ Limpiar eventos genéricos
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-group" data-group="filters">
-        <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-filters">
-          <span>Filtros y navegación</span>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <div class="sidebar-group-content" id="sidebar-filters">
-          <div class="entity-section">
-            <div class="entity-title">🎯 Controles de filtrado</div>
-            <div class="mb-3">
-              <label for="filter-carrera" class="form-label">Filtrar por Carrera</label>
-              <select id="filter-carrera" class="form-select" aria-label="Filtro de carreras">
-                <option value="">-- Todas --</option>
-              </select>
-            </div>
-            <div class="d-flex align-items-center gap-2 mb-3">
-              <div id="filter-active" class="flex-grow-1 small text-muted"></div>
-              <button id="clear-filter" class="btn btn-outline-secondary btn-sm btn-hover-lift" style="display:none;" type="button"
-                title="Limpiar filtros aplicados">
-                ✖️ Limpiar filtro
-              </button>
-            </div>
-            <div class="form-check mb-3">
-              <input class="form-check-input" type="checkbox" id="show-all-combined">
-              <label class="form-check-label" for="show-all-combined">Mostrar todas combinadas</label>
-            </div>
-            <div class="mb-3">
-              <label for="filter-week" class="form-label">Semana a mostrar (primer día)</label>
-              <input id="filter-week" type="date" class="form-control">
-            </div>
-            <div class="mb-0">
-              <label for="semester-end" class="form-label">Fin de semestre</label>
-              <input id="semester-end" type="date" class="form-control"
-                title="Fecha final del semestre (repeticiones semanales hasta esta fecha)">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-group" data-group="catalogs">
-        <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-catalogs">
-          <span>Gestión académica</span>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <div class="sidebar-group-content" id="sidebar-catalogs">
-          <div class="entity-section">
-            <div class="entity-title">🎓 Carreras</div>
-            <div class="d-grid gap-3">
-              <button id="open-carrera-modal" type="button" class="btn btn-success btn-hover-lift"
-                title="Registrar una nueva carrera">
-                🎓 Crear Carrera
-              </button>
-            </div>
-            <ul id="list-carreras" class="mt-3 mb-0 list-unstyled"></ul>
-          </div>
-          <div class="entity-section">
-            <div class="entity-title">📚 Módulos</div>
-            <div class="d-grid gap-3">
-              <button id="open-modulo-modal" type="button" class="btn btn-success btn-hover-lift"
-                title="Crear un módulo y asociarlo a una carrera">
-                📚 Crear Módulo
-              </button>
-              <div class="d-grid gap-2">
-                <button id="open-list-modulos-sidebar" type="button" class="btn btn-outline-primary btn-hover-lift"
-                  title="Consultar el catálogo completo de módulos">
-                  👁️ Ver Módulos
+                <button id="save-schedule" type="button" class="btn btn-secondary btn-hover-lift"
+                  title="Guardar cambios actuales del calendario">
+                  💾 Guardar cambios
                 </button>
-              </div>
-            </div>
-            <ul id="list-modulos" class="mt-3 mb-0 list-unstyled"></ul>
-          </div>
-          <div class="entity-section">
-            <div class="entity-title">👩‍🏫 Docentes</div>
-            <div class="d-grid gap-3">
-              <button id="open-doc-modal" type="button" class="btn btn-success btn-hover-lift"
-                title="Crear o editar un docente">
-                👩‍🏫 Crear Docente
-              </button>
-              <div class="d-grid gap-2">
-                <button id="open-list-docentes-sidebar" type="button" class="btn btn-outline-primary btn-hover-lift"
-                  title="Ver el listado completo de docentes">
-                  👁️ Ver Docentes
+                <button id="migrate-server" type="button" class="btn btn-outline-warning btn-hover-lift"
+                  title="Envía los datos locales al servidor REST (requiere servidor corriendo)">
+                  🔄 Migrar datos al servidor
                 </button>
-              </div>
-            </div>
-            <ul id="list-docentes" class="mt-3 mb-0 list-unstyled"></ul>
-          </div>
-          <div class="entity-section mb-0">
-            <div class="entity-title">🏫 Salas</div>
-            <div class="d-grid gap-3">
-              <button id="open-sala-modal" type="button" class="btn btn-success btn-hover-lift"
-                title="Agregar una nueva sala o laboratorio">
-                🏫 Crear Sala
-              </button>
-              <div class="d-grid gap-2">
-                <button id="ver-salas" type="button" class="btn btn-outline-primary btn-hover-lift"
-                  title="Ver todas las salas registradas">
-                  👁️ Ver Salas
+                <button id="clean-generic-events" type="button" class="btn btn-outline-danger btn-hover-lift"
+                  title="Elimina eventos genéricos sin módulo asignado (bloques azules)">
+                  🗑️ Limpiar eventos genéricos
                 </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="sidebar-group" data-group="tools">
-        <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-tools">
-          <span>Herramientas de edición</span>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <div class="sidebar-group-content" id="sidebar-tools">
-          <div class="entity-section">
-            <div class="entity-title">🧰 Herramientas rápidas</div>
-            <div class="d-flex flex-column gap-3 align-items-stretch">
-              <button id="run-acople" type="button" class="btn btn-secondary btn-hover-lift"
-                title="Reacomoda eventos para cerrar huecos">
-                🔧 Ejecutar Acople
-              </button>
-            </div>
-            <div class="form-check form-switch mb-0">
-              <input class="form-check-input" type="checkbox" id="toggle-acople">
-              <label class="form-check-label" for="toggle-acople">Auto-acoplar bloques (cerrar huecos entre clases)</label>
-            </div>
-          </div>
-          <div class="entity-section mb-0" id="auto-history-container">
-            <div class="entity-title">🕒 Historial auto</div>
-            <div id="auto-op-history" class="sidebar-history"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-group" data-group="settings">
-        <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-settings">
-          <span>Ajustes de interfaz</span>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <div class="sidebar-group-content" id="sidebar-settings">
-          <div class="entity-section mb-0">
-            <div class="entity-title">⚙️ Ajustes rápidos</div>
-            <div class="mb-3">
-              <label for="turno-theme" class="form-label">Tema de Turno</label>
-              <select id="turno-theme" class="form-select">
-                <option value="Diurno">Diurno (claro)</option>
-                <option value="Vespertino">Vespertino (oscuro)</option>
-              </select>
-            </div>
-            <div class="mb-3 small text-muted">
-              <div id="api-mode">Modo API: <strong style="color:green">OFF</strong></div>
-              <div id="api-base-indicator" class="mt-1">Origen API: <code>--</code></div>
-            </div>
-            <div class="d-flex flex-column gap-3 align-items-stretch">
-              <button id="toggle-api" type="button" class="btn btn-outline-warning btn-hover-lift"
-                title="Activa o desactiva el uso de la API (requiere recargar)">
-                ⚙️ Alternar Modo API
-              </button>
-              <button id="toggle-api-source" type="button" class="btn btn-outline-secondary btn-hover-lift"
-                title="Cambiar entre servidores Render y Local">
-                🌐 Cambiar origen API
-              </button>
+        <div class="sidebar-group" data-group="filters">
+          <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-filters">
+            <span>Filtros y navegación</span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="sidebar-group-content" id="sidebar-filters">
+            <div class="entity-section">
+              <div class="entity-title">🎯 Controles de filtrado</div>
+              <div class="mb-3">
+                <label for="filter-carrera" class="form-label">Filtrar por Carrera</label>
+                <select id="filter-carrera" class="form-select" aria-label="Filtro de carreras">
+                  <option value="">-- Todas --</option>
+                </select>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-3">
+                <div id="filter-active" class="flex-grow-1 small text-muted"></div>
+                <button id="clear-filter" class="btn btn-outline-secondary btn-sm btn-hover-lift" style="display:none;"
+                  type="button" title="Limpiar filtros aplicados">
+                  ✖️ Limpiar filtro
+                </button>
+              </div>
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="show-all-combined">
+                <label class="form-check-label" for="show-all-combined">Mostrar todas combinadas</label>
+              </div>
+              <div class="mb-3">
+                <label for="filter-week" class="form-label">Semana a mostrar (primer día)</label>
+                <input id="filter-week" type="date" class="form-control">
+              </div>
+              <div class="mb-0">
+                <label for="semester-end" class="form-label">Fin de semestre</label>
+                <input id="semester-end" type="date" class="form-control"
+                  title="Fecha final del semestre (repeticiones semanales hasta esta fecha)">
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div id="sidebar-resize-handle" aria-hidden="true"></div>
+
+        <div class="sidebar-group" data-group="catalogs">
+          <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-catalogs">
+            <span>Gestión académica</span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="sidebar-group-content" id="sidebar-catalogs">
+            <div class="entity-section">
+              <div class="entity-title">🎓 Carreras</div>
+              <div class="d-grid gap-3">
+                <button id="open-carrera-modal" type="button" class="btn btn-success btn-hover-lift"
+                  title="Registrar una nueva carrera">
+                  🎓 Crear Carrera
+                </button>
+              </div>
+              <ul id="list-carreras" class="mt-3 mb-0 list-unstyled"></ul>
+            </div>
+            <div class="entity-section">
+              <div class="entity-title">📚 Módulos</div>
+              <div class="d-grid gap-3">
+                <button id="open-modulo-modal" type="button" class="btn btn-success btn-hover-lift"
+                  title="Crear un módulo y asociarlo a una carrera">
+                  📚 Crear Módulo
+                </button>
+                <div class="d-grid gap-2">
+                  <button id="open-list-modulos-sidebar" type="button" class="btn btn-outline-primary btn-hover-lift"
+                    title="Consultar el catálogo completo de módulos">
+                    👁️ Ver Módulos
+                  </button>
+                </div>
+              </div>
+              <ul id="list-modulos" class="mt-3 mb-0 list-unstyled"></ul>
+            </div>
+            <div class="entity-section">
+              <div class="entity-title">👩‍🏫 Docentes</div>
+              <div class="d-grid gap-3">
+                <button id="open-doc-modal" type="button" class="btn btn-success btn-hover-lift"
+                  title="Crear o editar un docente">
+                  👩‍🏫 Crear Docente
+                </button>
+                <div class="d-grid gap-2">
+                  <button id="open-list-docentes-sidebar" type="button" class="btn btn-outline-primary btn-hover-lift"
+                    title="Ver el listado completo de docentes">
+                    👁️ Ver Docentes
+                  </button>
+                </div>
+              </div>
+              <ul id="list-docentes" class="mt-3 mb-0 list-unstyled"></ul>
+            </div>
+            <div class="entity-section mb-0">
+              <div class="entity-title">🏫 Salas</div>
+              <div class="d-grid gap-3">
+                <button id="open-sala-modal" type="button" class="btn btn-success btn-hover-lift"
+                  title="Agregar una nueva sala o laboratorio">
+                  🏫 Crear Sala
+                </button>
+                <div class="d-grid gap-2">
+                  <button id="ver-salas" type="button" class="btn btn-outline-primary btn-hover-lift"
+                    title="Ver todas las salas registradas">
+                    👁️ Ver Salas
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-group" data-group="tools">
+          <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-tools">
+            <span>Herramientas de edición</span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="sidebar-group-content" id="sidebar-tools">
+            <div class="entity-section">
+              <div class="entity-title">🧰 Herramientas rápidas</div>
+              <div class="d-flex flex-column gap-3 align-items-stretch">
+                <button id="run-acople" type="button" class="btn btn-secondary btn-hover-lift"
+                  title="Reacomoda eventos para cerrar huecos">
+                  🔧 Ejecutar Acople
+                </button>
+              </div>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="toggle-acople">
+                <label class="form-check-label" for="toggle-acople">Auto-acoplar bloques (cerrar huecos entre
+                  clases)</label>
+              </div>
+            </div>
+            <div class="entity-section mb-0" id="auto-history-container">
+              <div class="entity-title">🕒 Historial auto</div>
+              <div id="auto-op-history" class="sidebar-history"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-group" data-group="settings">
+          <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-settings">
+            <span>Ajustes de interfaz</span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="sidebar-group-content" id="sidebar-settings">
+            <div class="entity-section mb-0">
+              <div class="entity-title">⚙️ Ajustes rápidos</div>
+              <div class="mb-3">
+                <label for="turno-theme" class="form-label">Tema de Turno</label>
+                <select id="turno-theme" class="form-select">
+                  <option value="Diurno">Diurno (claro)</option>
+                  <option value="Vespertino">Vespertino (oscuro)</option>
+                </select>
+              </div>
+              <div class="mb-3 small text-muted">
+                <div id="api-mode">Modo API: <strong style="color:green">OFF</strong></div>
+                <div id="api-base-indicator" class="mt-1">Origen API: <code>--</code></div>
+              </div>
+              <div class="d-flex flex-column gap-3 align-items-stretch">
+                <button id="toggle-api" type="button" class="btn btn-outline-warning btn-hover-lift"
+                  title="Activa o desactiva el uso de la API (requiere recargar)">
+                  ⚙️ Alternar Modo API
+                </button>
+                <button id="toggle-api-source" type="button" class="btn btn-outline-secondary btn-hover-lift"
+                  title="Cambiar entre servidores Render y Local">
+                  🌐 Cambiar origen API
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="sidebar-resize-handle" aria-hidden="true"></div>
       </div>
 
-    <div id="calendar-wrap" class="schedule-container">
-      <div id="calendar"></div>
+      <div id="calendar-wrap" class="schedule-container">
+        <div id="calendar"></div>
+      </div>
     </div>
-  </div>
 
   </div>
 
   <!-- Modal for creating docente -->
-    <div id="doc-modal" class="app-modal app-modal--narrow" role="dialog" aria-modal="true" style="display:none">
-      <h4>Crear Docente</h4>
-      <div class="modal-body">
-    <form id="form-docente">
-      <div><label>RUT <input id="doc-rut" placeholder="RUT" required></label></div>
-      <div><label>Nombre <input id="doc-nombre" placeholder="Nombre completo" required></label></div>
-      <div style="display:flex;gap:6px;"><label>Edad <input id="doc-edad" type="number"
-        placeholder="Edad"></label><label>Estado civil <input id="doc-estado"
-        placeholder="Estado civil"></label></div>
-      <div><label>Horas por contrato <input id="doc-contrato" type="number" placeholder="Horas contratadas"
-        value="24"></label></div>
-      <div><label>Carrera <select id="doc-carrera">
-        <option value="">(sin asignar)</option>
-      </select></label></div>
-      <div><label>Turno <select id="doc-turno">
-        <option value="Diurno">Diurno</option>
-        <option value="Vespertino">Vespertino</option>
-      </select></label></div>
-      <div style="display:flex;gap:8px;margin-top:8px;"><button type="submit">Crear</button><button type="button"
-      id="close-doc-modal">Cancelar</button></div>
-    </form>
-      </div>
+  <div id="doc-modal" class="app-modal app-modal--narrow" role="dialog" aria-modal="true" style="display:none">
+    <h4>Crear Docente</h4>
+    <div class="modal-body">
+      <form id="form-docente">
+        <div><label>RUT <input id="doc-rut" placeholder="RUT" required></label></div>
+        <div><label>Nombre <input id="doc-nombre" placeholder="Nombre completo" required></label></div>
+        <div style="display:flex;gap:6px;"><label>Edad <input id="doc-edad" type="number"
+              placeholder="Edad"></label><label>Estado civil <input id="doc-estado" placeholder="Estado civil"></label>
+        </div>
+        <div><label>Horas por contrato <input id="doc-contrato" type="number" placeholder="Horas contratadas"
+              value="24"></label></div>
+        <div><label>Carrera <select id="doc-carrera">
+              <option value="">(sin asignar)</option>
+            </select></label></div>
+        <div><label>Turno <select id="doc-turno">
+              <option value="Diurno">Diurno</option>
+              <option value="Vespertino">Vespertino</option>
+            </select></label></div>
+        <div style="display:flex;gap:8px;margin-top:8px;"><button type="submit">Crear</button><button type="button"
+            id="close-doc-modal">Cancelar</button></div>
+      </form>
     </div>
+  </div>
 
   <!-- Modal: listar módulos (por carrera) -->
   <div id="list-modulos-modal" class="app-modal app-modal--narrow" role="dialog" aria-modal="true" style="display:none">
@@ -9695,7 +10262,8 @@
   </div>
 
   <!-- Modal: listar docentes (por carrera) -->
-  <div id="list-docentes-modal" class="app-modal app-modal--narrow" role="dialog" aria-modal="true" style="display:none">
+  <div id="list-docentes-modal" class="app-modal app-modal--narrow" role="dialog" aria-modal="true"
+    style="display:none">
     <h4>Docentes</h4>
     <div class="modal-body">
       <div id="list-docentes-modal-body" style="padding:8px;"></div>
@@ -9724,8 +10292,8 @@
         <div><input id="carrera-id" placeholder="ID (ej: C-001)" required></div>
         <div><input id="carrera-nombre" placeholder="Nombre de la carrera" required></div>
         <div><input id="carrera-total" type="number" placeholder="Horas totales"></div>
-        <div style="display:flex;gap:6px;"><input id="carrera-practica" type="number" placeholder="Horas prácticas"><input
-            id="carrera-teorica" type="number" placeholder="Horas teóricas"></div>
+        <div style="display:flex;gap:6px;"><input id="carrera-practica" type="number"
+            placeholder="Horas prácticas"><input id="carrera-teorica" type="number" placeholder="Horas teóricas"></div>
         <div style="display:flex;gap:8px;margin-top:8px;"><button type="submit">Crear Carrera</button><button
             type="button" id="close-carrera-modal">Cancelar</button></div>
       </form>
@@ -9744,8 +10312,8 @@
           <label><input type="radio" name="mod-tipo" value="Teórico" checked> Teórico</label>
           <label style="margin-left:8px"><input type="radio" name="mod-tipo" value="Práctico"> Práctico</label>
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px;"><button type="submit">Crear Módulo</button><button type="button"
-            id="close-modulo-modal">Cancelar</button></div>
+        <div style="display:flex;gap:8px;margin-top:8px;"><button type="submit">Crear Módulo</button><button
+            type="button" id="close-modulo-modal">Cancelar</button></div>
       </form>
     </div>
   </div>
@@ -9917,7 +10485,7 @@
   </script>
 
   <script>
-    (function(){
+    (function () {
       // CEDUC schedule manager centralizes block-based FullCalendar integration.
       const CONFIG = { startHour: 8, startMinute: 30, blockMinutes: 35, blockCount: 22 };
       const BLOCK_DURATION_MS = CONFIG.blockMinutes * 60000;
@@ -10141,7 +10709,7 @@
       }
 
       // Namespace unified to avoid global collisions
-      try { window.CEDUC = window.CEDUC || {}; } catch(_) {}
+      try { window.CEDUC = window.CEDUC || {}; } catch (_) { }
       window.CEDUC.SnapOverlay = {
         highlightCellForDate(api, date, view) { highlightCell(api, date, view); },
         clearHighlight() { clearOverlay(); }
@@ -10215,15 +10783,15 @@
         cal.setOption('snapDuration', '00:35:00');
         cal.setOption('slotDuration', '00:35:00');
 
-        if (typeof prev.eventContent !== 'function') cal.setOption('eventContent', function(arg) {
+        if (typeof prev.eventContent !== 'function') cal.setOption('eventContent', function (arg) {
           const eventColor = (arg.event.extendedProps && arg.event.extendedProps.color) || arg.event.backgroundColor || arg.event.color;
           if (eventColor) {
-            try { arg.event.setProp('color', eventColor); } catch (_) {}
+            try { arg.event.setProp('color', eventColor); } catch (_) { }
           }
           return true;
         });
 
-        if (typeof prev.eventAllow !== 'function') cal.setOption('eventAllow', function(dropInfo, draggedEvent) {
+        if (typeof prev.eventAllow !== 'function') cal.setOption('eventAllow', function (dropInfo, draggedEvent) {
           const startDate = new Date(dropInfo.start);
           const durationMs = dropInfo.end ? (dropInfo.end.getTime() - dropInfo.start.getTime()) : null;
           const baseDuration = durationMs ? Math.round(durationMs / 60000) : eventDurationMinutes(draggedEvent);
@@ -10232,34 +10800,34 @@
           return true;
         });
 
-        if (typeof prev.eventDragStart !== 'function') cal.setOption('eventDragStart', function(info) {
+        if (typeof prev.eventDragStart !== 'function') cal.setOption('eventDragStart', function (info) {
           const placement = snapPlacement(new Date(info.event.start), eventDurationMinutes(info.event));
           if (placement.ok) highlightCell(cal, placement.start, info.view);
         });
 
-        if (typeof prev.eventDrag !== 'function') cal.setOption('eventDrag', function(info) {
+        if (typeof prev.eventDrag !== 'function') cal.setOption('eventDrag', function (info) {
           const placement = snapPlacement(new Date(info.event.start), eventDurationMinutes(info.event));
           if (placement.ok) highlightCell(cal, placement.start, info.view);
         });
 
-        if (typeof prev.eventDragStop !== 'function') cal.setOption('eventDragStop', function(info) {
+        if (typeof prev.eventDragStop !== 'function') cal.setOption('eventDragStop', function (info) {
           clearOverlay();
         });
 
-        if (typeof prev.eventDrop !== 'function') cal.setOption('eventDrop', function(info) {
+        if (typeof prev.eventDrop !== 'function') cal.setOption('eventDrop', function (info) {
           handleMutableEvent(info, null);
         });
 
-        if (typeof prev.eventResize !== 'function') cal.setOption('eventResize', function(info) {
+        if (typeof prev.eventResize !== 'function') cal.setOption('eventResize', function (info) {
           handleMutableEvent(info, null);
         });
 
-        cal.setOption('eventAdd', function(info) {
+        cal.setOption('eventAdd', function (info) {
           registerEvent(info.event);
           if (typeof prev.eventAdd === 'function') prev.eventAdd(info);
         });
 
-        cal.setOption('eventRemove', function(info) {
+        cal.setOption('eventRemove', function (info) {
           releaseEvent(info.event);
           if (typeof prev.eventRemove === 'function') prev.eventRemove(info);
         });
@@ -10287,7 +10855,7 @@
 
       function bootstrapCalendarBinding() {
         let attempts = 0;
-        (function probe(){
+        (function probe() {
           if (ensureCalendar()) return;
           if (attempts >= 20) return;
           attempts += 1;
@@ -10295,16 +10863,16 @@
         })();
       }
 
-      window.findIndependentBlockByTime = function(date) {
+      window.findIndependentBlockByTime = function (date) {
         const target = date instanceof Date ? date : new Date(date);
         return findBlockByTime(target);
       };
 
-      window.findIndependentBlockById = function(id) {
+      window.findIndependentBlockById = function (id) {
         return findBlockById(id);
       };
 
-      window.getAvailableIndependentBlocks = function(date, excludeEventId) {
+      window.getAvailableIndependentBlocks = function (date, excludeEventId) {
         if (!date) return blocks.slice();
         const target = date instanceof Date ? date : new Date(date);
         if (Number.isNaN(target.getTime())) return blocks.slice();
@@ -10312,12 +10880,12 @@
         return blocks.filter(block => isRangeAvailable(day, [block], excludeEventId || null));
       };
 
-      window.updateIndependentEventMetadata = function(event, block) {
+      window.updateIndependentEventMetadata = function (event, block) {
         if (!block) return;
         updateMetadata(event, [block]);
       };
 
-      window.validateIndependentBlockPlacement = function(event, targetBlock) {
+      window.validateIndependentBlockPlacement = function (event, targetBlock) {
         if (!targetBlock) return false;
         const baseDate = event && event.start ? new Date(event.start) : new Date();
         baseDate.setHours(Math.floor(targetBlock.startMinutes / 60), targetBlock.startMinutes % 60, 0, 0);
@@ -10325,7 +10893,7 @@
         return placement.ok;
       };
 
-      window.placeEventInIndependentBlock = function(event, block) {
+      window.placeEventInIndependentBlock = function (event, block) {
         if (!event || !block) return false;
         const originalStart = event.start ? new Date(event.start) : null;
         if (originalStart) releaseEvent(event);
@@ -10348,42 +10916,42 @@
         return true;
       };
 
-      window.releaseIndependentBlock = function(event) {
+      window.releaseIndependentBlock = function (event) {
         releaseEvent(event);
       };
 
-      window.validateIndependentResize = function(event, newEnd) {
+      window.validateIndependentResize = function (event, newEnd) {
         if (!event || !event.start || !(newEnd instanceof Date)) return false;
         const placement = snapPlacement(new Date(event.start), eventDurationMinutes(event));
         if (!placement.ok) return false;
         return newEnd.getHours() === placement.end.getHours() && newEnd.getMinutes() === placement.end.getMinutes();
       };
 
-      window.CEDUC_snapToNearestBlock = function(date) {
+      window.CEDUC_snapToNearestBlock = function (date) {
         const target = date instanceof Date ? date : new Date(date);
         const placement = snapPlacement(target, CONFIG.blockMinutes);
         if (!placement.ok) return null;
         return { block: placement.primary, date: placement.start };
       };
 
-      window.CEDUC_getBlockForTime = function(date) {
+      window.CEDUC_getBlockForTime = function (date) {
         const target = date instanceof Date ? date : new Date(date);
         return findBlockByTime(target);
       };
 
-      window.CEDUC_getBlockIndexByStart = function(date) {
+      window.CEDUC_getBlockIndexByStart = function (date) {
         const block = window.CEDUC_getBlockForTime(date);
         return block ? block.index : null;
       };
 
-      window.CEDUC_computeBlocksBetweenDates = function(start, end) {
+      window.CEDUC_computeBlocksBetweenDates = function (start, end) {
         const startDate = start instanceof Date ? start : new Date(start);
         const endDate = end instanceof Date ? end : new Date(end);
         return blocksForRange(startDate, endDate);
       };
 
-      try { window.CEDUC = window.CEDUC || {}; } catch(_) {}
-      window.CEDUC.placeProgrammaticEvent = function(eventLike, targetStartDate, durationMinutes) {
+      try { window.CEDUC = window.CEDUC || {}; } catch (_) { }
+      window.CEDUC.placeProgrammaticEvent = function (eventLike, targetStartDate, durationMinutes) {
         const cal = ensureCalendar();
         if (!cal) return { ok: false, reason: 'no-calendar' };
         const startDate = new Date(targetStartDate);
@@ -10422,29 +10990,29 @@
       ensureCalendar();
 
       // Carrera filter: inject UI and bind filtering by extendedProps.carreraId
-      (function setupCarreraFilter(){
-        function getToolbarCenter(){
+      (function setupCarreraFilter() {
+        function getToolbarCenter() {
           const cal = ensureCalendar();
           if (!cal || !cal.el) return null;
           return cal.el.querySelector('.fc-header-toolbar .fc-toolbar-center');
         }
 
-        function normalizeId(val){
+        function normalizeId(val) {
           return String(val || '').trim().toLowerCase();
         }
 
-        function normalizeName(val){
+        function normalizeName(val) {
           return String(val || '').trim().toLowerCase();
         }
 
-        function carreraLabelFromEvent(ev){
+        function carreraLabelFromEvent(ev) {
           const props = ev.extendedProps || {};
           const id = props.carreraId || props.carrera || null;
           const name = props.carreraNombre || props.carrera_name || props.carreraLabel || null;
           return name || id || '';
         }
 
-        function collectCarreras(){
+        function collectCarreras() {
           const cal = ensureCalendar();
           if (!cal) return [];
           const byKey = new Map();
@@ -10457,10 +11025,10 @@
               if (!byKey.has(key)) byKey.set(key, { id, name, label: (props.carreraNombre || props.carrera_name || props.carreraLabel || props.carrera || props.carreraId || '').toString() });
             }
           });
-          return Array.from(byKey.values()).sort((a,b) => a.label.localeCompare(b.label));
+          return Array.from(byKey.values()).sort((a, b) => a.label.localeCompare(b.label));
         }
 
-        function renderFilter(){
+        function renderFilter() {
           const center = getToolbarCenter();
           if (!center) return;
           // Avoid duplicating filter
@@ -10498,7 +11066,7 @@
           wrap.appendChild(status);
           center.appendChild(wrap);
 
-          function applyFilter(id){
+          function applyFilter(id) {
             const cal = ensureCalendar();
             if (!cal) return;
             const normalized = (id || '').trim();
@@ -10522,10 +11090,10 @@
             }
           }
 
-          select.addEventListener('change', function(){
+          select.addEventListener('change', function () {
             applyFilter(this.value);
           });
-          clearBtn.addEventListener('click', function(){
+          clearBtn.addEventListener('click', function () {
             select.value = '';
             applyFilter('');
           });
@@ -10533,7 +11101,7 @@
           // Rebuild options when events change (e.g., load async)
           const cal = ensureCalendar();
           if (cal) {
-            cal.setOption('eventAdd', function(info){
+            cal.setOption('eventAdd', function (info) {
               const existingLabels = Array.from(select.options).map(o => o.textContent.toLowerCase());
               const label = carreraLabelFromEvent(info.event);
               if (label) {
@@ -10546,13 +11114,13 @@
                 }
               }
             });
-            cal.setOption('eventRemove', function(){ /* no-op for now */ });
+            cal.setOption('eventRemove', function () { /* no-op for now */ });
           }
         }
 
         // Try rendering filter after calendar is ready
         let tries = 0;
-        (function waitToolbar(){
+        (function waitToolbar() {
           const center = getToolbarCenter();
           if (center) { renderFilter(); return; }
           if (tries++ < 20) setTimeout(waitToolbar, 300);
