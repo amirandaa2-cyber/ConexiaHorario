@@ -9,14 +9,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bowlby+One&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-page: #f8fafc;
+      --bg-page: #edf1f6;
       --card-bg: #ffffff;
-      --text-color: #0f172a;
-      --muted-text: #64748b;
+      --card-muted: #f6f8fb;
+      --text-color: #132033;
+      --muted-text: #5b6576;
       --brand-orange: #f97316;
-      --brand-green: #10b981;
-      --brand-blue: #2563eb;
+      --brand-green: #0f9d7a;
+      --brand-blue: #1f4ea8;
       --border-color: rgba(15, 23, 42, 0.08);
+      --shadow-soft: 0 15px 35px rgba(15, 23, 42, 0.08);
     }
 
     *, *::before, *::after {
@@ -26,7 +28,9 @@
     body {
       margin: 0;
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(180deg, #fdf7f0 0%, #f8fbff 100%);
+      background: radial-gradient(circle at 20% 20%, rgba(31, 78, 168, 0.08), transparent 55%),
+        radial-gradient(circle at 80% 0%, rgba(249, 115, 22, 0.08), transparent 50%),
+        var(--bg-page);
       color: var(--text-color);
       min-height: 100vh;
     }
@@ -34,10 +38,11 @@
     .page-shell {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 40px 24px 64px;
+      padding: 48px 24px 80px;
       display: flex;
       flex-direction: column;
       gap: 32px;
+      position: relative;
     }
 
     header.hero {
@@ -46,11 +51,11 @@
       justify-content: space-between;
       gap: 20px;
       align-items: center;
-      background: var(--card-bg);
-      border-radius: 24px;
-      padding: 32px;
-      box-shadow: 0 20px 55px rgba(15, 23, 42, 0.08);
-      border: 1px solid var(--border-color);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 251, 0.96));
+      border-radius: 28px;
+      padding: 36px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(19, 32, 51, 0.08);
     }
 
     .hero-eyebrow {
@@ -78,6 +83,10 @@
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
+      background: var(--card-muted);
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(19, 32, 51, 0.06);
     }
 
     .primary-btn,
@@ -96,15 +105,15 @@
     }
 
     .primary-btn {
-      background: linear-gradient(135deg, var(--brand-orange), #fb923c);
+      background: linear-gradient(135deg, var(--brand-orange), #d9620f);
       color: #fff;
-      box-shadow: 0 15px 30px rgba(249, 115, 22, 0.35);
+      box-shadow: 0 14px 32px rgba(249, 115, 22, 0.28);
     }
 
     .ghost-btn {
-      background: rgba(15, 23, 42, 0.05);
+      background: rgba(19, 32, 51, 0.04);
       color: var(--text-color);
-      border: 1px solid rgba(15, 23, 42, 0.08);
+      border: 1px solid rgba(19, 32, 51, 0.12);
     }
 
     .primary-btn:hover,
@@ -121,13 +130,29 @@
 
     .metric-card {
       background: var(--card-bg);
-      border-radius: 20px;
-      padding: 20px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
+      border-radius: 24px;
+      padding: 22px 28px;
+      border: 1px solid rgba(19, 32, 51, 0.06);
+      box-shadow: var(--shadow-soft);
       display: flex;
       flex-direction: column;
       gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(31, 78, 168, 0.08), rgba(15, 157, 122, 0.08));
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .metric-card > * {
+      position: relative;
+      z-index: 1;
     }
 
     .metric-label {
@@ -161,11 +186,11 @@
     }
 
     .panel-section {
-      background: var(--card-bg);
-      border-radius: 22px;
-      padding: 28px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+      background: linear-gradient(145deg, var(--card-bg), var(--card-muted));
+      border-radius: 26px;
+      padding: 32px;
+      border: 1px solid rgba(19, 32, 51, 0.08);
+      box-shadow: var(--shadow-soft);
     }
 
     .progress-row {
@@ -179,14 +204,16 @@
       width: 100%;
       height: 12px;
       border-radius: 999px;
-      background: rgba(148, 163, 184, 0.2);
+      background: rgba(148, 163, 184, 0.25);
       overflow: hidden;
+      position: relative;
     }
 
     .progress-value {
       height: 100%;
       border-radius: inherit;
       background: linear-gradient(90deg, var(--brand-blue), var(--brand-green));
+      box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.15);
     }
 
     .list-grid {
@@ -218,12 +245,13 @@
     }
 
     .chip {
-      padding: 4px 10px;
+      padding: 4px 12px;
       border-radius: 999px;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 600;
-      background: rgba(16, 185, 129, 0.15);
+      background: rgba(16, 185, 129, 0.1);
       color: var(--brand-green);
+      border: 1px solid rgba(16, 185, 129, 0.2);
     }
 
     footer.page-footer {
@@ -259,63 +287,65 @@
     <section class="cards-grid" aria-label="Indicadores destacados">
       <article class="metric-card">
         <span class="metric-label">Docentes activos</span>
-        <span class="metric-value">46</span>
-        <span class="metric-trend">+3 incorporados este mes</span>
+        <span class="metric-value" id="docentes-activos-value">46</span>
+        <span class="metric-trend" id="docentes-activos-trend">+3 incorporados este mes</span>
       </article>
       <article class="metric-card">
         <span class="metric-label">Cobertura semanal</span>
-        <span class="metric-value">92%</span>
-        <span class="metric-trend">↑ 5 pts vs semana anterior</span>
+        <span class="metric-value" id="cobertura-semanal-value">92%</span>
+        <span class="metric-trend" id="cobertura-semanal-trend">↑ 5 pts vs semana anterior</span>
       </article>
       <article class="metric-card">
         <span class="metric-label">Horas por docente</span>
-        <span class="metric-value">18.4</span>
-        <span class="metric-trend">Objetivo: 20 h promedio</span>
+        <span class="metric-value" id="horas-docente-value">18.4</span>
+        <span class="metric-trend" id="horas-docente-trend">Objetivo: 20 h promedio</span>
       </article>
       <article class="metric-card">
         <span class="metric-label">Bloques críticos</span>
-        <span class="metric-value">7</span>
-        <span class="metric-trend" style="color:#ef4444;">Prioridad alta</span>
+        <span class="metric-value" id="bloques-criticos-value">7</span>
+        <span class="metric-trend" id="bloques-criticos-trend" style="color:#ef4444;">Prioridad alta</span>
       </article>
     </section>
 
     <section class="panel-section" aria-labelledby="distribucion-title">
       <h2 id="distribucion-title" class="section-title">Distribución de carga</h2>
       <p class="section-description">Resumen semanal por escuela. Los porcentajes indican la utilización de las horas asignables para cada equipo docente.</p>
-      <div class="progress-row">
-        <span>Ingeniería &amp; Minería</span>
-        <span>87%</span>
-      </div>
-      <div class="progress-bar" aria-hidden="true">
-        <div class="progress-value" style="width:87%"></div>
-      </div>
-      <div class="progress-row">
-        <span>Negocios &amp; Logística</span>
-        <span>94%</span>
-      </div>
-      <div class="progress-bar" aria-hidden="true">
-        <div class="progress-value" style="width:94%"></div>
-      </div>
-      <div class="progress-row">
-        <span>Salud</span>
-        <span>78%</span>
-      </div>
-      <div class="progress-bar" aria-hidden="true">
-        <div class="progress-value" style="width:78%"></div>
-      </div>
-      <div class="progress-row">
-        <span>Tecnologías de la Información</span>
-        <span>101%</span>
-      </div>
-      <div class="progress-bar" aria-hidden="true">
-        <div class="progress-value" style="width:100%"></div>
+      <div id="distribucion-carga-list">
+        <div class="progress-row">
+          <span>Ingeniería &amp; Minería</span>
+          <span>87%</span>
+        </div>
+        <div class="progress-bar" aria-hidden="true">
+          <div class="progress-value" style="width:87%"></div>
+        </div>
+        <div class="progress-row">
+          <span>Negocios &amp; Logística</span>
+          <span>94%</span>
+        </div>
+        <div class="progress-bar" aria-hidden="true">
+          <div class="progress-value" style="width:94%"></div>
+        </div>
+        <div class="progress-row">
+          <span>Salud</span>
+          <span>78%</span>
+        </div>
+        <div class="progress-bar" aria-hidden="true">
+          <div class="progress-value" style="width:78%"></div>
+        </div>
+        <div class="progress-row">
+          <span>Tecnologías de la Información</span>
+          <span>101%</span>
+        </div>
+        <div class="progress-bar" aria-hidden="true">
+          <div class="progress-value" style="width:100%"></div>
+        </div>
       </div>
     </section>
 
     <section class="list-grid" aria-label="Detalle de focos prioritarios">
       <article class="panel-section list-card">
         <h2 class="section-title">Docentes con mayor carga</h2>
-        <ul>
+        <ul id="docentes-mayor-carga-list">
           <li><span>Camila Rivas</span><span class="chip">24 h</span></li>
           <li><span>Javier Lazo</span><span class="chip">22 h</span></li>
           <li><span>Pamela Olivares</span><span class="chip">21 h</span></li>
@@ -324,7 +354,7 @@
       </article>
       <article class="panel-section list-card">
         <h2 class="section-title">Alertas de reemplazo</h2>
-        <ul>
+        <ul id="alertas-reemplazo-list">
           <li><span>Programación I · Vespertino</span><span class="chip" style="background:rgba(239,68,68,0.15);color:#ef4444;">3 faltas</span></li>
           <li><span>Metalurgia · Taller M2</span><span class="chip" style="background:rgba(251,191,36,0.2);color:#b45309;">Seguimiento</span></li>
           <li><span>Higiene y Seguridad</span><span class="chip">Cubierto</span></li>
@@ -333,7 +363,7 @@
       </article>
       <article class="panel-section list-card">
         <h2 class="section-title">Bloques en riesgo</h2>
-        <ul>
+        <ul id="bloques-riesgo-list">
           <li><span>Lunes · 08:00-09:40</span><span class="chip" style="background:rgba(59,130,246,0.15);color:#2563eb;">Sobrecarga</span></li>
           <li><span>Martes · 19:00-21:00</span><span class="chip" style="background:rgba(239,68,68,0.15);color:#ef4444;">Sin docente</span></li>
           <li><span>Jueves · 15:00-18:00</span><span class="chip">Estable</span></li>
@@ -366,6 +396,144 @@
       }
       const btn = document.getElementById('export-pdf-btn');
       if (btn) btn.addEventListener('click', downloadPdf);
+    })();
+  </script>
+  <script>
+    (function() {
+      const DASHBOARD_ENDPOINT = '/api/dashboard/estadisticas';
+      const fallbackData = {
+        docentesActivos: { value: '46', trend: '+3 incorporados este mes' },
+        coberturaSemanal: { value: '92%', trend: '↑ 5 pts vs semana anterior' },
+        horasPorDocente: { value: '18.4', trend: 'Objetivo: 20 h promedio' },
+        bloquesCriticos: { value: '7', trend: 'Prioridad alta' },
+        distribucion: [
+          { label: 'Ingeniería & Minería', percent: 87 },
+          { label: 'Negocios & Logística', percent: 94 },
+          { label: 'Salud', percent: 78 },
+          { label: 'Tecnologías de la Información', percent: 101 }
+        ],
+        docentesCarga: [
+          { label: 'Camila Rivas', badge: '24 h' },
+          { label: 'Javier Lazo', badge: '22 h' },
+          { label: 'Pamela Olivares', badge: '21 h' },
+          { label: 'Ignacio Romero', badge: '21 h' }
+        ],
+        alertasReemplazo: [
+          { label: 'Programación I · Vespertino', badge: '3 faltas', badgeStyle: { background: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
+          { label: 'Metalurgia · Taller M2', badge: 'Seguimiento', badgeStyle: { background: 'rgba(251,191,36,0.2)', color: '#b45309' } },
+          { label: 'Higiene y Seguridad', badge: 'Cubierto' },
+          { label: 'Logística Aplicada', badge: 'Cubierto' }
+        ],
+        bloquesRiesgo: [
+          { label: 'Lunes · 08:00-09:40', badge: 'Sobrecarga', badgeStyle: { background: 'rgba(59,130,246,0.15)', color: '#2563eb' } },
+          { label: 'Martes · 19:00-21:00', badge: 'Sin docente', badgeStyle: { background: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
+          { label: 'Jueves · 15:00-18:00', badge: 'Estable' },
+          { label: 'Viernes · 09:40-11:20', badge: 'Estable' }
+        ]
+      };
+
+      function updateMetric(target, payload, fallback) {
+        const el = document.getElementById(target.valueId);
+        if (!el) return;
+        const metric = payload ?? fallback;
+        if (metric == null) return;
+        const display = metric.display ?? metric.value ?? String(metric);
+        el.textContent = display;
+        const trendEl = document.getElementById(target.trendId);
+        if (trendEl && (metric.trend || fallback?.trend)) {
+          trendEl.textContent = metric.trend || fallback.trend || '';
+        }
+      }
+
+      function createProgressItem(item) {
+        const percentRaw = Number(item.percent ?? item.value ?? 0);
+        const percent = Number.isFinite(percentRaw) ? percentRaw : 0;
+        const badgeText = item.badgeText ?? item.display ?? `${Math.round(percent)}%`;
+        const row = document.createElement('div');
+        row.className = 'progress-row';
+        const label = document.createElement('span');
+        label.textContent = item.label || '—';
+        const badge = document.createElement('span');
+        badge.textContent = badgeText;
+        row.append(label, badge);
+        const bar = document.createElement('div');
+        bar.className = 'progress-bar';
+        bar.setAttribute('aria-hidden', 'true');
+        const fill = document.createElement('div');
+        fill.className = 'progress-value';
+        fill.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+        bar.append(fill);
+        return [row, bar];
+      }
+
+      function renderDistribucion(list) {
+        const container = document.getElementById('distribucion-carga-list');
+        if (!container) return;
+        container.innerHTML = '';
+        (list || []).forEach(item => {
+          const [row, bar] = createProgressItem(item);
+          container.append(row, bar);
+        });
+      }
+
+      function renderList(containerId, items) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        if (!items || !items.length) {
+          const empty = document.createElement('li');
+          empty.textContent = 'Sin datos disponibles';
+          container.appendChild(empty);
+          return;
+        }
+        items.forEach(item => {
+          const li = document.createElement('li');
+          const label = document.createElement('span');
+          label.textContent = item.label || item.title || '—';
+          li.appendChild(label);
+          const badgeText = item.badge ?? item.value ?? item.display;
+          if (badgeText) {
+            const chip = document.createElement('span');
+            chip.className = 'chip';
+            chip.textContent = badgeText;
+            if (item.badgeStyle) {
+              Object.assign(chip.style, item.badgeStyle);
+            }
+            li.appendChild(chip);
+          }
+          container.appendChild(li);
+        });
+      }
+
+      function renderDashboard(data) {
+        const metrics = [
+          { valueId: 'docentes-activos-value', trendId: 'docentes-activos-trend', payload: data.docentesActivos, fallback: fallbackData.docentesActivos },
+          { valueId: 'cobertura-semanal-value', trendId: 'cobertura-semanal-trend', payload: data.coberturaSemanal, fallback: fallbackData.coberturaSemanal },
+          { valueId: 'horas-docente-value', trendId: 'horas-docente-trend', payload: data.horasPorDocente, fallback: fallbackData.horasPorDocente },
+          { valueId: 'bloques-criticos-value', trendId: 'bloques-criticos-trend', payload: data.bloquesCriticos, fallback: fallbackData.bloquesCriticos }
+        ];
+        metrics.forEach(metric => updateMetric(metric, metric.payload, metric.fallback));
+        renderDistribucion(data.distribucion || fallbackData.distribucion);
+        renderList('docentes-mayor-carga-list', data.docentesCarga || fallbackData.docentesCarga);
+        renderList('alertas-reemplazo-list', data.alertasReemplazo || fallbackData.alertasReemplazo);
+        renderList('bloques-riesgo-list', data.bloquesRiesgo || fallbackData.bloquesRiesgo);
+      }
+
+      async function fetchDashboard() {
+        try {
+          const response = await fetch(DASHBOARD_ENDPOINT, { cache: 'no-cache' });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          renderDashboard(payload || {});
+        } catch (err) {
+          console.warn('No se pudo cargar el dashboard desde el backend', err);
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        renderDashboard({});
+        fetchDashboard();
+      });
     })();
   </script>
 </body>
