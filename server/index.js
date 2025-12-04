@@ -41,6 +41,17 @@ const ALLOWED_ROLE_CODES = (process.env.ALLOWED_ROLE_CODES || 'admin,docente')
 	.filter(Boolean);
 const BLOCK_MINUTES = 35;
 
+// Función para calcular la hora de un bloque
+// Bloque 1 = 08:30, cada bloque suma 35 minutos
+function getBlockTime(bloqueNumero) {
+	const baseHour = 8;
+	const baseMinute = 30;
+	const totalMinutes = baseMinute + ((bloqueNumero - 1) * BLOCK_MINUTES);
+	const hour = baseHour + Math.floor(totalMinutes / 60);
+	const minute = totalMinutes % 60;
+	return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+}
+
 // DAO helpers for auto-organize
 async function getDocentesPorCarrera(carreraId) {
 	const { rows } = await db.query(
@@ -81,6 +92,164 @@ async function asignarEvento({ moduloId, docenteId, salaId, start, end }) {
 		[id, title, start, end, moduloId, docenteId, salaId, JSON.stringify(extendedProps)]
 	);
 	return { id };
+}
+
+// Versión mejorada para auto-organizar que retorna el evento completo
+async function asignarEventoCompleto(moduloId, docenteId, salaId, carreraId, fecha, horaInicio, horaFin, bloques) {
+	try {
+		const id = uuidv4();
+		
+		// Obtener datos del módulo
+		const { rows: moduloRows } = await db.query(
+			'SELECT nombre, codigo_asignatura FROM modulos WHERE id=$1 OR codigo_asignatura=$1',
+			[moduloId]
+		);
+		const moduloData = moduloRows[0];
+		if (!moduloData) {
+			console.error(`Módulo no encontrado: ${moduloId}`);
+			return null;
+		}
+		
+		// Obtener datos del docente
+		const { rows: docenteRows } = await db.query(
+			'SELECT nombre FROM docentes WHERE id=$1',
+			[docenteId]
+		);
+		const docenteNombre = docenteRows[0]?.nombre || 'Sin docente';
+		
+		// Obtener datos de la sala
+		const { rows: salaRows } = await db.query(
+			'SELECT nombre FROM salas WHERE id=$1',
+			[salaId]
+		);
+		const salaNombre = salaRows[0]?.nombre || 'Sin sala';
+		
+		const title = `${moduloData.nombre} - ${docenteNombre}`;
+		
+		// Crear timestamps ISO completos
+		const startISO = `${fecha}T${horaInicio}`;
+		const endISO = `${fecha}T${horaFin}`;
+		
+		// Crear extendedProps con metadatos completos
+		const extendedProps = mergeMetaIntoExtendedProps({
+			moduloNombre: moduloData.nombre,
+			docenteNombre: docenteNombre,
+			salaNombre: salaNombre,
+			carreraId: String(carreraId),
+			autoGenerado: true
+		}, { 
+			moduloId: String(moduloData.codigo_asignatura || moduloId), 
+			docenteId: String(docenteId), 
+			salaId: String(salaId),
+			carreraId: String(carreraId)
+		});
+		
+		// Insertar en la base de datos
+		await db.query(
+			`INSERT INTO events (id, title, start, "end", modulo_id, docente_id, sala_id, extendedProps, date)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			 ON CONFLICT (title, start, "end") DO NOTHING`,
+			[id, title, startISO, endISO, moduloData.codigo_asignatura, docenteId, salaId, JSON.stringify(extendedProps), fecha]
+		);
+		
+		// Retornar el evento completo en formato FullCalendar
+		return {
+			id,
+			title,
+			start: startISO,
+			end: endISO,
+			moduloId: moduloData.codigo_asignatura,
+			modulo: moduloData.nombre,
+			docenteId,
+			docente: docenteNombre,
+			salaId,
+			sala: salaNombre,
+			carreraId: String(carreraId),
+			extendedProps
+		};
+	} catch (error) {
+		console.error('Error en asignarEventoCompleto:', error);
+		return null;
+	}
+}
+
+// Versión mejorada para auto-organizar que retorna el evento completo
+async function asignarEventoCompleto(moduloId, docenteId, salaId, carreraId, fecha, horaInicio, horaFin, bloques) {
+	try {
+		const id = uuidv4();
+		
+		// Obtener datos del módulo
+		const { rows: moduloRows } = await db.query(
+			'SELECT nombre, codigo_asignatura FROM modulos WHERE id=$1 OR codigo_asignatura=$1',
+			[moduloId]
+		);
+		const moduloData = moduloRows[0];
+		if (!moduloData) {
+			console.error(`Módulo no encontrado: ${moduloId}`);
+			return null;
+		}
+		
+		// Obtener datos del docente
+		const { rows: docenteRows } = await db.query(
+			'SELECT nombre FROM docentes WHERE id=$1',
+			[docenteId]
+		);
+		const docenteNombre = docenteRows[0]?.nombre || 'Sin docente';
+		
+		// Obtener datos de la sala
+		const { rows: salaRows } = await db.query(
+			'SELECT nombre FROM salas WHERE id=$1',
+			[salaId]
+		);
+		const salaNombre = salaRows[0]?.nombre || 'Sin sala';
+		
+		const title = `${moduloData.nombre} - ${docenteNombre}`;
+		
+		// Crear timestamps ISO completos
+		const startISO = `${fecha}T${horaInicio}`;
+		const endISO = `${fecha}T${horaFin}`;
+		
+		// Crear extendedProps con metadatos completos
+		const extendedProps = mergeMetaIntoExtendedProps({
+			moduloNombre: moduloData.nombre,
+			docenteNombre: docenteNombre,
+			salaNombre: salaNombre,
+			carreraId: String(carreraId),
+			autoGenerado: true
+		}, { 
+			moduloId: String(moduloData.codigo_asignatura || moduloId), 
+			docenteId: String(docenteId), 
+			salaId: String(salaId),
+			carreraId: String(carreraId)
+		});
+		
+		// Insertar en la base de datos
+		await db.query(
+			`INSERT INTO events (id, title, start, "end", modulo_id, docente_id, sala_id, extendedProps, date)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			 ON CONFLICT (title, start, "end") DO NOTHING`,
+			[id, title, startISO, endISO, moduloData.codigo_asignatura, docenteId, salaId, JSON.stringify(extendedProps), fecha]
+		);
+		
+		// Retornar el evento completo en formato FullCalendar
+		return {
+			id,
+			title,
+			start: startISO,
+			end: endISO,
+			moduloId: moduloData.codigo_asignatura,
+			modulo: moduloData.nombre,
+			docenteId,
+			docente: docenteNombre,
+			salaId,
+			sala: salaNombre,
+			carreraId: String(carreraId),
+			extendedProps
+		};
+	} catch (error) {
+		console.error('Error en asignarEventoCompleto:', error);
+		return null;
+	}
 }
 
 // Funciones auxiliares para usar disponibilidad_horaria
@@ -1467,31 +1636,33 @@ if(dbReady){
 							}
 
 							// SOLUCI\u00d3N 6: Crear evento con IDs consolidados
-							const nuevoEvento = await asignarEvento(
+							const nuevoEvento = await asignarEventoCompleto(
 								modulo.codigo_asignatura,  // moduloId
 								docenteAsignado.id,        // docenteId
 								salaDisponible.id,         // salaId
 								carreraId,                 // carreraId
-								fechaStr,
-								bloqueStartTime,
-								bloqueEndTime,
-								1 // Duración: 1 bloque
+								fechaStr,                  // fecha
+								bloqueStartTime,          // horaInicio
+								bloqueEndTime,            // horaFin
+								1                          // bloques
 							);
 
 							if (nuevoEvento) {
 								bloquesAsignados++;
+								// Usar los datos completos del nuevoEvento
 								asignaciones.push({
-									titulo: modulo.nombre,
-									docente: docenteAsignado.nombre,
-									sala: salaDisponible.nombre,
-									fecha: fechaStr,
-									horaInicio: bloqueStartTime,
-									horaFin: bloqueEndTime,
-									bloques: 1,
-									moduloId: modulo.codigo_asignatura,
-									docenteId: docenteAsignado.id,
-									salaId: salaDisponible.id,
-									carreraId
+									eventoId: nuevoEvento.id,
+									title: nuevoEvento.title,
+									start: nuevoEvento.start,
+									end: nuevoEvento.end,
+									modulo: nuevoEvento.modulo,
+									docente: nuevoEvento.docente,
+									sala: nuevoEvento.sala,
+									moduloId: nuevoEvento.moduloId,
+									docenteId: nuevoEvento.docenteId,
+									salaId: nuevoEvento.salaId,
+									carreraId: nuevoEvento.carreraId,
+									extendedProps: nuevoEvento.extendedProps
 								});
 
 								console.log(`[AUTO-ORGANIZAR] ✅ Bloque asignado: ${modulo.nombre} - ${fechaStr} ${bloqueStartTime} - Sala ${salaDisponible.nombre} (${bloquesAsignados}/${bloquesNecesarios})`);
