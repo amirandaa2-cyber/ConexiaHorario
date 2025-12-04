@@ -6660,7 +6660,26 @@
         if (skippedDates.length) { alert(`Algunas ocurrencias no se crearon por exceso de horas del docente o conflictos:\n${skippedDates.join(', ')}`); }
       });
 
-      // Modal #event-edit-modal eliminado - ahora se usa #modal-edicion consolidado
+      // Event edit modal: allows marking hours worked and applying changes to remaining weeks
+      const eventEditHtml = `
+      <div id="event-edit-modal" class="app-modal" role="dialog" aria-modal="true" style="display:none">
+        <h4>Editar Evento</h4>
+        <div class="modal-body">
+          <form id="form-event-edit">
+            <div><label>Evento: <span id="edit-ev-title"></span></label></div>
+            <div style="display:flex;gap:8px;"><label>Fecha <input id="edit-start-date" type="date"></label><label>Bloque <select id="edit-start-time"></select></label></div>
+            <div><label>Duración (bloques de 35 min) <input id="edit-duration" type="number" step="1" min="1" max="22"></label></div>
+            <div><label>Docente <select id="edit-docente"></select></label></div>
+            <div><label>Sala <select id="edit-sala"><option value="">(ninguna)</option></select></label></div>
+            <div><label>Carrera asociada <input id="edit-carrera" type="text" readonly></label></div>
+            <div><label>Horas trabajadas ahora <input id="edit-hours-worked" type="number" step="0.5" min="0"></label></div>
+            <div><label>Aplicar a semanas restantes <input id="edit-apply-remaining" type="checkbox"></label></div>
+            <div style="display:flex;gap:8px;margin-top:8px;justify-content:space-between;"><div><button type="button" id="delete-event" style="background:#c02626;color:#fff">Eliminar evento</button></div><div><button type="submit">Guardar</button><button type="button" id="edit-cancel">Cancelar</button></div></div>
+          </form>
+        </div>
+      </div>
+    `;
+      document.body.insertAdjacentHTML('beforeend', eventEditHtml);
       // Simple conflict modal (replaces complex modal)
       const simpleConflictHtml = `
       <div id="simple-conflict-overlay" class="modal-overlay" style="display:none">
@@ -8284,20 +8303,44 @@
       populateTimeSelect(editStartTimeSel);
       document.getElementById('edit-cancel').addEventListener('click', () => { hideModal(eventEditModal); currentEditingEvent = null; });
 
-      // REDIRECCIONADO: openEventEditModal ahora usa #modal-edicion consolidado
       function openEventEditModal(eventApi) {
-        // Redirigir a la función moderna abrirModal que usa #modal-edicion
-        if (typeof abrirModal === 'function') {
-          abrirModal(eventApi);
-        } else {
-          console.warn('abrirModal no está disponible, usando fallback');
-          currentEditingEvent = eventApi;
-          const modalEdicion = document.getElementById('modal-edicion');
-          if (modalEdicion) {
-            modalEdicion.classList.add('show');
-            modalEdicion.setAttribute('aria-hidden', 'false');
+        currentEditingEvent = eventApi;
+        document.getElementById('edit-ev-title').textContent = eventApi.title;
+        // populate form with current event data
+        const s = new Date(eventApi.start);
+        document.getElementById('edit-start-date').value = s.toISOString().slice(0, 10);
+        const startTimeStr = normalizeTimeStr(timeStrFromDate(s));
+        if (editStartTimeSel) {
+          const block = getBlockForTime(startTimeStr) || getBlockByStart(startTimeStr);
+          if (block) {
+            editStartTimeSel.value = block.start;
+          } else {
+            const blockList = getAvailableBlocks();
+            editStartTimeSel.value = blockList.length ? normalizeBlockTime(blockList[0].start) : '';
           }
         }
+        const blockCount = computeBlocksBetweenDates(new Date(eventApi.start), new Date(eventApi.end));
+        document.getElementById('edit-duration').value = blockCount;
+        // populate docentes and salas selects
+        const docSel = document.getElementById('edit-docente'); docSel.innerHTML = ''; docentes.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.text = d.nombre + ' (' + (d.contratoHoras || 24) + 'h)'; docSel.appendChild(o); });
+        const salaSel = document.getElementById('edit-sala'); salaSel.innerHTML = '<option value="">(ninguna)</option>'; salas.forEach(sal => { const o = document.createElement('option'); o.value = sal.id; o.text = sal.nombre + ' (' + sal.id + ')'; salaSel.appendChild(o); });
+        const meta = (eventApi.extendedProps && eventApi.extendedProps.__meta) || {};
+        if (meta.docenteId) docSel.value = meta.docenteId;
+        if (meta.salaId) salaSel.value = meta.salaId;
+        const carreraInput = document.getElementById('edit-carrera');
+        if (carreraInput) {
+          const moduloFromMeta = meta.moduloId ? (modulos || []).find(m => String(m.id) === String(meta.moduloId)) : null;
+          const carreraId = meta.carreraId || (moduloFromMeta ? moduloFromMeta.carreraId : null);
+          let carreraLabel = 'Sin carrera asignada';
+          if (carreraId) {
+            const carrera = (carreras || []).find(c => String(c.id) === String(carreraId));
+            carreraLabel = carrera ? `${carrera.nombre} (${carrera.id})` : carreraId;
+          }
+          carreraInput.value = carreraLabel;
+        }
+        document.getElementById('edit-hours-worked').value = 0;
+        document.getElementById('edit-apply-remaining').checked = false;
+        showModal(eventEditModal);
       }
 
       // Expose a professional, safe, independent event management entrypoint
@@ -9387,19 +9430,6 @@
             placeholder="Notas o descripción adicional..."></textarea>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="evento-horas-trabajadas" class="form-label">Horas trabajadas ahora</label>
-            <input id="evento-horas-trabajadas" class="form-input" type="number" step="0.5" min="0" value="0" />
-          </div>
-          <div class="form-group" style="display: flex; align-items: center; padding-top: 28px;">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input id="evento-aplicar-restantes" type="checkbox" />
-              <span>Aplicar a semanas restantes</span>
-            </label>
-          </div>
-        </div>
-
         <div class="form-buttons">
           <button id="btn-eliminar" type="button" class="btn btn-danger">🗑️ Eliminar</button>
           <button id="btn-cancelar" type="button" class="btn btn-secondary">Cancelar</button>
@@ -9430,19 +9460,6 @@
           <div class="form-group">
             <label for="asig-modulo" class="form-label">Módulo</label>
             <select id="asig-modulo" class="form-select"></select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Turno</label>
-          <div style="display: flex; gap: 24px; padding: 8px 0;">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="radio" name="asig-turno" value="Diurno" checked />
-              <span>Diurno (08:30 - 18:25)</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="radio" name="asig-turno" value="Vespertino" />
-              <span>Vespertino (18:00 - 22:00)</span>
-            </label>
           </div>
         </div>
         <div class="asignacion-row">
@@ -9883,7 +9900,9 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    /* Modal styling — target modals used in this app (eliminados #assign-modal y #event-edit-modal duplicados) */
+    /* Modal styling — target modals used in this app */
+    #assign-modal,
+    #event-edit-modal,
     .legacy-conflict-modal,
     #auto-preview-modal,
     #acople-preview-modal,
@@ -9961,17 +9980,33 @@
       transform: translateY(-1px);
     }
 
-    /* Modal buttons (modals duplicados eliminados) */
+    /* Modal buttons */
+    #assign-modal button,
+    #event-edit-modal button,
     #auto-preview-modal button,
     #acople-preview-modal button {
       border-radius: 8px;
     }
 
+    #assign-modal button[type="submit"],
+    #event-edit-modal button[type="submit"],
     #auto-preview-modal #auto-preview-apply,
     #acople-preview-modal #acople-preview-apply {
       background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
       color: #fff;
       border: 1px solid rgba(5, 150, 105, 0.12);
+    }
+
+    #assign-modal button[type="button"],
+    #event-edit-modal #edit-cancel {
+      background: #fff;
+      color: var(--brand-orange);
+      border: 1px solid rgba(249, 115, 22, 0.12);
+    }
+
+    #assign-modal button:hover,
+    #event-edit-modal button:hover {
+      transform: translateY(-1px);
     }
 
 
