@@ -191,14 +191,155 @@
       gap: 18px;
     }
 
-    #data-output {
-      background: rgba(249, 250, 251, 0.85);
-      border: 1px dashed rgba(15, 23, 42, 0.12);
-      border-radius: 12px;
-      padding: 16px;
-      white-space: pre-wrap;
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 2147482000;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-backdrop[aria-hidden="true"] {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .modal-window {
+      width: min(640px, 100%);
+      max-height: 85vh;
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 25px 50px rgba(15, 23, 42, 0.3);
+      border: 1px solid rgba(15, 23, 42, 0.14);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0.01em;
+    }
+
+    .modal-header p {
+      margin: 4px 0 0;
       color: var(--muted);
-      min-height: 120px;
+      font-size: 14px;
+    }
+
+    .modal-close {
+      border: none;
+      background: rgba(15, 23, 42, 0.05);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--text-color);
+      transition: background 0.2s ease;
+    }
+
+    .modal-close:hover {
+      background: rgba(249, 115, 22, 0.18);
+      color: var(--brand-orange);
+    }
+
+    .modal-content {
+      overflow-y: auto;
+      max-height: calc(85vh - 150px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 18px 20px;
+      box-shadow: 0 16px 28px rgba(15, 23, 42, 0.12);
+    }
+
+    .modal-card h4 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px 16px;
+    }
+
+    .modal-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .modal-field span {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .modal-field strong {
+      font-size: 15px;
+      color: var(--text-color);
+    }
+
+    .modal-loader,
+    .empty-state {
+      border-radius: 16px;
+      border: 1px dashed rgba(15, 23, 42, 0.15);
+      padding: 20px;
+      background: rgba(249, 250, 251, 0.9);
+      text-align: center;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .modal-loader::before {
+      content: '';
+      display: block;
+      width: 32px;
+      height: 32px;
+      margin: 0 auto 10px;
+      border-radius: 50%;
+      border: 3px solid rgba(249, 115, 22, 0.25);
+      border-top-color: var(--brand-orange);
+      animation: modalSpin 0.8s linear infinite;
+    }
+
+    @keyframes modalSpin {
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     @media (max-width: 720px) {
@@ -223,8 +364,7 @@
 </head>
 
 <body>
-  <h1>Herramientas del Horario</h1>
-  <p class="muted">Este panel interactúa con el timegrid mediante BroadcastChannel.</p>
+  <h1>Herramientas</h1>
 
   <div class="section stack">
     <strong>Filtro de Carrera</strong>
@@ -267,12 +407,32 @@
       <button id="list-salas" class="secondary">Salas</button>
       <button id="refresh-events" class="secondary">Refrescar eventos</button>
     </div>
-    <pre id="data-output" class="muted" style="max-height:240px; overflow:auto"></pre>
   </div>
 
+  <div id="data-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-window" role="dialog" aria-modal="true" aria-labelledby="data-modal-title">
+      <div class="modal-header">
+        <div>
+          <h2 id="data-modal-title">Registros</h2>
+          <p id="data-modal-subtitle"></p>
+        </div>
+        <button type="button" class="modal-close" id="data-modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="modal-content" id="data-modal-content"></div>
+    </div>
+  </div>
+
+  <script src="assets/session-guard.js"></script>
   <script>
     const CHANNEL_NAME = 'ceduc-calendar';
     const channel = new BroadcastChannel(CHANNEL_NAME);
+
+    const modal = document.getElementById('data-modal');
+    const modalContent = document.getElementById('data-modal-content');
+    const modalTitle = document.getElementById('data-modal-title');
+    const modalSubtitle = document.getElementById('data-modal-subtitle');
+    const modalCloseBtn = document.getElementById('data-modal-close');
+    let bodyOverflowBeforeModal = '';
 
     const REMOTE_API_BASE = 'https://conexiahorario.onrender.com/api';
     const LOCAL_API_BASE = 'http://localhost:3001/api';
@@ -289,12 +449,187 @@
       try { return localStorage.getItem('conexia_admin_token') || null; } catch (_) { return null; }
     }
 
+    function isModalOpen() {
+      return modal.getAttribute('aria-hidden') === 'false';
+    }
+
+    function updateModalHeader(title, subtitle) {
+      modalTitle.textContent = title || 'Registros';
+      if (subtitle) {
+        modalSubtitle.textContent = subtitle;
+        modalSubtitle.style.display = '';
+      } else {
+        modalSubtitle.textContent = '';
+        modalSubtitle.style.display = 'none';
+      }
+    }
+
+    function setModalContent(node) {
+      modalContent.innerHTML = '';
+      if (!node) return;
+      if (Array.isArray(node)) {
+        node.forEach((child) => child && modalContent.appendChild(child));
+      } else {
+        modalContent.appendChild(node);
+      }
+    }
+
+    function openModal() {
+      if (isModalOpen()) return;
+      bodyOverflowBeforeModal = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      modal.setAttribute('aria-hidden', 'false');
+      if (modalCloseBtn && typeof modalCloseBtn.focus === 'function') {
+        try {
+          modalCloseBtn.focus({ preventScroll: true });
+        } catch (_) {
+          modalCloseBtn.focus();
+        }
+      }
+    }
+
+    function closeModal() {
+      if (!isModalOpen()) return;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = bodyOverflowBeforeModal;
+      setTimeout(() => {
+        if (!isModalOpen()) {
+          modalContent.innerHTML = '';
+        }
+      }, 200);
+    }
+
+    function renderEmptyState(message) {
+      const box = document.createElement('div');
+      box.className = 'empty-state';
+      box.textContent = message;
+      return box;
+    }
+
+    function showModalLoader(label) {
+      updateModalHeader(label, 'Consultando información…');
+      const loader = document.createElement('div');
+      loader.className = 'modal-loader';
+      loader.textContent = 'Cargando datos';
+      setModalContent(loader);
+      openModal();
+    }
+
+    function showModalError(label) {
+      updateModalHeader(label, 'No se pudo cargar la información');
+      setModalContent(renderEmptyState('Intenta nuevamente en unos segundos.'));
+      openModal();
+    }
+
+    function humanizeKey(key) {
+      return String(key || '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/^./, (char) => char.toUpperCase());
+    }
+
+    function formatValue(value) {
+      if (value === null || value === undefined || value === '') return '—';
+      if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+      if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
+      if (value instanceof Date) return value.toLocaleString('es-CL');
+      if (typeof value === 'object') {
+        try {
+          return JSON.stringify(value);
+        } catch (_) {
+          return '[objeto]';
+        }
+      }
+      return String(value);
+    }
+
+    function deriveTitle(item, index) {
+      if (!item || typeof item !== 'object') return `Registro ${index + 1}`;
+      const main = item.nombre || item.name || item.title || item.label || null;
+      const secondary = item.codigo || item.code || item.id || item._id || null;
+      if (main && secondary && String(main).trim() !== String(secondary).trim()) {
+        return `${main} · ${secondary}`;
+      }
+      return main || secondary || `Registro ${index + 1}`;
+    }
+
+    function buildCards(items) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'modal-cards';
+      const MAX_RECORDS = 40;
+      const MAX_FIELDS = 10;
+      const list = items.slice(0, MAX_RECORDS);
+      list.forEach((item, index) => {
+        const card = document.createElement('article');
+        card.className = 'modal-card';
+        const heading = document.createElement('h4');
+        heading.textContent = deriveTitle(item, index);
+        card.appendChild(heading);
+
+        if (item && typeof item === 'object') {
+          const entries = Object.entries(item).filter(([, value]) => value !== undefined && value !== null && value !== '');
+          if (entries.length) {
+            const fields = document.createElement('div');
+            fields.className = 'modal-fields';
+            entries.slice(0, MAX_FIELDS).forEach(([key, value]) => {
+              const field = document.createElement('div');
+              field.className = 'modal-field';
+              const label = document.createElement('span');
+              label.textContent = humanizeKey(key);
+              const val = document.createElement('strong');
+              val.textContent = formatValue(value);
+              field.append(label, val);
+              fields.appendChild(field);
+            });
+            card.appendChild(fields);
+          }
+        }
+
+        wrapper.appendChild(card);
+      });
+
+      if (items.length > list.length) {
+        const notice = renderEmptyState(`Mostrando ${list.length} de ${items.length} registros.`);
+        wrapper.appendChild(notice);
+      }
+
+      return wrapper;
+    }
+
+    function showModalData(label, data) {
+      const total = Array.isArray(data) ? data.length : 0;
+      const subtitle = total === 1 ? '1 resultado encontrado' : `${total} resultados encontrados`;
+      updateModalHeader(label, subtitle);
+      if (!total) {
+        setModalContent(renderEmptyState('No se encontraron registros para esta consulta.'));
+      } else {
+        setModalContent(buildCards(data));
+      }
+      openModal();
+    }
+
     async function authorizedFetch(url, options = {}) {
       const headers = Object.assign({}, options.headers || {}, { 'Content-Type': 'application/json' });
       const token = getStoredToken();
       if (token) headers['Authorization'] = 'Bearer ' + token;
       const opts = Object.assign({}, options, { headers });
       return fetch(url, opts);
+    }
+
+    async function fetchResourceAndShow(path, label) {
+      showModalLoader(label);
+      try {
+        const response = await authorizedFetch(API_BASE + path);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const records = Array.isArray(payload) ? payload : [];
+        showModalData(label, records);
+      } catch (err) {
+        console.error(label, err);
+        showModalError(label);
+      }
     }
 
     async function loadCarreras() {
@@ -319,24 +654,19 @@
       }
     }
 
-    async function listAndShow(url, label) {
-      const out = document.getElementById('data-output');
-      out.textContent = `${label}: cargando...`;
-      try {
-        const r = await authorizedFetch(API_BASE + url);
-        const data = r.ok ? await r.json() : [];
-        out.textContent = `${label} (${Array.isArray(data) ? data.length : 0}):\n` + JSON.stringify(data, null, 2);
-      } catch (err) {
-        out.textContent = `${label}: error`;
-        console.error(label, err);
-      }
-    }
-
-    document.getElementById('list-carreras').addEventListener('click', () => listAndShow('/carreras', 'Carreras'));
-    document.getElementById('list-docentes').addEventListener('click', () => listAndShow('/docentes', 'Docentes'));
-    document.getElementById('list-modulos').addEventListener('click', () => listAndShow('/modulos', 'Modulos'));
-    document.getElementById('list-salas').addEventListener('click', () => listAndShow('/salas', 'Salas'));
+    document.getElementById('list-carreras').addEventListener('click', () => fetchResourceAndShow('/carreras', 'Carreras'));
+    document.getElementById('list-docentes').addEventListener('click', () => fetchResourceAndShow('/docentes', 'Docentes'));
+    document.getElementById('list-modulos').addEventListener('click', () => fetchResourceAndShow('/modulos', 'Modulos'));
+    document.getElementById('list-salas').addEventListener('click', () => fetchResourceAndShow('/salas', 'Salas'));
     document.getElementById('refresh-events').addEventListener('click', () => channel.postMessage({ type: 'refresh-events' }));
+
+    modalCloseBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeModal();
+    });
 
     document.getElementById('apply-filter').addEventListener('click', () => {
       const carreraId = document.getElementById('carrera-select').value || '';

@@ -1262,19 +1262,23 @@
         }
       } catch(_) {}
     });
-          const cal = window.calendar || window.fcCalendar; if (!cal) return false;
-          const ev = cal.getEventById(eventId); if (!ev) return false;
-          try { if (window.releaseIndependentBlock) window.releaseIndependentBlock(ev); } catch(_) {}
-          ev.remove();
-          try {
-            await fetch('/api/events/' + encodeURIComponent(eventId), { method: 'DELETE' });
-          } catch(_) {}
-          return true;
-        ;
-      
+
+    window.deleteCalendarEvent = async function(eventId) {
+      const cal = window.calendar || window.fcCalendar;
+      if (!cal) return false;
+      const ev = cal.getEventById(eventId);
+      if (!ev) return false;
+      try { if (window.releaseIndependentBlock) window.releaseIndependentBlock(ev); } catch(_) {}
+      ev.remove();
+      try {
+        await fetch('/api/events/' + encodeURIComponent(eventId), { method: 'DELETE' });
+      } catch(_) {}
+      return true;
+    };
+  
     </script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.19/locales-all.global.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     // Mejorar el área de usuario tras cargar el DOM
@@ -4010,37 +4014,15 @@
         }
 
         function setupSidebarCollapseToggle() {
-          const STORAGE_KEY = 'sidebar_collapsed_v1';
           const toggleBtn = document.getElementById('sidebar-toggle');
-          const sidebar = document.getElementById('sidebar');
-          if (!toggleBtn || !sidebar) return;
+          if (!toggleBtn) return;
 
-          let storedValue = null;
-          try { storedValue = localStorage.getItem(STORAGE_KEY); } catch (_) { storedValue = null; }
-          const prefersCollapsed = window.matchMedia('(max-width: 980px)').matches;
-          let collapsed = storedValue === null ? prefersCollapsed : storedValue === 'true';
+          toggleBtn.setAttribute('aria-pressed', 'false');
+          toggleBtn.setAttribute('aria-label', 'Abrir vista lateral');
+          toggleBtn.title = 'Abrir vista lateral';
 
-          const applyState = (isCollapsed) => {
-            document.body.classList.toggle('sidebar-hidden', isCollapsed);
-            toggleBtn.setAttribute('aria-pressed', isCollapsed ? 'true' : 'false');
-            toggleBtn.setAttribute('aria-label', isCollapsed ? 'Mostrar panel lateral' : 'Ocultar panel lateral');
-            toggleBtn.title = isCollapsed ? 'Mostrar panel lateral' : 'Ocultar panel lateral';
-            sidebar.setAttribute('aria-hidden', isCollapsed ? 'true' : 'false');
-            if (isCollapsed) sidebar.setAttribute('inert', ''); else sidebar.removeAttribute('inert');
-            try { localStorage.setItem(STORAGE_KEY, isCollapsed ? 'true' : 'false'); } catch (_) { }
-            collapsed = isCollapsed;
-          };
-
-          applyState(collapsed);
           toggleBtn.addEventListener('click', () => {
-            applyState(!collapsed);
-          });
-
-          window.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && collapsed) {
-              applyState(false);
-              toggleBtn.focus();
-            }
+            window.location.href = 'sidebar.html';
           });
         }
 
@@ -4278,14 +4260,6 @@
           c.colorVespertino = palette.vespertino;
           const li = document.createElement('li');
           li.innerHTML = `${c.nombre} (ID: ${c.id})`;
-
-          const autoBtn = document.createElement('button'); autoBtn.textContent = 'Auto-organizar esta carrera'; autoBtn.style.marginLeft = '8px';
-          autoBtn.addEventListener('click', () => {
-            if (confirm('Ejecutar auto-organizador para la carrera "' + c.nombre + '"? Esto replicará los módulos de la semana actual en las semanas restantes del semestre.')) {
-              replicateCareerWeek(c.id);
-            }
-          });
-          li.appendChild(autoBtn);
 
           // palette editors
           const pal = document.createElement('div'); pal.style.marginTop = '6px';
@@ -8451,7 +8425,8 @@
 
     /* Layout */
     #app {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(var(--sidebar-min-width), var(--sidebar-width)) minmax(0, 1fr);
       gap: 18px;
       align-items: flex-start;
       transition: gap 0.25s ease;
@@ -8949,15 +8924,15 @@
 
     /* Responsive fixes for FullCalendar */
     #app {
-      flex-wrap: wrap;
-      align-items: stretch;
+      grid-template-columns: minmax(var(--sidebar-min-width), var(--sidebar-width)) minmax(0, 1fr);
+      align-items: flex-start;
     }
 
     /* allow calendar area to shrink/grow inside the flex row */
     #calendar-wrap {
-      flex: 1 1 calc(100% - var(--sidebar-width) - 24px);
       min-width: 0;
       min-height: 0;
+      width: 100%;
       display: flex;
       flex-direction: column;
     }
@@ -8973,8 +8948,9 @@
     }
 
     /* medium screens: calendar first, sidebar stacked below */
-    @media (max-width: 1280px) {
+    @media (max-width: 1100px) {
       #app {
+        display: flex;
         flex-direction: column;
         gap: 16px;
       }
@@ -8982,7 +8958,6 @@
       #calendar-wrap {
         order: -1;
         width: 100%;
-        flex: 1 1 auto;
       }
 
       #sidebar {
@@ -9011,8 +8986,9 @@
     /* small-screen layout: sidebar on top, calendar full width below */
     @media (max-width: 980px) {
       #app {
-        gap: 12px;
+        display: flex;
         flex-direction: column;
+        gap: 12px;
       }
 
       #sidebar {
@@ -9022,7 +8998,6 @@
       #calendar-wrap {
         order: -1;
         width: 100%;
-        flex: 1 1 auto;
       }
 
       #calendar {
@@ -9116,10 +9091,11 @@
 
     body.sidebar-hidden #app {
       gap: 0;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     body.sidebar-hidden #calendar-wrap {
-      flex: 1 1 100%;
+      width: 100%;
     }
 
     body.sidebar-hidden #sidebar {
@@ -9407,7 +9383,7 @@
 
   <div id="layout-shell" style="display:none;">
     <header id="sidebar-toggle-bar">
-      <button id="sidebar-toggle" type="button" aria-label="Ocultar panel lateral" aria-pressed="false">
+      <button id="sidebar-toggle" type="button" aria-label="Abrir vista lateral" aria-pressed="false">
         <span class="hamburger-icon" aria-hidden="true"></span>
       </button>
       <div class="topbar-spacer" aria-hidden="true"></div>
@@ -9429,12 +9405,12 @@
 
       <div class="sidebar-group" data-group="legend">
         <button class="sidebar-group-toggle" type="button" aria-expanded="true" aria-controls="sidebar-legend">
-          <span>Resumen y leyenda</span>
+          <span>Resumen</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>
         <div class="sidebar-group-content" id="sidebar-legend">
           <div id="career-legend">
-            <h4>Leyenda</h4>
+            
             <div id="legend-items"></div>
           </div>
         </div>
@@ -10267,6 +10243,7 @@
       function ensureCalendar() {
         const candidate = window.calendar || window.fcCalendar || null;
         if (!candidate) return null;
+        if (typeof candidate.getOption !== 'function') return null;
         if (calendarRef !== candidate || !candidate.__ceducHooksApplied) {
           bindCalendar(candidate);
         }

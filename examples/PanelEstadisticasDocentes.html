@@ -403,6 +403,7 @@
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-YcsIP0GLKlTnmpNqm7ujwZuMYhyoF30w8L3yXLX0nL9pOEHtkobaN6D+PfYZ7R6POjISiFDUFxIr05o2NqXSPA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script src="assets/session-guard.js"></script>
   <script>
     (function(){
       function downloadPdf(){
@@ -426,7 +427,34 @@
   </script>
   <script>
     (function() {
-      const DASHBOARD_ENDPOINT = '/api/dashboard/estadisticas';
+      const REMOTE_API_BASE = 'https://conexiahorario.onrender.com/api';
+      const LOCAL_API_BASE = 'http://localhost:3001/api';
+
+      function normalizeBase(url) {
+        if (!url) return '';
+        return url.endsWith('/') ? url.slice(0, -1) : url;
+      }
+
+      function detectApiBase() {
+        if (window.CONEXIA_API_BASE) {
+          return window.CONEXIA_API_BASE;
+        }
+        try {
+          const { origin = '', host = '' } = window.location || {};
+          if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
+            return LOCAL_API_BASE;
+          }
+          if (origin && origin.startsWith('http')) {
+            return origin.replace(/\/$/, '') + '/api';
+          }
+        } catch (_) {
+          /* noop */
+        }
+        return REMOTE_API_BASE;
+      }
+
+      const API_BASE = normalizeBase(detectApiBase() || REMOTE_API_BASE);
+      const DASHBOARD_ENDPOINT = `${API_BASE}/dashboard/estadisticas`;
       const numberFormatter = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
       const decimalFormatter = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
@@ -476,6 +504,14 @@
 
       let horasDocentesChart = null;
 
+      function getStoredToken() {
+        try {
+          return localStorage.getItem('conexia_admin_token') || null;
+        } catch (_) {
+          return null;
+        }
+      }
+
       function setText(id, value) {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
@@ -493,7 +529,7 @@
         return decimalFormatter.format(num);
       }
 
-      function ensureList(source, fallback) {
+      function ensureList(source, fallback = []) {
         return Array.isArray(source) && source.length ? source : fallback;
       }
 
@@ -680,37 +716,48 @@
         }
       }
 
-      function renderDashboard(payload) {
-        const resumen = payload.resumenGeneral && typeof payload.resumenGeneral.totalClases !== 'undefined'
-          ? payload.resumenGeneral
-          : fallbackData.resumenGeneral;
-        updateMetricCards(resumen);
+      function renderDashboard(payload, { allowFallback = false } = {}) {
+        const resumenSource = payload?.resumenGeneral;
+        const resumen = resumenSource && typeof resumenSource.totalClases !== 'undefined'
+          ? resumenSource
+          : allowFallback ? fallbackData.resumenGeneral : null;
+        if (resumen) {
+          updateMetricCards(resumen);
+        }
 
-        const horasDocentes = ensureList(payload.horasDocentes, fallbackData.horasDocentes);
+        const horasDocentes = ensureList(payload?.horasDocentes, allowFallback ? fallbackData.horasDocentes : []);
         renderHorasDocentesChart(horasDocentes);
 
-        renderSalasList('salas-mas-list', ensureList(payload.salasMasUsadas, fallbackData.salasMasUsadas));
-        renderSalasList('salas-menos-list', ensureList(payload.salasMenosUsadas, fallbackData.salasMenosUsadas));
-        renderTiemposMuertos(ensureList(payload.tiemposMuertos, fallbackData.tiemposMuertos));
+        renderSalasList('salas-mas-list', ensureList(payload?.salasMasUsadas, allowFallback ? fallbackData.salasMasUsadas : []));
+        renderSalasList('salas-menos-list', ensureList(payload?.salasMenosUsadas, allowFallback ? fallbackData.salasMenosUsadas : []));
+        renderTiemposMuertos(ensureList(payload?.tiemposMuertos, allowFallback ? fallbackData.tiemposMuertos : []));
 
-        const estadisticasHorario = payload.estadisticasHorario || fallbackData.estadisticasHorario;
-        renderCarreras(ensureList(estadisticasHorario?.carrerasMasCarga, fallbackData.estadisticasHorario.carrerasMasCarga));
+        const estadisticasHorario = payload?.estadisticasHorario || (allowFallback ? fallbackData.estadisticasHorario : null) || {};
+        renderCarreras(
+          ensureList(
+            estadisticasHorario?.carrerasMasCarga,
+            allowFallback ? fallbackData.estadisticasHorario.carrerasMasCarga : []
+          )
+        );
         updateInsights(estadisticasHorario);
       }
 
       async function fetchDashboard() {
         try {
-          const response = await fetch(DASHBOARD_ENDPOINT, { cache: 'no-cache' });
+          const headers = { 'Content-Type': 'application/json' };
+          const token = getStoredToken();
+          if (token) headers.Authorization = `Bearer ${token}`;
+          const response = await fetch(DASHBOARD_ENDPOINT, { cache: 'no-cache', headers });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const payload = await response.json();
           renderDashboard(payload || {});
         } catch (err) {
           console.warn('No se pudo cargar el dashboard desde el backend', err);
+          renderDashboard(fallbackData, { allowFallback: true });
         }
       }
 
       document.addEventListener('DOMContentLoaded', () => {
-        renderDashboard(fallbackData);
         fetchDashboard();
       });
     })();
