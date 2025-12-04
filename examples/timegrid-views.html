@@ -1511,9 +1511,18 @@
         try {
           // Carreras
           selCarrera.innerHTML = '';
+          const optCarreraVacia = document.createElement('option');
+          optCarreraVacia.value = '';
+          optCarreraVacia.textContent = '-- Selecciona una carrera --';
+          selCarrera.appendChild(optCarreraVacia);
           (window.carreras || []).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nombre; selCarrera.appendChild(o); });
+          
           // Modulos
           selModulo.innerHTML = '';
+          const optModuloVacio = document.createElement('option');
+          optModuloVacio.value = '';
+          optModuloVacio.textContent = '-- Selecciona un módulo --';
+          selModulo.appendChild(optModuloVacio);
           (window.modulos || []).forEach(m => {
             const codigo = m.codigoAsignatura || m.codigo || m.id;
             const o = document.createElement('option');
@@ -1521,8 +1530,13 @@
             o.textContent = `${codigo} - ${m.nombre}`;
             selModulo.appendChild(o);
           });
+          
           // Docentes
           selDocente.innerHTML = '';
+          const optDocenteVacio = document.createElement('option');
+          optDocenteVacio.value = '';
+          optDocenteVacio.textContent = '-- Selecciona un docente --';
+          selDocente.appendChild(optDocenteVacio);
           (window.docentes || []).filter(d => d.activo !== false).forEach(d => {
             const o = document.createElement('option');
             o.value = d.id;
@@ -1533,12 +1547,23 @@
             if (contratoHoras != null) o.dataset.contrato = contratoHoras;
             selDocente.appendChild(o);
           });
+          
           // Salas
           selSala.innerHTML = '';
+          const optSalaVacia = document.createElement('option');
+          optSalaVacia.value = '';
+          optSalaVacia.textContent = '(ninguna)';
+          selSala.appendChild(optSalaVacia);
           (window.salas || []).forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.nombre; selSala.appendChild(o); });
+          
           // Bloques
           selBloque.innerHTML = '';
+          const optBloqueVacio = document.createElement('option');
+          optBloqueVacio.value = '';
+          optBloqueVacio.textContent = '-- Selecciona un bloque --';
+          selBloque.appendChild(optBloqueVacio);
           (window.CEDUC_BLOQUES || []).forEach(b => { const o = document.createElement('option'); o.value = b.numero; o.textContent = `Bloque ${b.numero} (${b.inicio}-${b.fin})`; selBloque.appendChild(o); });
+          
           actualizarLeyendaDocente();
         } catch (e) { console.error('cargarOpciones asignación', e); }
       }
@@ -1655,17 +1680,41 @@
       }
 
       function precargarContexto(ctx) {
-        const hoy = new Date();
-        inputFecha.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-        if (ctx.carreraId) { selCarrera.value = ctx.carreraId; selCarrera.dispatchEvent(new Event('change')); }
+        // Establecer fecha - primero intentar con ctx.fecha, luego ctx.date, o fecha actual
+        if (ctx.fecha) {
+          inputFecha.value = ctx.fecha;
+        } else if (ctx.date) {
+          const d = new Date(ctx.date);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          inputFecha.value = `${yyyy}-${mm}-${dd}`;
+        } else {
+          const hoy = new Date();
+          inputFecha.value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+        }
+        
+        // Precargar carrera si viene en el contexto
+        if (ctx.carreraId) { 
+          selCarrera.value = ctx.carreraId; 
+          selCarrera.dispatchEvent(new Event('change')); 
+        }
+        
+        // Precargar módulo si viene en el contexto
         if (ctx.moduloId) {
           const modulo = (window.modulos || []).find(m => String(m.id) === String(ctx.moduloId));
-          if (modulo && !ctx.carreraId) { selCarrera.value = modulo.carreraId; selCarrera.dispatchEvent(new Event('change')); }
+          if (modulo && !ctx.carreraId) { 
+            selCarrera.value = modulo.carreraId; 
+            selCarrera.dispatchEvent(new Event('change')); 
+          }
           selModulo.value = ctx.moduloId;
         }
+        
+        // Precargar docente, sala y bloque si vienen
         if (ctx.docenteId) { selDocente.value = ctx.docenteId; }
         if (ctx.salaId) { selSala.value = ctx.salaId; }
         if (ctx.bloqueNumero) { selBloque.value = ctx.bloqueNumero; }
+        
         actualizarLeyendaDocente();
       }
 
@@ -1674,7 +1723,7 @@
         if (!selCarrera.value) errs.push('Carrera');
         if (!selModulo.value) errs.push('Módulo');
         if (!selDocente.value) errs.push('Docente');
-        if (!selSala.value) errs.push('Sala');
+        // Sala es opcional
         if (!inputFecha.value) errs.push('Fecha');
         if (!selBloque.value) errs.push('Bloque');
         const dur = parseInt(inputDuracion.value || '1', 10);
@@ -1695,7 +1744,13 @@
         const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}T${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}:00`;
         const modulo = (window.modulos || []).find(m => String(m.id) === String(selModulo.value));
         const carrera = (window.carreras || []).find(c => String(c.id) === String(selCarrera.value));
-        const color = modulo && modulo.color ? modulo.color : '#3788d8';
+        
+        // Usar color de la carrera en lugar del color del módulo
+        const color = carrera ? getColorForCarrera(carrera.id) : '#3788d8';
+        
+        // Calcular horas (cada bloque = 35min = 0.5833 horas)
+        const horas = durBloques * 0.5833;
+        
         const ev = {
           id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           title: modulo ? modulo.nombre : 'Módulo',
@@ -1707,7 +1762,16 @@
           extendedProps: {
             carreraId: carrera ? carrera.id : null,
             descripcion: txtDescripcion.value || '',
-            __meta: { moduloId: modulo ? modulo.id : null, docenteId: selDocente.value || null, salaId: selSala.value || null }
+            __meta: { 
+              moduloId: modulo ? modulo.id : null, 
+              docenteId: selDocente.value || null, 
+              salaId: selSala.value || null,
+              bloques: durBloques,
+              horas: horas,
+              bloqueInicio: bloqueNum,
+              fechaInicioIso: startDate.toISOString(),
+              fechaFinIso: endDate.toISOString()
+            }
           }
         };
         return ajustarEventoABloque(ev);
@@ -1816,6 +1880,56 @@
     const KEY_CALENDAR_STATE = 'conexia_calendar_state_v1';
     const SESSION_ROLES_KEY = 'conexia_admin_roles';
     const REMOTE_API_BASE = 'https://conexiahorario.onrender.com/api';
+    
+    // Paleta de colores para carreras - colores vibrantes y distinguibles
+    const CARRERA_COLORS = [
+      '#e74c3c', // Rojo
+      '#3498db', // Azul
+      '#2ecc71', // Verde
+      '#f39c12', // Naranja
+      '#9b59b6', // Púrpura
+      '#1abc9c', // Turquesa
+      '#e67e22', // Naranja oscuro
+      '#34495e', // Gris azulado
+      '#16a085', // Verde azulado
+      '#c0392b', // Rojo oscuro
+      '#27ae60', // Verde esmeralda
+      '#8e44ad', // Púrpura oscuro
+      '#2980b9', // Azul oscuro
+      '#f1c40f', // Amarillo
+      '#d35400', // Naranja quemado
+      '#7f8c8d', // Gris
+      '#e91e63', // Rosa
+      '#00bcd4', // Cian
+      '#ff5722', // Naranja profundo
+      '#607d8b'  // Azul gris
+    ];
+    
+    // Cache de colores por carrera
+    const carreraColorCache = {};
+    
+    // Función para obtener color por carrera
+    function getColorForCarrera(carreraId) {
+      if (!carreraId) return '#3788d8'; // Color por defecto
+      
+      // Si ya está en cache, retornar
+      if (carreraColorCache[carreraId]) {
+        return carreraColorCache[carreraId];
+      }
+      
+      // Buscar la carrera
+      const carrera = (window.carreras || []).find(c => String(c.id) === String(carreraId));
+      if (!carrera) return '#3788d8';
+      
+      // Asignar color basado en el índice de la carrera
+      const carreraIndex = (window.carreras || []).findIndex(c => String(c.id) === String(carreraId));
+      const color = CARRERA_COLORS[carreraIndex % CARRERA_COLORS.length];
+      
+      // Guardar en cache
+      carreraColorCache[carreraId] = color;
+      
+      return color;
+    }
     const LOCAL_API_BASE = 'http://localhost:3001/api';
     const API_BASE_OVERRIDE_KEY = 'conexia_api_base_override';
 
@@ -3095,7 +3209,10 @@
             }
             const modulo = getModulosList().find(m => String(m.id) === String(moduloId));
             const carrera = getCarrerasList().find(c => String(c.id) === String(carreraId));
-            const color = (modulo && modulo.color) || (carrera && carrera.color) || '#3788d8';
+            
+            // Usar color de la carrera
+            const color = carrera ? getColorForCarrera(carrera.id) : '#3788d8';
+            
             const blockCount = Math.max(1, Math.round(durationMinutes / BLOCK_MINUTES));
             const snappedRange = snapDateRange(baseStart, blockCount);
             const finalStart = snappedRange ? snappedRange.start : baseStart;
@@ -3322,12 +3439,28 @@
 
       // Persistencia con debounce
       let persistTimeout = null;
+      let validationTimeout = null;
+      let isDragging = false;
+      
       function debouncedPersistEvents() {
         if (persistTimeout) clearTimeout(persistTimeout);
         persistTimeout = setTimeout(() => {
-          persistEventsAndValidate();
+          save(KEY_EVENTS, storedEvents);
           console.log('Eventos persistidos (debounced)');
+          // Validar solo si no estamos arrastrando
+          if (!isDragging) {
+            debouncedValidation();
+          }
         }, 1000);
+      }
+      
+      function debouncedValidation() {
+        if (validationTimeout) clearTimeout(validationTimeout);
+        validationTimeout = setTimeout(() => {
+          if (!isDragging) {
+            runRealtimeValidation();
+          }
+        }, 500);
       }
 
       // Normalizadores de registros para los catálogos provenientes del API/localStorage
@@ -3630,10 +3763,32 @@
               try {
                 if (info && info.allDay) return;
                 let bloqueNumero = null;
-                try { bloqueNumero = calcularNumeroBloque(info.date); } catch (_) { /* ignore */ }
-                const ctx = { dateStr: info.dateStr, bloqueNumero };
+                let fechaStr = null;
+                
+                try { 
+                  bloqueNumero = calcularNumeroBloque(info.date); 
+                } catch (_) { /* ignore */ }
+                
+                // Extraer la fecha del clic
+                if (info.date) {
+                  const d = new Date(info.date);
+                  const yyyy = d.getFullYear();
+                  const mm = String(d.getMonth() + 1).padStart(2, '0');
+                  const dd = String(d.getDate()).padStart(2, '0');
+                  fechaStr = `${yyyy}-${mm}-${dd}`;
+                }
+                
+                const ctx = { 
+                  dateStr: info.dateStr, 
+                  bloqueNumero: bloqueNumero,
+                  fecha: fechaStr,
+                  date: info.date
+                };
+                
                 if (window.openManualAssignModal) {
                   window.openManualAssignModal(ctx);
+                } else {
+                  console.warn('openManualAssignModal no está definida');
                 }
               } catch (e) { console.error('dateClick -> abrir modal asignación', e); }
             },
@@ -3950,6 +4105,7 @@
             },
             eventDrop: async function (info) {
               try {
+                isDragging = false; // Asegurar que drag finaliza
                 const ev = info.event;
                 console.debug('eventDrop invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
 
@@ -4098,6 +4254,7 @@
             },
             eventResize: async function (info) {
               try {
+                isDragging = false; // Asegurar que resize finaliza
                 const ev = info.event;
                 console.debug('eventResize invoked, ev.id=', ev && ev.id, 'ev.title=', ev && ev.title);
 
@@ -4329,25 +4486,30 @@
           }
           // Mantener colores originales al agregar número de bloque
           function preservarColoresEvento(eventoOriginal, eventoConBloque) {
-            // Derivar color desde la carrera si el evento no trae colores propios
+            // Derivar color desde la carrera
             function colorDesdeCarrera(ev) {
               try {
                 const meta = (ev.extendedProps && ev.extendedProps.__meta) || {};
+                
+                // Primero intentar obtener carreraId directamente del evento
+                if (ev.extendedProps && ev.extendedProps.carreraId) {
+                  return getColorForCarrera(ev.extendedProps.carreraId);
+                }
+                
+                // Si no, buscar a través del módulo
                 const mod = (window.modulos || []).find(m => String(m.id) === String(meta.moduloId));
-                const carr = mod ? (window.carreras || []).find(c => String(c.id) === String(mod.carreraId)) : null;
-                const doc = (window.docentes || []).find(d => String(d.id) === String(meta.docenteId));
-                if (carr) {
-                  if (doc && doc.turno === 'Vespertino' && carr.colorVespertino) return carr.colorVespertino;
-                  if (carr.colorDiurno) return carr.colorDiurno;
-                  if (carr.color) return carr.color;
+                if (mod && mod.carreraId) {
+                  return getColorForCarrera(mod.carreraId);
                 }
               } catch (_) { }
-              return '#3788d8';
+              return '#3788d8'; // Color por defecto
             }
+            
             const derived = colorDesdeCarrera(eventoOriginal);
-            const bg = eventoOriginal.backgroundColor || derived;
-            const border = eventoOriginal.borderColor || bg;
+            const bg = derived; // Usar siempre el color de la carrera
+            const border = derived; // Borde del mismo color que el fondo
             const txt = eventoOriginal.textColor || '#ffffff';
+            
             return {
               ...eventoConBloque,
               backgroundColor: bg,
@@ -4866,18 +5028,31 @@
         const filterCarrera = document.getElementById('filter-carrera');
         if (filterCarrera) filterCarrera.innerHTML = '<option value="">-- Todas --</option>';
         carreras.forEach(c => {
-          const palette = getCareerPalette(c);
-          // sincronizar colores en el objeto carrera para que otras partes (leyenda, eventos) lo usen
-          c.colorDiurno = palette.diurno;
-          c.colorVespertino = palette.vespertino;
+          // Obtener color de la carrera desde nuestra función centralizada
+          const color = getColorForCarrera(c.id);
+          
           const li = document.createElement('li');
-          li.innerHTML = `${c.nombre} (ID: ${c.id})`;
-
-          // palette editors
-          const pal = document.createElement('div'); pal.style.marginTop = '6px';
-          pal.innerHTML = `Diurno: <input type="color" data-cid="${c.id}" class="pal-diurno" value="${c.colorDiurno}"> Vespertino: <input type="color" data-cid="${c.id}" class="pal-vespertino" value="${c.colorVespertino}">`;
-          li.appendChild(pal);
+          li.style.display = 'flex';
+          li.style.alignItems = 'center';
+          li.style.gap = '10px';
+          li.style.marginBottom = '8px';
+          
+          // Indicador visual de color
+          const colorIndicator = document.createElement('div');
+          colorIndicator.style.width = '20px';
+          colorIndicator.style.height = '20px';
+          colorIndicator.style.borderRadius = '4px';
+          colorIndicator.style.backgroundColor = color;
+          colorIndicator.style.border = '2px solid rgba(0,0,0,0.1)';
+          colorIndicator.style.flexShrink = '0';
+          
+          const textSpan = document.createElement('span');
+          textSpan.textContent = `${c.nombre} (ID: ${c.id})`;
+          
+          li.appendChild(colorIndicator);
+          li.appendChild(textSpan);
           listCarreras.appendChild(li);
+          
           if (selectCarreraForModulo) {
             const opt = document.createElement('option'); opt.value = c.id; opt.text = c.nombre; selectCarreraForModulo.appendChild(opt);
           }
@@ -4894,13 +5069,6 @@
           filterWeek.value = monday.toISOString().slice(0, 10);
         }
         // listeners
-        // palette inputs change handler (delegated)
-        document.querySelectorAll('.pal-diurno').forEach(inp => {
-          inp.addEventListener('change', function () { const cid = this.getAttribute('data-cid'); const c = carreras.find(x => x.id === cid); if (c) { c.colorDiurno = this.value; save(KEY_CARRERAS, carreras); refreshCalendarEvents(); } });
-        });
-        document.querySelectorAll('.pal-vespertino').forEach(inp => {
-          inp.addEventListener('change', function () { const cid = this.getAttribute('data-cid'); const c = carreras.find(x => x.id === cid); if (c) { c.colorVespertino = this.value; save(KEY_CARRERAS, carreras); refreshCalendarEvents(); } });
-        });
         if (filterCarrera) filterCarrera.addEventListener('change', () => refreshCalendarEvents());
         if (filterWeek) filterWeek.addEventListener('change', () => {
           const v = document.getElementById('filter-week').value; if (v && calendar) { calendar.gotoDate(v); }
@@ -5530,6 +5698,8 @@
       }
 
       function renderDocentes() {
+        if (!listDocentes) return;
+        syncGlobalCatalogs();
         listDocentes.innerHTML = '';
         const filtered = (docentes || []).filter(d => {
           const byState = (d.activo !== false ? docentesShowActive : docentesShowInactive);
@@ -6786,7 +6956,10 @@
       // Hook validations into calendar mutations: when events are added/changed in the data model, run checks and show messages
       function runRealtimeValidation() {
         try {
-          console.log('runRealtimeValidation: iniciando validación de', storedEvents.length, 'eventos');
+          // Early return si no hay eventos o estamos arrastrando
+          if (!storedEvents || storedEvents.length === 0 || isDragging) {
+            return;
+          }
 
           // check all docentes for over-contract
           const conflictsByDocente = new Map();
@@ -6872,10 +7045,7 @@
             }
           }
 
-          // Si llegamos aquí, no hay conflictos críticos
-          if (conflictsByDocente.size === 0 && conflictsBySala.size === 0) {
-            console.log('runRealtimeValidation: no se detectaron conflictos');
-          }
+          // Si llegamos aquí, no hay conflictos críticos (silenciar log para performance)
 
         } catch (err) {
           console.error('runRealtimeValidation error:', err);
@@ -6883,29 +7053,27 @@
         }
       }
 
-      // Attach to calendar lifecycle: when storedEvents changes we call runRealtimeValidation and refreshCalendarEvents
+      // Attach to calendar lifecycle: when storedEvents changes we call validation (debounced)
       const originalSaveEvents = save;
       function persistEventsAndValidate() {
+        // Guardar inmediatamente
         save(KEY_EVENTS, storedEvents);
-        runRealtimeValidation();
-        try {
-          if (calendar && typeof calendar.refetchEvents === 'function') {
-            // calendar.refetchEvents(); // Simplified: avoid redundant refetch
-          } else {
-            refreshCalendarEvents();
-          }
-        } catch (e) { try { refreshCalendarEvents(); } catch (err) { } }
-        // delayed retry to avoid render races after DnD/resizes
-        setTimeout(() => {
+        
+        // Validar solo si no estamos arrastrando (con debounce)
+        if (!isDragging) {
+          debouncedValidation();
+        }
+        
+        // Evitar refetch redundante durante drag
+        if (!isDragging) {
           try {
             if (calendar && typeof calendar.refetchEvents === 'function') {
-              // calendar.refetchEvents(); // Simplified: avoid redundant refetch
-              if (typeof calendar.render === 'function') calendar.render();
+              // Refetch solo al finalizar drag
             } else {
               refreshCalendarEvents();
             }
-          } catch (err) { console.error('delayed refresh error', err); }
-        }, 250);
+          } catch (e) { console.error('refresh error', e); }
+        }
       }
 
       // --- Auto-organizer (simple greedy scheduler) ---
@@ -11168,6 +11336,7 @@
         });
 
         if (typeof prev.eventDragStart !== 'function') cal.setOption('eventDragStart', function (info) {
+          isDragging = true; // Deshabilitar validación durante drag
           const placement = snapPlacement(new Date(info.event.start), eventDurationMinutes(info.event));
           if (placement.ok) highlightCell(cal, placement.start, info.view);
         });
@@ -11178,7 +11347,10 @@
         });
 
         if (typeof prev.eventDragStop !== 'function') cal.setOption('eventDragStop', function (info) {
+          isDragging = false; // Habilitar validación después de drag
           clearOverlay();
+          // Ejecutar validación al finalizar drag
+          debouncedValidation();
         });
 
         if (typeof prev.eventDrop !== 'function') cal.setOption('eventDrop', function (info) {
