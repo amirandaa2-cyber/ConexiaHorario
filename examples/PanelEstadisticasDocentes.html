@@ -252,7 +252,7 @@
       </div>
       <div class="hero-actions">
         <a class="ghost-btn" href="timegrid-views.html">⟵ Volver al calendario</a>
-        <button type="button" class="primary-btn" onclick="window.print()">🖨️ Exportar como PDF</button>
+        <button type="button" class="primary-btn" id="export-pdf-btn">🖨️ Exportar como PDF</button>
       </div>
     </header>
 
@@ -346,5 +346,27 @@
       Datos referenciales para exploración visual. Integra tus API o reportes reales conectando este panel al backend de Conexia.
     </footer>
   </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-YcsIP0GLKlTnmpNqm7ujwZuMYhyoF30w8L3yXLX0nL9pOEHtkobaN6D+PfYZ7R6POjISiFDUFxIr05o2NqXSPA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+    (function(){
+      function downloadPdf(){
+        const target = document.querySelector('.page-shell');
+        if (!window.html2pdf || !target) {
+          window.print();
+          return;
+        }
+        const opt = {
+          margin: 10,
+          filename: 'panel-estadisticas-docentes.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(target).save();
+      }
+      const btn = document.getElementById('export-pdf-btn');
+      if (btn) btn.addEventListener('click', downloadPdf);
+    })();
+  </script>
 </body>
 </html>

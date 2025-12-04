@@ -1252,7 +1252,6 @@
     // Mejorar el área de usuario tras cargar el DOM
     document.addEventListener('DOMContentLoaded', function() {
       try {
-        document.body.classList.add('sidebar-hidden');
         const openBtn = document.getElementById('open-sidebar-window');
         if (openBtn) {
           openBtn.addEventListener('click', function(){
@@ -1274,8 +1273,8 @@
         ;
       
     </script>
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.19/index.global.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.19/locales-all.global.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     // Mejorar el área de usuario tras cargar el DOM
@@ -10143,8 +10142,8 @@
       // Namespace unified to avoid global collisions
       try { window.CEDUC = window.CEDUC || {}; } catch(_) {}
       window.CEDUC.SnapOverlay = {
-        highlightCellForDate(api, date, view) { highlightCell(api, date, view); },
-        clearHighlight() { clearOverlay(); }
+        highlightCellForDate: function(api, date, view) { highlightCell(api, date, view); },
+        clearHighlight: function() { clearOverlay(); }
       };
 
       function colorFor(evt) {
@@ -10189,7 +10188,10 @@
       }
 
       function bindCalendar(cal) {
-        if (!cal) return null;
+        if (!cal || typeof cal.getOption !== 'function' || typeof cal.setOption !== 'function') {
+          console.warn('[CEDUC] Calendar instance missing expected FullCalendar APIs.');
+          return null;
+        }
         calendarRef = cal;
         if (cal.__ceducHooksApplied) {
           rebuildOccupancy(cal);
@@ -10277,7 +10279,9 @@
 
       function ensureCalendar() {
         const candidate = window.calendar || window.fcCalendar || null;
-        if (!candidate) return null;
+        if (!candidate || typeof candidate.getOption !== 'function' || typeof candidate.setOption !== 'function') {
+          return null;
+        }
         if (calendarRef !== candidate || !candidate.__ceducHooksApplied) {
           bindCalendar(candidate);
         }
