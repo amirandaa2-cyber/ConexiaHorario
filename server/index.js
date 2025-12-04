@@ -34,6 +34,7 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET || undefined) : null;
 const USE_DB_ONLY = /^(1|true)$/i.test(process.env.USE_DB_ONLY || '');
+const AUTO_ORGANIZE_ALLOW_PUBLIC = /^(1|true)$/i.test(process.env.AUTO_ORGANIZE_ALLOW_PUBLIC || '');
 const ALLOWED_ROLE_CODES = (process.env.ALLOWED_ROLE_CODES || 'admin,docente')
 	.split(',')
 	.map((code) => code.trim().toLowerCase())
@@ -573,14 +574,23 @@ if(dbReady){
 		app.use('/api/dashboard', dashboardRoutes);
 	}
 	// Auto-organize endpoint: assigns pending modules to eligible docentes
-	app.post('/api/auto-organizar', async (req, res) => {
+	async function handleAutoOrganizar(req, res) {
 		try {
 			const token = extractToken(req);
-			const session = await loadSessionFromToken(token, { requireAdmin: true });
-			if (!session) return res.status(401).json({ error: 'No autorizado' });
+			let session = null;
+			try {
+				session = await loadSessionFromToken(token, { requireAdmin: true });
+			} catch (authErr) {
+				console.warn('Auth check failed for auto-organizar:', authErr?.message || authErr);
+			}
+			if (!session && !AUTO_ORGANIZE_ALLOW_PUBLIC) {
+				return res.status(401).json({ error: 'No autorizado' });
+			}
 
-			const { carreraId, startDate, weeks = 1 } = req.body || {};
-			const carrera = String(carreraId || '').trim();
+			const { carreraId: bodyCarreraId, startDate: bodyStartDate, weeks: bodyWeeks } = req.body || {};
+			const { carreraId: queryCarreraId, startDate: queryStartDate, weeks: queryWeeks } = req.query || {};
+			const weeks = Number(bodyWeeks ?? queryWeeks ?? 1) || 1;
+			const carrera = String(bodyCarreraId ?? queryCarreraId ?? '').trim();
 			if (!carrera) return res.status(400).json({ error: 'carreraId requerido' });
 
 			const docentes = await getDocentesPorCarrera(carrera);
@@ -602,7 +612,7 @@ if(dbReady){
 			);
 
 			const assignments = [];
-			let baseStart = startDate ? new Date(startDate) : new Date();
+			let baseStart = (bodyStartDate || queryStartDate) ? new Date(bodyStartDate || queryStartDate) : new Date();
 			baseStart.setHours(8, 30, 0, 0);
 
 			for (const mod of modulosPend) {
@@ -630,11 +640,14 @@ if(dbReady){
 				baseStart = new Date(end.getTime() + 10 * 60000);
 			}
 
-			res.json({ assigned: assignments.length, assignments });
+			res.json({ assigned: assignments.length, assignments, weeks });
 		} catch (err) {
 			handleDbError(res, err);
 		}
-	});
+	}
+
+	app.post('/api/auto-organizar', handleAutoOrganizar);
+	app.get('/api/auto-organizar', handleAutoOrganizar);
 	app.post('/api/auth/login', async (req,res)=>{
 		const { identifier, password } = req.body || {};
 		const email = normalizeEmail(identifier);
