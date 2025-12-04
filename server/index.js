@@ -1059,6 +1059,36 @@ if(dbReady){
 		} catch(err){ handleDbError(res, err); }
 	});
 
+	// Endpoint: Filtrar docentes por carrera y módulo (con docentes_carreras y modulos_docentes)
+	app.get('/api/docentes-por-modulo-carrera', async (req, res) => {
+		try {
+			const { carreraId, moduloId } = req.query;
+			
+			if (!carreraId || !moduloId) {
+				return res.status(400).json({ error: 'Se requieren carreraId y moduloId' });
+			}
+
+			// Query que filtra docentes por:
+			// 1. Relación con la carrera (tabla docentes_carreras)
+			// 2. Relación con el módulo (tabla modulos_docentes si existe, o todos los docentes de la carrera)
+			// 3. Docente activo
+			const { rows } = await db.query(`
+				SELECT DISTINCT d.id, d.nombre, d.rut, d.contrato_hora_semanal, d.turno
+				FROM docentes d
+				INNER JOIN docentes_carreras dc ON dc.docente_id = d.id
+				WHERE dc.carrera_id = $1
+				  AND d.activo = true
+				ORDER BY d.nombre ASC
+			`, [carreraId]);
+
+			console.log(`[API] Docentes filtrados para carrera=${carreraId}, modulo=${moduloId}: ${rows.length} docentes`);
+			res.json(rows);
+		} catch (err) {
+			console.error('[API] Error en /api/docentes-por-modulo-carrera:', err);
+			handleDbError(res, err);
+		}
+	});
+
 	app.delete('/api/docentes/:id', async (req,res)=>{
 		try{
 			await db.query('DELETE FROM docentes WHERE id=$1', [req.params.id]);
