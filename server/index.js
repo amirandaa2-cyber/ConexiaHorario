@@ -685,14 +685,6 @@ if(dbReady){
 			}
 
 			res.json({ assigned: assignments.length, assignments, weeks });
-			// QA summary log for integration verification
-			console.log('[AUTO-ORGANIZAR][Resumen]', {
-				carrera,
-				weeks,
-				assigned: assignments.length,
-				first: assignments[0] || null,
-				last: assignments[assignments.length - 1] || null
-			});
 		} catch (err) {
 			handleDbError(res, err);
 		}
