@@ -1252,6 +1252,7 @@
     // Mejorar el área de usuario tras cargar el DOM
     document.addEventListener('DOMContentLoaded', function() {
       try {
+        document.body.classList.add('sidebar-hidden');
         const openBtn = document.getElementById('open-sidebar-window');
         if (openBtn) {
           openBtn.addEventListener('click', function(){
@@ -1262,29 +1263,19 @@
         }
       } catch(_) {}
     });
-
-    window.deleteCalendarEventById = async function(eventId) {
-      const cal = window.calendar || window.fcCalendar;
-      if (!cal) return false;
-      const ev = cal.getEventById(eventId);
-      if (!ev) return false;
-      try {
-        if (typeof window.releaseIndependentBlock === 'function') {
-          window.releaseIndependentBlock(ev);
-        }
-      } catch (_) {}
-      ev.remove();
-      try {
-        await fetch('/api/events/' + encodeURIComponent(eventId), { method: 'DELETE' });
-      } catch (_) {}
-      return true;
-    };
+          const cal = window.calendar || window.fcCalendar; if (!cal) return false;
+          const ev = cal.getEventById(eventId); if (!ev) return false;
+          try { if (window.releaseIndependentBlock) window.releaseIndependentBlock(ev); } catch(_) {}
+          ev.remove();
+          try {
+            await fetch('/api/events/' + encodeURIComponent(eventId), { method: 'DELETE' });
+          } catch(_) {}
+          return true;
+        ;
       
     </script>
-  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.19/index.global.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.19/locales-all.global.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@6.1.19/index.global.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/interaction@6.1.19/index.global.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/locales-all.global.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     // Mejorar el área de usuario tras cargar el DOM
@@ -2981,16 +2972,8 @@
             }
           } catch (err) { console.warn('No se pudo leer estado de calendario guardado', err); }
 
-          // Detectar plugins disponibles para habilitar vistas y drag & drop solo si cargaron correctamente
-          const calendarPlugins = [];
-          if (window.FullCalendar) {
-            if (window.FullCalendar.TimeGrid) calendarPlugins.push(window.FullCalendar.TimeGrid);
-            if (window.FullCalendar.Interaction) calendarPlugins.push(window.FullCalendar.Interaction);
-          }
-
           // Revertimos a la configuración original del calendario (sin sistema de 22 bloques)
           calendar = new FullCalendar.Calendar(calendarEl, {
-            plugins: calendarPlugins.length ? calendarPlugins : undefined,
             locale: 'es',
             initialDate: _initialDate,
             initialView: _initialView,
@@ -3056,6 +3039,7 @@
             // Etiquetas en cada inicio de bloque (08:30, 09:05, 09:40, ...)
             slotLabelInterval: '00:35:00',
             slotLabelFormat: { hour: '2-digit', minute: '2-digit' },
+            slotHeight: 60,
             dayMaxEvents: false,
             eventTimeFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
             dateClick: function(info) {
@@ -4461,11 +4445,6 @@
           updateFilterUI();
         } catch (e) { console.error('filter wiring', e); }
         relocateCarreraFilterToToolbar();
-        try {
-          document.dispatchEvent(new CustomEvent('ceduc:carreras-sync', { detail: { total: carreras.length } }));
-        } catch (eventErr) {
-          console.warn('No se pudo notificar ceduc:carreras-sync', eventErr);
-        }
       }
 
       function renderModulos() {
@@ -10159,8 +10138,8 @@
       // Namespace unified to avoid global collisions
       try { window.CEDUC = window.CEDUC || {}; } catch(_) {}
       window.CEDUC.SnapOverlay = {
-        highlightCellForDate: function(api, date, view) { highlightCell(api, date, view); },
-        clearHighlight: function() { clearOverlay(); }
+        highlightCellForDate(api, date, view) { highlightCell(api, date, view); },
+        clearHighlight() { clearOverlay(); }
       };
 
       function colorFor(evt) {
@@ -10205,10 +10184,7 @@
       }
 
       function bindCalendar(cal) {
-        if (!cal || typeof cal.getOption !== 'function' || typeof cal.setOption !== 'function') {
-          console.warn('[CEDUC] Calendar instance missing expected FullCalendar APIs.');
-          return null;
-        }
+        if (!cal) return null;
         calendarRef = cal;
         if (cal.__ceducHooksApplied) {
           rebuildOccupancy(cal);
@@ -10296,9 +10272,7 @@
 
       function ensureCalendar() {
         const candidate = window.calendar || window.fcCalendar || null;
-        if (!candidate || typeof candidate.getOption !== 'function' || typeof candidate.setOption !== 'function') {
-          return null;
-        }
+        if (!candidate) return null;
         if (calendarRef !== candidate || !candidate.__ceducHooksApplied) {
           bindCalendar(candidate);
         }
@@ -10441,146 +10415,141 @@
       bootstrapCalendarBinding();
       ensureCalendar();
 
-      // Carrera filter: leverage carrera asociada para mostrar/ocultar bloques sin romper lógica previa
+      // Carrera filter: inject UI and bind filtering by extendedProps.carreraId
       (function setupCarreraFilter(){
-        const diacriticRegex = /[\u0300-\u036f]/g;
-        const state = { value: '' };
-
-        function normalizeText(value){
-          return String(value || '')
-            .normalize('NFD')
-            .replace(diacriticRegex, '')
-            .trim()
-            .toLowerCase();
-        }
-
-        function safeList(globalName){
-          try {
-            const collection = window[globalName];
-            return Array.isArray(collection) ? collection : [];
-          } catch (_) {
-            return [];
-          }
-        }
-
-        function findModuloById(id){
-          if (id == null) return null;
-          return safeList('modulos').find(m => String(m.id) === String(id)) || null;
-        }
-
-        function findCarreraById(id){
-          if (id == null) return null;
-          return safeList('carreras').find(c => String(c.id) === String(id)) || null;
-        }
-
-        function extractCarreraInfo(event){
-          const props = (event && event.extendedProps) || {};
-          const meta = props.__meta || {};
-          let carreraId = props.carreraId ?? props.carrera ?? meta.carreraId ?? null;
-          let carreraLabel = props.carreraNombre ?? props.carrera_name ?? props.carreraLabel ?? null;
-
-          if (!carreraId && meta.moduloId != null) {
-            const modulo = findModuloById(meta.moduloId);
-            if (modulo) {
-              carreraId = modulo.carreraId ?? carreraId;
-              carreraLabel = carreraLabel || modulo.carreraNombre || modulo.nombre || null;
-            }
-          }
-
-          if (carreraId && !carreraLabel) {
-            const carrera = findCarreraById(carreraId);
-            if (carrera) {
-              carreraLabel = carrera.nombre || carrera.descripcion || carrera.id;
-            }
-          }
-
-          if (!carreraLabel && carreraId) {
-            carreraLabel = carreraId;
-          }
-
-          return {
-            id: carreraId != null ? String(carreraId) : '',
-            label: carreraLabel != null ? String(carreraLabel) : ''
-          };
-        }
-
-        function applyFilter(value){
-          state.value = value || '';
-          const calendar = ensureCalendar();
-          if (!calendar) return;
-          const target = normalizeText(state.value);
-          calendar.getEvents().forEach(ev => {
-            const info = extractCarreraInfo(ev);
-            const eventId = normalizeText(info.id);
-            const eventLabel = normalizeText(info.label);
-            const match = !target || eventId === target || (!eventId && eventLabel === target);
-            ev.setProp('display', match ? 'auto' : 'none');
-          });
-        }
-
-        function hookCalendar(calendar){
-          const cal = calendar || ensureCalendar();
-          if (!cal || cal.__carreraFilterHooked) return;
-          cal.__carreraFilterHooked = true;
-          ['eventAdd', 'eventChange', 'eventRemove', 'eventsSet'].forEach(optionName => {
-            const previous = cal.getOption(optionName);
-            cal.setOption(optionName, function(arg){
-              let result;
-              if (typeof previous === 'function') {
-                result = previous(arg);
-              }
-              const refresh = () => {
-                try {
-                  applyFilter(state.value);
-                } catch (err) {
-                  console.warn('No se pudo actualizar el filtro de carreras', err);
-                }
-              };
-              if (result && typeof result.then === 'function') {
-                result.finally(refresh);
-              } else {
-                refresh();
-              }
-              return result;
-            });
-          });
-        }
-
-        function attachToSelect(){
-          const select = document.getElementById('filter-carrera');
-          if (!select) {
-            setTimeout(attachToSelect, 400);
-            return;
-          }
-          if (!select.classList.contains('toolbar-filter-select')) {
-            select.classList.add('toolbar-filter-select');
-          }
-          if (!select.__carreraFilterEnhanced) {
-            select.__carreraFilterEnhanced = true;
-            select.addEventListener('change', () => {
-              applyFilter(select.value);
-            });
-          }
-          applyFilter(select.value);
-        }
-
-        document.addEventListener('ceduc:carreras-sync', () => {
-          const select = document.getElementById('filter-carrera');
-          if (select) {
-            applyFilter(select.value);
-          }
-        });
-
-        attachToSelect();
-        (function waitForCalendar(){
+        function getToolbarCenter(){
           const cal = ensureCalendar();
-          if (!cal) {
-            setTimeout(waitForCalendar, 400);
-            return;
+          if (!cal || !cal.el) return null;
+          return cal.el.querySelector('.fc-header-toolbar .fc-toolbar-center');
+        }
+
+        function normalizeId(val){
+          return String(val || '').trim().toLowerCase();
+        }
+
+        function normalizeName(val){
+          return String(val || '').trim().toLowerCase();
+        }
+
+        function carreraLabelFromEvent(ev){
+          const props = ev.extendedProps || {};
+          const id = props.carreraId || props.carrera || null;
+          const name = props.carreraNombre || props.carrera_name || props.carreraLabel || null;
+          return name || id || '';
+        }
+
+        function collectCarreras(){
+          const cal = ensureCalendar();
+          if (!cal) return [];
+          const byKey = new Map();
+          cal.getEvents().forEach(ev => {
+            const props = ev.extendedProps || {};
+            const id = normalizeId(props.carreraId || props.carrera);
+            const name = normalizeName(props.carreraNombre || props.carrera_name || props.carreraLabel);
+            if (id || name) {
+              const key = id || name;
+              if (!byKey.has(key)) byKey.set(key, { id, name, label: (props.carreraNombre || props.carrera_name || props.carreraLabel || props.carrera || props.carreraId || '').toString() });
+            }
+          });
+          return Array.from(byKey.values()).sort((a,b) => a.label.localeCompare(b.label));
+        }
+
+        function renderFilter(){
+          const center = getToolbarCenter();
+          if (!center) return;
+          // Avoid duplicating filter
+          if (center.querySelector('.toolbar-filter-carrera')) return;
+          const wrap = document.createElement('div');
+          wrap.className = 'toolbar-filter-carrera';
+
+          const select = document.createElement('select');
+          select.className = 'toolbar-filter-select';
+          select.setAttribute('aria-label', 'Filtrar por carrera');
+
+          const optAll = document.createElement('option');
+          optAll.value = '';
+          optAll.textContent = '-- Todas --';
+          select.appendChild(optAll);
+
+          collectCarreras().forEach(entry => {
+            const opt = document.createElement('option');
+            opt.value = entry.id || entry.name || entry.label;
+            opt.textContent = (entry.label || entry.name || entry.id).toUpperCase();
+            select.appendChild(opt);
+          });
+
+          const clearBtn = document.createElement('button');
+          clearBtn.type = 'button';
+          clearBtn.className = 'toolbar-filter-clear is-hidden fc-button';
+          clearBtn.textContent = 'Limpiar';
+
+          const status = document.createElement('span');
+          status.className = 'toolbar-filter-active';
+          status.textContent = 'Mostrando todos los horarios';
+
+          wrap.appendChild(select);
+          wrap.appendChild(clearBtn);
+          wrap.appendChild(status);
+          center.appendChild(wrap);
+
+          function applyFilter(id){
+            const cal = ensureCalendar();
+            if (!cal) return;
+            const normalized = (id || '').trim();
+            const showAll = normalized === '';
+            cal.getEvents().forEach(ev => {
+              const props = ev.extendedProps || {};
+              const evId = normalizeId(props.carreraId || props.carrera || '');
+              const evName = normalizeName(props.carreraNombre || props.carrera_name || props.carreraLabel || '');
+              const targetId = normalizeId(normalized);
+              const targetName = normalizeName(normalized);
+              const match = showAll ? true : (evId && evId === targetId) || (evName && evName === targetName) || (normalizeName(carreraLabelFromEvent(ev)) === targetName);
+              // Toggle visibility without removing events
+              ev.setProp('display', match ? 'auto' : 'none');
+            });
+            if (showAll) {
+              status.textContent = 'Mostrando todos los horarios';
+              clearBtn.classList.add('is-hidden');
+            } else {
+              status.textContent = 'Filtrando por carrera: ' + normalized.toUpperCase();
+              clearBtn.classList.remove('is-hidden');
+            }
           }
-          hookCalendar(cal);
-          const select = document.getElementById('filter-carrera');
-          if (select) applyFilter(select.value);
+
+          select.addEventListener('change', function(){
+            applyFilter(this.value);
+          });
+          clearBtn.addEventListener('click', function(){
+            select.value = '';
+            applyFilter('');
+          });
+
+          // Rebuild options when events change (e.g., load async)
+          const cal = ensureCalendar();
+          if (cal) {
+            cal.setOption('eventAdd', function(info){
+              const existingLabels = Array.from(select.options).map(o => o.textContent.toLowerCase());
+              const label = carreraLabelFromEvent(info.event);
+              if (label) {
+                const normalizedLabel = label.toString().trim().toLowerCase();
+                if (!existingLabels.includes(normalizedLabel)) {
+                  const opt = document.createElement('option');
+                  opt.value = label;
+                  opt.textContent = label.toUpperCase();
+                  select.appendChild(opt);
+                }
+              }
+            });
+            cal.setOption('eventRemove', function(){ /* no-op for now */ });
+          }
+        }
+
+        // Try rendering filter after calendar is ready
+        let tries = 0;
+        (function waitToolbar(){
+          const center = getToolbarCenter();
+          if (center) { renderFilter(); return; }
+          if (tries++ < 20) setTimeout(waitToolbar, 300);
         })();
       })();
     })();
