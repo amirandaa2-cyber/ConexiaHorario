@@ -1,19 +1,13 @@
 {
-  "name": "conexia-server",
+  "name": "fullcalendar-examples-local",
   "version": "0.0.0",
   "private": true,
-  "main": "index.js",
+  "description": "Minimal package.json to serve FullCalendar examples locally",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "serve": "http-server ./examples -p 8000",
+    "serve:py": "python -m http.server 8000"
   },
-  "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "body-parser": "^1.20.2",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "google-auth-library": "^9.15.1",
-    "pg": "^8.16.3",
-    "uuid": "^13.0.0"
+  "devDependencies": {
+    "http-server": "^14.1.1"
   }
 }
