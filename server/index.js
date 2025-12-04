@@ -86,10 +86,10 @@ async function asignarEvento({ moduloId, docenteId, salaId, start, end }) {
 	const carreraId = titleRow.rows[0]?.carrera_id ? String(titleRow.rows[0].carrera_id) : null;
 	const extendedProps = mergeMetaIntoExtendedProps({}, { moduloId, docenteId, salaId, carreraId });
 	await db.query(
-		`INSERT INTO events (id, title, start, "end", modulo_id, docente_id, sala_id, extendedProps)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`INSERT INTO events (id, title, start, "end", modulo_id, docente_id, sala_id, carrera_id, extendedProps)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 ON CONFLICT (title, start, "end") DO NOTHING`,
-		[id, title, start, end, moduloId, docenteId, salaId, JSON.stringify(extendedProps)]
+		[id, title, start, end, moduloId, docenteId, salaId, carreraId, JSON.stringify(extendedProps)]
 	);
 	return { id };
 }
@@ -577,9 +577,12 @@ function mapEventRow(row) {
 		docenteId: row.docente_id || null,
 		salaId: row.sala_id || null,
 		carreraId:
-			row.modulo_carrera !== null && row.modulo_carrera !== undefined
-				? String(row.modulo_carrera)
-				: baseProps.carreraId ?? existingMeta.carreraId ?? null,
+			// PRIORIDAD 1: carrera_id directo de events
+			(row.carrera_id !== null && row.carrera_id !== undefined) ? String(row.carrera_id)
+			// PRIORIDAD 2: carrera_id desde modulo
+			: (row.modulo_carrera !== null && row.modulo_carrera !== undefined) ? String(row.modulo_carrera)
+			// PRIORIDAD 3: desde extendedProps
+			: baseProps.carreraId ?? existingMeta.carreraId ?? null,
 		carreraNombre: row.carrera_nombre || baseProps.carreraNombre || existingMeta.carreraNombre || null,
 		carreraCodigo: row.carrera_codigo || baseProps.carreraCodigo || existingMeta.carreraCodigo || null
 	};
@@ -1405,13 +1408,14 @@ if(dbReady){
 				       e.modulo_id,
 				       e.docente_id,
 				       e.sala_id,
+				       e.carrera_id,
 				       m.carrera_id AS modulo_carrera,
 				       c.nombre AS carrera_nombre,
 				       c.codigo AS carrera_codigo,
 				       COALESCE(e.extendedProps, '{}'::jsonb) AS "extendedProps"
 		  FROM events e
 		  LEFT JOIN modulos m ON m.id = e.modulo_id
-		  LEFT JOIN carreras c ON c.id = m.carrera_id
+		  LEFT JOIN carreras c ON COALESCE(e.carrera_id, m.carrera_id) = c.id
 		 ORDER BY e.start ASC`);
 			res.json(rows.map(mapEventRow));
 		}catch(err){ handleDbError(res, err); }
@@ -1440,8 +1444,8 @@ if(dbReady){
 				previousEvent = prevResult.rows[0] || null;
 			}
 			const upsertResult = await db.query(
-				`INSERT INTO events (id,title,start,"end",modulo_id,docente_id,sala_id,extendedProps)
-				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+				`INSERT INTO events (id,title,start,"end",modulo_id,docente_id,sala_id,carrera_id,extendedProps)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 				 ON CONFLICT (id) DO UPDATE
 				 SET title=EXCLUDED.title,
 			     start=EXCLUDED.start,
@@ -1449,10 +1453,11 @@ if(dbReady){
 			     modulo_id=EXCLUDED.modulo_id,
 			     docente_id=EXCLUDED.docente_id,
 			     sala_id=EXCLUDED.sala_id,
+			     carrera_id=EXCLUDED.carrera_id,
 		     extendedProps=EXCLUDED.extendedProps,
 		     updated_at=NOW()
 		     RETURNING id, docente_id, start`,
-				[id, payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedPropsJson]
+				[id, payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, linking.carreraId, extendedPropsJson]
 			);
 			const savedEvent = upsertResult.rows[0] || null;
 			await refreshDocenteSemanaHoras([
@@ -1475,8 +1480,8 @@ if(dbReady){
 			}
 			const previousEvent = existingResult.rows[0];
 			const updatedResult = await db.query(
-				'UPDATE events SET title=$1, start=$2, "end"=$3, modulo_id=$4, docente_id=$5, sala_id=$6, extendedProps=$7, updated_at=NOW() WHERE id=$8 RETURNING id, docente_id, start',
-				[payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, extendedPropsJson, req.params.id]
+				'UPDATE events SET title=$1, start=$2, "end"=$3, modulo_id=$4, docente_id=$5, sala_id=$6, carrera_id=$7, extendedProps=$8, updated_at=NOW() WHERE id=$9 RETURNING id, docente_id, start',
+				[payload.title, payload.start, payload.end, linking.moduloId, linking.docenteId, linking.salaId, linking.carreraId, extendedPropsJson, req.params.id]
 			);
 			const updatedEvent = updatedResult.rows[0] || null;
 			await refreshDocenteSemanaHoras([
