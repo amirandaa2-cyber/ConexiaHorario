@@ -50,9 +50,13 @@
       z-index: -1;
     }
 
-    body > * {
+    body > *:not(#data-modal) {
       width: min(680px, 100%);
       max-width: 100%;
+    }
+
+    #data-modal {
+      width: 100%;
     }
 
     h1 {

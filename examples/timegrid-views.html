@@ -7,6 +7,28 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap" rel="stylesheet">
   <style>
+    /* Layout: sidebar + schedule using Flexbox */
+    .main-layout {
+      display: flex;
+      height: 100vh;
+      width: 100%;
+      overflow: hidden;
+    }
+    .sidebar {
+      flex: 0 0 250px;
+      width: 250px;
+      min-width: 250px;
+      height: 100%;
+      overflow-y: auto;
+      box-sizing: border-box;
+    }
+    .schedule-container {
+      flex: 1 1 auto;
+      min-width: 0;
+      height: 100%;
+      overflow: auto;
+      box-sizing: border-box;
+    }
     /* Make custom dialog modals vertically scrollable when content exceeds viewport */
     [role="dialog"] {
       max-height: calc(100vh - 40px) !important;
@@ -3480,14 +3502,22 @@
 
                 const idx = storedEvents.findIndex(se => se.id === ev.id);
                 if (idx !== -1) {
-                  // Actualizar manteniendo todos los metadatos originales
+                  const incomingMeta = (ev.extendedProps && ev.extendedProps.__meta)
+                    ? JSON.parse(JSON.stringify(ev.extendedProps.__meta))
+                    : null;
+                  const prevExtendedProps = storedEvents[idx].extendedProps || {};
                   storedEvents[idx] = {
                     ...storedEvents[idx],
                     start: startIso,
-                    end: endIso
+                    end: endIso,
+                    extendedProps: {
+                      ...prevExtendedProps,
+                      __meta: incomingMeta || prevExtendedProps.__meta || {}
+                    }
                   };
-                  // ensureEventBlockMeta eliminado
-                  ev.setExtendedProp('__meta', storedEvents[idx].extendedProps.__meta);
+                  if (storedEvents[idx].extendedProps.__meta) {
+                    ev.setExtendedProp('__meta', storedEvents[idx].extendedProps.__meta);
+                  }
                   persistEventsAndValidate();
                   console.debug('Event updated in storedEvents:', storedEvents[idx]);
                 } else {
@@ -3622,9 +3652,13 @@
 
                 const idx = storedEvents.findIndex(se => se.id === ev.id);
                 if (idx !== -1) {
+                  const incomingMeta = (ev.extendedProps && ev.extendedProps.__meta)
+                    ? JSON.parse(JSON.stringify(ev.extendedProps.__meta))
+                    : null;
                   storedEvents[idx].start = startIso;
                   storedEvents[idx].end = endIso;
-                  // ensureEventBlockMeta eliminado
+                  storedEvents[idx].extendedProps = storedEvents[idx].extendedProps || {};
+                  storedEvents[idx].extendedProps.__meta = incomingMeta || storedEvents[idx].extendedProps.__meta || {};
                   ev.setExtendedProp('__meta', storedEvents[idx].extendedProps.__meta);
                   persistEventsAndValidate();
                   console.log('Evento redimensionado exitosamente:', storedEvents[idx].title);
@@ -9242,22 +9276,23 @@
 
     /* Botones del calendario */
     .fc .fc-button-primary {
-      background: linear-gradient(135deg, #f97316 0%, #ff9f43 100%) !important;
+      background: #f97316 !important;
       border-color: #f97316 !important;
-      box-shadow: 0 2px 4px rgba(249, 115, 22, 0.2);
+      box-shadow: none !important;
     }
 
     .fc .fc-button-primary:hover {
-      background: linear-gradient(135deg, #ff9f43 0%, #f97316 100%) !important;
+      background: #ff9f43 !important;
       border-color: #ff9f43 !important;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+      transform: none !important;
+      box-shadow: none !important;
     }
 
     .fc .fc-button-primary:not(:disabled).fc-button-active,
     .fc .fc-button-primary:not(:disabled):active {
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+      background: #10b981 !important;
       border-color: #059669 !important;
+      box-shadow: none !important;
     }
 
     /* Cabecera del calendario */
@@ -9389,8 +9424,8 @@
       <div class="topbar-spacer" aria-hidden="true"></div>
     </header>
 
-    <div id="app">
-    <div id="sidebar">
+    <div id="app" class="main-layout">
+    <div id="sidebar" class="sidebar">
       <div class="sidebar-brand">
           <div class="header-logo-container">
             <picture>
@@ -9616,7 +9651,7 @@
       <div id="sidebar-resize-handle" aria-hidden="true"></div>
       </div>
 
-    <div id="calendar-wrap">
+    <div id="calendar-wrap" class="schedule-container">
       <div id="calendar"></div>
     </div>
   </div>
